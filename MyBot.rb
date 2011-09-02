@@ -132,7 +132,7 @@ def default_move ant
 	# Find a close neighbour and move to him
 	distance = closest_enemy ant, ant.ai.my_ants 
 	unless distance.nil?
-		if ( distance[0].abs + distance[1].abs) < 20
+		if ( distance[0].abs + distance[1].abs) < 40
 			dir = move_distance ant.square, distance
 			move ant, dir
 
