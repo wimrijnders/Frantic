@@ -22,16 +22,54 @@ def closest_food ant, food
 end
 
 def default_move ant
+	moved = false
+
 	# try to go north, if possible; otherwise try east, south, west.
 	[:N, :E, :S, :W].each do |dir|
 		if ant.square.neighbor(dir).passable?
 			ant.order dir
+			moved = true
 			break
 		end
 	end
+
+	unless moved
+		ant.stay
+	end
 end
 
+def get_food ant, food
+	dir = nil
+
+	closest = closest_food ant, food
+	return nil unless closest
+
+	rdif = closest[0] - ant.row
+	cdif = closest[1] - ant.col
+
+	if rdif.abs > cdif.abs
+		if rdif > 0
+			dir = :S
+		else
+			dir = :N
+		end
+	else
+		if cdif > 0
+			dir = :E
+		else
+			dir = :W
+		end
+	end
+
+	dir
+
+end
+
+
+
+#
 # main routine
+#
 
 ai=AI.new
 
@@ -43,34 +81,18 @@ ai.run do |ai|
 	# your turn code here
 	
 	ai.my_ants.each do |ant|
-		closest = closest_food ant, ai.food
+		next if ant.evading
 
-		if closest
-			rdif = closest[0] - ant.row
-			cdif = closest[1] - ant.col
+		dir = get_food ant, ai.food
 
-			if rdif.abs > cdif.abs
-				if rdif > 0
-					dir = :S
-				else
-					dir = :N
-				end
-			else
-				if cdif > 0
-					dir = :E
-				else
-					dir = :W
-				end
-			end
-
+		unless dir.nil?
 			if ant.square.neighbor(dir).passable?
 				ant.order dir
 			else
-				# given square is occupied. Use original-based code to go somewhere else.	
-				default_move ant
+				ant.evade dir
 			end
 		else
-			# No closest; just do something
+			# No food close by; just do something
 			default_move ant
 		end
 	end

@@ -2,6 +2,42 @@
 # by Matma Rex (matma.rex@gmail.com)
 # Released under CC-BY 3.0 license
 
+class Logger
+	def initialize
+		@log = true
+	end
+
+	def info str
+		puts "- #{ str }" if @log
+	end
+end
+
+$logger = Logger.new
+
+
+def right dir
+	newdir = case dir
+		when :N; :E 
+		when :E; :S 
+		when :S; :W 
+		when :W; :N 
+	end
+
+	newdir
+end
+
+def left dir
+	newdir = case dir
+		when :N; :W 
+		when :W; :S 
+		when :S; :E 
+		when :E; :N 
+	end
+
+	newdir
+end
+
+
 # Represents a single ant.
 class Ant
 	# Owner of this ant. If it's 0, it's your ant.
@@ -13,6 +49,9 @@ class Ant
 	
 	def initialize alive, owner, square, ai
 		@alive, @owner, @square, @ai = alive, owner, square, ai
+
+		@want_dir = nil
+		@next_dir = nil
 	end
 	
 	def alive?; @alive; end
@@ -25,11 +64,80 @@ class Ant
 	# Order this ant to go in given direction.
 	# Equivalent to ai.order ant, direction.
 	def order direction
-		@square.neighbor( direction ).moved_here = true
+		@square.neighbor( direction ).moved_here = self
 
 		@ai.order self, direction
 	end
+
+	def square= sq
+		@square = sq
+	end
+
+	def stay
+		$logger.info "Ant stays."
+		@square.moved_here = self
+	end
+
+	def evade dir
+		# The direction we want to go is blocked;
+		# go round the obstacle
+		$logger.info "Starting evasion"
+	
+		done = false
+		newdir = dir
+
+		# Don't try original direction again
+		(0..2).each do
+			newdir = right newdir
+			if square.neighbor(newdir).passable?
+				done = true
+				break
+			end
+		end
+	
+		if done
+			@want_dir = dir if @want_dir.nil?
+			@next_dir = left newdir
+			order newdir
+		else
+			stay
+		end
+	end
+
+
+	def evading
+		unless @next_dir.nil?
+			$logger.info "evading next_dir"
+
+			if square.neighbor( @next_dir ).passable?
+				order @next_dir
+				@next_dir = nil
+				$logger.info "evading next_dir success"
+			else 
+				evade @next_dir
+			end
+
+			return true
+		end
+
+		unless @want_dir.nil?
+			$logger.info "evading want_dir"
+
+			if square.neighbor( @want_dir).passable?
+				order @want_dir
+				@want_dir = nil
+				$logger.info "evasion complete"
+			else 
+				evade @want_dir
+			end
+
+			return true
+		end
+
+		false
+	end
 end
+
 
 # Represent a single field of the map.
 class Square
@@ -45,7 +153,7 @@ class Square
 	def initialize water, food, ant, row, col, ai
 		@water, @food, @ant, @row, @col, @ai = water, food, ant, row, col, ai
 
-		@moved_here = false
+		@moved_here = nil
 	end
 	
 	# Returns true if this square is not water.
@@ -62,12 +170,17 @@ class Square
 	end
 
 	def moved_here?
-		@moved_here
+		!@moved_here.nil?
 	end
 
 	def moved_here= val 
 		@moved_here = val
 	end
+
+	def moved_here
+		@moved_here
+	end
+
 	
 	# Returns true if this square has an alive ant.
 	def ant?; @ant and @ant.alive?; end;
@@ -225,11 +338,10 @@ class AI
 			row.each do |square|
 				square.food=false
 				square.ant=nil
-				square.moved_here = false
 			end
 		end
 		
-		@my_ants=[]
+		# @my_ants=[]
 		@enemy_ants=[]
 
 		@food = []
@@ -247,21 +359,47 @@ class AI
 
 				@food << [ row, col ]
 			when 'a'
-				a=Ant.new true, owner, @map[row][col], self
-				@map[row][col].ant = a
 				
 				if owner==0
-					my_ants.push a
+					unless @map[row][col].moved_here?
+						$logger.info "New ant."
+
+						a=Ant.new true, owner, @map[row][col], self
+						@map[row][col].ant = a
+						my_ants.push a
+					else
+						$logger.info "Moved ant."
+						a = @map[row][col].moved_here 
+						@map[row][col].ant = a
+						a.square = @map[row][col] 
+					end
+
 				else
 					enemy_ants.push a
 				end
 			when 'd'
+				if owner==0
+					if @map[row][col].moved_here?
+						$logger.info "My ant died!."
+						my_ants.delete @map[row][col].moved_here
+					else
+						$logger.info "Dead ant unexpected!"
+					end
+				end
+
 				d=Ant.new false, owner, @map[row][col], self
 				@map[row][col].ant = d
 			when 'r'
 				# pass
 			else
 				warn "unexpected: #{rd}"
+			end
+		end
+
+		# reset the moved ants 
+		@map.each do |row|
+			row.each do |square|
+				square.moved_here = nil
 			end
 		end
 
