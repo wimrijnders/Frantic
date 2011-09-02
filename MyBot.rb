@@ -3,6 +3,31 @@ require 'ants.rb'
 
 # Local methods
 
+def norm_distance ai, distance, ll = nil
+	# If the distance is greater than half the width/height,
+	# try the other side of the torus
+	if distance[0].abs > ai.rows/2
+		if distance[0] > 0
+			distance[0] -= ai.rows
+			ll[0] -= ai.rows unless ll.nil?
+		else
+			distance[0] += ai.rows
+			ll[0] += ai.rows unless ll.nil?
+		end
+	end
+
+	if distance[1].abs > ai.cols/2
+		if distance[1] > 0
+			distance[1] -= ai.cols
+			ll[1] -= ai.cols unless ll.nil?
+		else
+			distance[1] += ai.cols
+			ll[1] += ai.cols unless ll.nil?
+		end
+	end
+end
+
+
 def closest_food ant, ai 
 
 	food = ai.food 
@@ -13,69 +38,117 @@ def closest_food ant, ai
 	food.each do |l|
 		ll = l.clone
 
-		rowdist = l[0] - ant.row
-		coldist = l[1] - ant.col
+		distance = [ l[0] - ant.row, l[1] - ant.col ]
 
-		# If the distance is greater than half the width/height,
-		# try the other side of the torus
-		if rowdist.abs > ai.rows/2
-			if rowdist > 0
-				rowdist -= ai.rows
-				ll[0] -= ai.rows
-			else
-				rowdist += ai.rows
-				ll[0] += ai.rows
-			end
-		end
+		norm_distance ai, distance, ll
 
-		if coldist.abs > ai.cols/2
-			if coldist > 0
-				coldist -= ai.cols
-				ll[1] -= ai.cols
-			else
-				coldist += ai.cols
-				ll[1] += ai.cols
-			end
-		end
-
-		dist = rowdist.abs + coldist.abs
+		dist = distance[0].abs + distance[1].abs
 
 		if !cur_dist || dist < cur_dist
 			cur_dist = dist
-			cur_best = ll
+			cur_best = distance
 		end
 	end
 
+	cur_best
+end
+
+def closest_enemy ant, enemies 
+
+	cur_best = nil
+	cur_dist = nil
+
+	enemies.each do |l|
+		next if l.nil?
+
+		# skip self
+		next if l === ant
+		next unless l.moved?
+
+		distance = [ l.row - ant.row, l.col - ant.col ]
+
+		norm_distance ant.ai, distance
+
+		dist = distance[0].abs + distance[1].abs
+
+		# safeguard
+		next if dist == 0
+
+		if !cur_dist || dist < cur_dist
+			cur_dist = dist
+			cur_best = distance
+		end
+	end
+
+	cur_best
+end
+
+
+def closest_ant l, ai 
+
+	ants = ai.my_ants 
+
+	cur_best = nil
+	cur_dist = nil
+
+	ants.each do |ant|
+
+		ll = l.clone
+
+		distance = [ l[0] - ant.row, l[1] - ant.col ]
+
+		norm_distance ai, distance, ll
+
+		dist = distance[0].abs + distance[1].abs
+
+		if !cur_dist || dist < cur_dist
+			cur_dist = dist
+			cur_best = ant
+		end
+	end
 
 	cur_best
 end
 
 
 def default_move ant
-	moved = false
+	done = false
 
-	# try to go north, if possible; otherwise try east, south, west.
-	[:N, :E, :S, :W].each do |dir|
-		if ant.square.neighbor(dir).passable?
-			ant.order dir
-			moved = true
+	# if you have a neighbour that has moved, attempt the same move
+	[ :N, :E, :S, :W ].each do |dir|
+		n = ant.square.neighbor( dir ).ant
+
+		next if n.nil?
+
+		if n.mine? and n.moved? 
+			move ant, n.moved_to
+			done = true
 			break
 		end
 	end
 
-	unless moved
-		ant.stay
+	return if done
+
+	# Find a close neighbour and move to him
+	distance = closest_enemy ant, ant.ai.my_ants 
+	unless distance.nil?
+		if ( distance[0].abs + distance[1].abs) < 20
+			dir = move_distance ant.square, distance
+			move ant, dir
+
+			done = true
+		end
 	end
+
+	move ant, :E unless done
 end
 
-def get_food ant, ai
+
+def move_distance square, distance
 	dir = nil
 
-	closest = closest_food ant, ai
-	return nil unless closest
-
-	rdif = closest[0] - ant.row
-	cdif = closest[1] - ant.col
+	rdif = distance[0]
+	cdif = distance[1]
 
 	if rdif > 0
 		rowdir = :S
@@ -89,14 +162,23 @@ def get_food ant, ai
 		coldir = :W
 	end
 
+	# If one of the directions is zero, choose the other one
+	if rdif == 0
+		dir = coldir
+	elsif cdif == 0
+		dir = rowdir
+	end
+	return dir unless dir.nil?
+
+
 	# If one of the directions is blocked,
 	# and the other isn't, choose the other one
-	if !ant.square.neighbor(rowdir).passable?
-		if ant.square.neighbor(coldir).passable?
+	if !square.neighbor(rowdir).passable?
+		if square.neighbor(coldir).passable?
 			dir = coldir
 		end
-	elsif !ant.square.neighbor(coldir).passable?
-		if ant.square.neighbor(rowdir).passable?
+	elsif !square.neighbor(coldir).passable?
+		if square.neighbor(rowdir).passable?
 			dir = rowdir
 		end
 	end
@@ -113,6 +195,28 @@ def get_food ant, ai
 	dir
 end
 
+def move_to ai, from, to
+	distance = [ to.row - from.row, to.col - from.col ]
+	norm_distance ai, distance
+	move_distance from, distance
+end
+
+def move ant, dir
+	if ant.square.neighbor(dir).passable?
+		ant.order dir
+	else
+		ant.evade dir
+	end
+end
+
+
+def get_food ant, ai
+
+	distance = closest_food ant, ai
+	return nil unless distance
+
+	move_distance ant.square, distance
+end
 
 
 #
@@ -127,21 +231,50 @@ end
 
 ai.run do |ai|
 	# your turn code here
-	
+
 	ai.my_ants.each do |ant|
-		next if ant.evading
+		ant.evading
+	end
 
-		dir = get_food ant, ai
+	ai.food.each do |l|
+		ant = closest_ant l, ai
+		unless ant.nil?
+			next if ant.moved?
 
-		unless dir.nil?
-			if ant.square.neighbor(dir).passable?
-				ant.order dir
+			dir = get_food ant, ai
+			if dir.nil?
+				dir = move_to ai, ant.square, ai.map[ l[0] ][ l[1] ]
+			end
+			move ant, dir
+		end
+	end 
+
+	leader = nil;
+	ai.my_ants.each do |ant|
+		next if ant.moved?
+
+	if true #leader.nil?
+		leader = ant
+
+		distance = closest_enemy ant, ai.enemy_ants 
+		unless distance.nil?
+			if ( distance[0].abs + distance[1].abs) < 10
+				dir = move_distance ant.square, distance
+				move ant, dir
 			else
-				ant.evade dir
+				default_move ant
 			end
 		else
-			# No food close by; just do something
-			default_move ant
+			#if rand(2) == 0
+				default_move ant
+			#else
+			#	ant.stay
+			#end
 		end
+	else
+		dir = move_to ai, ant.square, leader.square
+		move ant, dir
+	end
+
 	end
 end
