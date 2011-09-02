@@ -4,7 +4,7 @@
 
 class Logger
 	def initialize
-		@log = true
+		@log = false
 	end
 
 	def info str
