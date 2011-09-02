@@ -15,22 +15,15 @@ class Ant
 		@alive, @owner, @square, @ai = alive, owner, square, ai
 	end
 	
-	# True if ant is alive.
 	def alive?; @alive; end
-	# True if ant is not alive.
 	def dead?; !@alive; end
-	
-	# Equivalent to ant.owner==0.
 	def mine?; owner==0; end
-	# Equivalent to ant.owner!=0.
 	def enemy?; owner!=0; end
-	
-	# Returns the row of square this ant is standing at.
 	def row; @square.row; end
-	# Returns the column of square this ant is standing at.
 	def col; @square.col; end
 	
-	# Order this ant to go in given direction. Equivalent to ai.order ant, direction.
+	# Order this ant to go in given direction.
+	# Equivalent to ai.order ant, direction.
 	def order direction
 		@square.neighbor( direction ).moved_here = true
 
@@ -111,12 +104,15 @@ class AI
 	# Radii, unsquared. Floats.
 	attr_accessor :viewradius, :attackradius, :spawnradius
 	
-	# Number of players. Available only after game's over.
+	# Following vailable only after game's over.
+
+	# Number of players.
 	attr_accessor :players
-	# Array of scores of players (you are player 0). Available only after game's over.
+	# Array of scores of players (you are player 0).
 	attr_accessor :score
 
-	# Initialize a new AI object. Arguments are streams this AI will read from and write to.
+	# Initialize a new AI object.
+	# Arguments are streams this AI will read from and write to.
 	def initialize stdin=$stdin, stdout=$stdout
 		@stdin, @stdout = stdin, stdout
 
