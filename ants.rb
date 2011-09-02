@@ -81,7 +81,7 @@ class Ant
 	def evade dir
 		# The direction we want to go is blocked;
 		# go round the obstacle
-		$logger.info "Starting evasion"
+		$logger.info "Starting evasion" if @want_dir.nil?
 	
 		done = false
 		newdir = dir
@@ -111,24 +111,18 @@ class Ant
 
 			if square.neighbor( @next_dir ).passable?
 				order @next_dir
-				@next_dir = nil
-				$logger.info "evading next_dir success"
+
+				# if the direction went corresponds with the
+				# direction wanted, we are done.
+				if @next_dir == @want_dir
+					$logger.info "evasion complete"
+					@next_dir = nil
+					@want_dir = nil
+				else
+					@next_dir = left @next_dir
+				end
 			else 
 				evade @next_dir
-			end
-
-			return true
-		end
-
-		unless @want_dir.nil?
-			$logger.info "evading want_dir"
-
-			if square.neighbor( @want_dir).passable?
-				order @want_dir
-				@want_dir = nil
-				$logger.info "evasion complete"
-			else 
-				evade @want_dir
 			end
 
 			return true
@@ -440,6 +434,14 @@ class AI
 	# Returns [row, col].
 	def normalize row, col
 		[row % @rows, col % @cols]
+	end
+
+	def rows
+		@rows
+	end
+
+	def cols
+		@cols
 	end
 end
 

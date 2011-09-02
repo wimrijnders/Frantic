@@ -3,23 +3,53 @@ require 'ants.rb'
 
 # Local methods
 
-def closest_food ant, food 
+def closest_food ant, ai 
+
+	food = ai.food 
 
 	cur_best = nil
 	cur_dist = nil
 
 	food.each do |l|
-		dist = ( l[0] - ant.row ).abs + (l[1] - ant.col).abs
+		ll = l.clone
+
+		rowdist = l[0] - ant.row
+		coldist = l[1] - ant.col
+
+		# If the distance is greater than half the width/height,
+		# try the other side of the torus
+		if rowdist.abs > ai.rows/2
+			if rowdist > 0
+				rowdist -= ai.rows
+				ll[0] -= ai.rows
+			else
+				rowdist += ai.rows
+				ll[0] += ai.rows
+			end
+		end
+
+		if coldist.abs > ai.cols/2
+			if coldist > 0
+				coldist -= ai.cols
+				ll[1] -= ai.cols
+			else
+				coldist += ai.cols
+				ll[1] += ai.cols
+			end
+		end
+
+		dist = rowdist.abs + coldist.abs
 
 		if !cur_dist || dist < cur_dist
 			cur_dist = dist
-			cur_best = l
+			cur_best = ll
 		end
 	end
 
 
 	cur_best
 end
+
 
 def default_move ant
 	moved = false
@@ -38,10 +68,10 @@ def default_move ant
 	end
 end
 
-def get_food ant, food
+def get_food ant, ai
 	dir = nil
 
-	closest = closest_food ant, food
+	closest = closest_food ant, ai
 	return nil unless closest
 
 	rdif = closest[0] - ant.row
@@ -83,7 +113,7 @@ ai.run do |ai|
 	ai.my_ants.each do |ant|
 		next if ant.evading
 
-		dir = get_food ant, ai.food
+		dir = get_food ant, ai
 
 		unless dir.nil?
 			if ant.square.neighbor(dir).passable?
