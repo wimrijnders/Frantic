@@ -77,22 +77,40 @@ def get_food ant, ai
 	rdif = closest[0] - ant.row
 	cdif = closest[1] - ant.col
 
-	if rdif.abs > cdif.abs
-		if rdif > 0
-			dir = :S
-		else
-			dir = :N
-		end
+	if rdif > 0
+		rowdir = :S
 	else
-		if cdif > 0
-			dir = :E
+		rowdir = :N
+	end
+
+	if cdif > 0
+		coldir = :E
+	else
+		coldir = :W
+	end
+
+	# If one of the directions is blocked,
+	# and the other isn't, choose the other one
+	if !ant.square.neighbor(rowdir).passable?
+		if ant.square.neighbor(coldir).passable?
+			dir = coldir
+		end
+	elsif !ant.square.neighbor(coldir).passable?
+		if ant.square.neighbor(rowdir).passable?
+			dir = rowdir
+		end
+	end
+	
+	if dir.nil?
+		# Otherwise, choose shortest distance
+		if rdif.abs > cdif.abs
+			dir = rowdir
 		else
-			dir = :W
+			dir = coldir
 		end
 	end
 
 	dir
-
 end
 
 

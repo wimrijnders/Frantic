@@ -40,6 +40,8 @@ end
 
 # Represents a single ant.
 class Ant
+	@@curleft = true
+
 	# Owner of this ant. If it's 0, it's your ant.
 	attr_accessor :owner
 	# Square this ant sits on.
@@ -52,6 +54,11 @@ class Ant
 
 		@want_dir = nil
 		@next_dir = nil
+
+		@left = @@curleft
+		@@curleft = !@@curleft
+
+		@moved= false
 	end
 	
 	def alive?; @alive; end
@@ -65,6 +72,7 @@ class Ant
 	# Equivalent to ai.order ant, direction.
 	def order direction
 		@square.neighbor( direction ).moved_here = self
+		@moved= true
 
 		@ai.order self, direction
 	end
@@ -78,6 +86,22 @@ class Ant
 		@square.moved_here = self
 	end
 
+	def evade_dir dir
+		if @left
+			left dir
+		else 
+			right dir
+		end
+	end
+
+	def evade2_dir dir
+		if @left
+			right dir
+		else 
+			left dir
+		end
+	end
+
 	def evade dir
 		# The direction we want to go is blocked;
 		# go round the obstacle
@@ -88,7 +112,7 @@ class Ant
 
 		# Don't try original direction again
 		(0..2).each do
-			newdir = right newdir
+			newdir = evade_dir newdir
 			if square.neighbor(newdir).passable?
 				done = true
 				break
@@ -97,7 +121,7 @@ class Ant
 	
 		if done
 			@want_dir = dir if @want_dir.nil?
-			@next_dir = left newdir
+			@next_dir = evade2_dir newdir
 			order newdir
 		else
 			stay
@@ -119,7 +143,7 @@ class Ant
 					@next_dir = nil
 					@want_dir = nil
 				else
-					@next_dir = left @next_dir
+					@next_dir = evade2_dir @next_dir
 				end
 			else 
 				evade @next_dir
@@ -129,6 +153,14 @@ class Ant
 		end
 
 		false
+	end
+
+	def moved= val
+		@moved = val
+	end
+
+	def moved?
+		@moved
 	end
 end
 
@@ -157,10 +189,21 @@ class Square
 	# Returns true if this square contains food.
 	def food?; @food; end
 
-	# Square is passable if it's not water, it doesn't contain alive ants and it doesn't contain food.
-	# In addition, no other friendly ant should have moved here
+	# Square is passable if it's not water,
+	# it doesn't contain alive ants and it doesn't contain food.
+	#
+	# In addition, no other friendly ant should have moved here.
 	def passable?
-		not ( water? or ant? or food? or moved_here? ) 
+		return false if water? or food?  or moved_here? 
+		if ant?
+			return false if @ant.enemy?
+
+			# If there was an ant there, but it is moving this turn,
+			# then you can safely enter the square
+			return false unless @ant.moved?
+		end
+
+		true
 	end
 
 	def moved_here?
@@ -393,7 +436,10 @@ class AI
 		# reset the moved ants 
 		@map.each do |row|
 			row.each do |square|
-				square.moved_here = nil
+				unless square.moved_here.nil?
+					square.moved_here.moved = false
+					square.moved_here = nil
+				end
 			end
 		end
 
