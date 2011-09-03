@@ -64,6 +64,7 @@ def closest_enemy ant, enemies
 		# skip self
 		next if l === ant
 		next unless l.moved?
+		next if l.evading?
 
 		distance = [ l.row - ant.row, l.col - ant.col ]
 
@@ -249,13 +250,14 @@ ai.run do |ai|
 		end
 	end 
 
-	leader = nil;
 	ai.my_ants.each do |ant|
 		next if ant.moved?
 
-	if true #leader.nil?
-		leader = ant
+		default_move ant
+		next
 
+
+		# Agressive mode
 		distance = closest_enemy ant, ai.enemy_ants 
 		unless distance.nil?
 			if ( distance[0].abs + distance[1].abs) < 10
@@ -271,10 +273,6 @@ ai.run do |ai|
 			#	ant.stay
 			#end
 		end
-	else
-		dir = move_to ai, ant.square, leader.square
-		move ant, dir
-	end
 
 	end
 end

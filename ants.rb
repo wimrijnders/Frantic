@@ -57,7 +57,7 @@ class Ant
 		@next_dir = nil
 
 		@left = @@curleft
-		@@curleft = !@@curleft
+		#@@curleft = !@@curleft
 
 		@moved= false
 	end
@@ -164,6 +164,10 @@ class Ant
 
 	def moved?
 		@moved
+	end
+
+	def evading?
+		!@next_dir.nil?
 	end
 end
 
