@@ -61,12 +61,18 @@ def closest_enemy ant, enemies
 	enemies.each do |l|
 		next if l.nil?
 
+		# Stuff for friendly ants
+
 		# skip self
 		next if l === ant
-		next unless l.moved?
-		next if l.evading?
+		if l.moved?
+			sq = l.square.neighbor( l.moved_to )
+			distance = [ sq.row - ant.row, sq.col - ant.col ]
+		else
+			distance = [ l.row - ant.row, l.col - ant.col ]
+		end
+		next if l.evading?		# Needed because you can trap an evading ant by following it
 
-		distance = [ l.row - ant.row, l.col - ant.col ]
 
 		norm_distance ant.ai, distance
 
@@ -113,35 +119,27 @@ end
 
 
 def default_move ant
-	done = false
 
-	# if you have a neighbour that has moved, attempt the same move
-	[ :N, :E, :S, :W ].each do |dir|
-		n = ant.square.neighbor( dir ).ant
 
-		next if n.nil?
+	# go to the least visited square
+	best_visited = nil
+	best_dir = nil
+	[:N, :E, :S, :W ].each do |dir|
+		sq = ant.square.neighbor( dir )
 
-		if n.mine? and n.moved? 
-			move ant, n.moved_to
-			done = true
-			break
+		next unless sq.passable?
+
+		val = sq.visited
+		if !best_visited || val < best_visited
+			best_visited = val
+			best_dir = dir
 		end
 	end
 
-	return if done
+	best_dir = :E if best_dir.nil?
+	#best_dir = [ :N, :E, :S, :W ][ rand(4) ] if best_dir.nil?
 
-	# Find a close neighbour and move to him
-	distance = closest_enemy ant, ant.ai.my_ants 
-	unless distance.nil?
-		if ( distance[0].abs + distance[1].abs) < 40
-			dir = move_distance ant.square, distance
-			move ant, dir
-
-			done = true
-		end
-	end
-
-	move ant, :E unless done
+	move ant, best_dir 
 end
 
 
@@ -220,6 +218,72 @@ def get_food ant, ai
 end
 
 
+def handle_conflict ant
+	return false if ant.moved?
+
+	if ant.attacked?
+		$logger.info "Conflict!"
+if false
+		# Check for direct friendly neighbours 
+		done = false
+		has_neighbour = false
+		[ :N, :E, :S, :W ].each do |dir|
+			n = ant.square.neighbor( dir ).ant
+			next if n.nil?
+
+			has_neighbour = true
+
+			if n.mine? and n.moved? 
+				# if neighbour moved, attempt the same move
+				$logger.info "neighbour moved."
+				move ant, n.moved_to
+				done = true
+				break
+			end
+		end
+		return true if done
+
+
+		if has_neighbour
+			# Neighbours didn´t move, perform attack yourself
+			$logger.info "Attack."
+			distance = ant.attack_distance
+			dir = move_distance ant.square, distance
+			move ant, dir
+			return true
+		end
+
+		# Find a close neighbour and move to him
+		# TODO: following should take moved ant into account
+		distance = closest_enemy ant, ant.ai.my_ants 
+		unless distance.nil?
+			dist = distance[0].abs + distance[1].abs
+			if dist == 1 
+				$logger.info "next to friend."
+				# already next to other ant
+				ant.stay
+			elsif dist < 20
+				$logger.info "Moving to friend."
+				dir = move_distance ant.square, distance
+				move ant, dir
+			end
+			return true
+		end
+end
+
+		# Otherwise, just run away
+		$logger.info "Retreat."
+		distance = ant.attack_distance
+		distance[0] *= -1
+		distance[1] *= -1
+		dir = move_distance ant.square, distance
+		move ant, dir
+		return true
+	end
+
+	false
+end
+
 #
 # main routine
 #
@@ -233,46 +297,40 @@ end
 ai.run do |ai|
 	# your turn code here
 
+	# Determine which ant are being attacked
+	# if an enemy close by, move to your closest neighbour if present
+	ai.my_ants.each do |ant|
+		ant.check_attacked
+	end
+
+
 	ai.my_ants.each do |ant|
 		ant.evading
+		#handle_conflict ant
+		ant.handle_orders
 	end
+
+
+
 
 	ai.food.each do |l|
 		ant = closest_ant l, ai
 		unless ant.nil?
 			next if ant.moved?
 
-			dir = get_food ant, ai
-			if dir.nil?
-				dir = move_to ai, ant.square, ai.map[ l[0] ][ l[1] ]
-			end
-			move ant, dir
+			ant.set_order ai.map[ l[0] ][ l[1] ], :FORAGE
+#			dir = get_food ant, ai
+#			if dir.nil?
+#				dir = move_to ai, ant.square, ai.map[ l[0] ][ l[1] ]
+#			end
+#			move ant, dir
 		end
 	end 
+
 
 	ai.my_ants.each do |ant|
 		next if ant.moved?
 
 		default_move ant
-		next
-
-
-		# Agressive mode
-		distance = closest_enemy ant, ai.enemy_ants 
-		unless distance.nil?
-			if ( distance[0].abs + distance[1].abs) < 10
-				dir = move_distance ant.square, distance
-				move ant, dir
-			else
-				default_move ant
-			end
-		else
-			#if rand(2) == 0
-				default_move ant
-			#else
-			#	ant.stay
-			#end
-		end
-
 	end
 end

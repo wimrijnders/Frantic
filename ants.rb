@@ -37,6 +37,15 @@ def left dir
 	newdir
 end
 
+class Order
+	attr_accessor :square
+
+	def initialize square, order
+		@square = square
+		@order = order
+	end
+end
+
 
 # Represents a single ant.
 class Ant
@@ -57,9 +66,12 @@ class Ant
 		@next_dir = nil
 
 		@left = @@curleft
-		#@@curleft = !@@curleft
+		@@curleft = !@@curleft
 
 		@moved= false
+
+		@attack_distance = nil
+		@orders = []
 	end
 	
 	def alive?; @alive; end
@@ -71,6 +83,7 @@ class Ant
 	
 	# Order this ant to go in given direction.
 	# Equivalent to ai.order ant, direction.
+
 	def order direction
 		@square.neighbor( direction ).moved_here = self
 		@moved= true
@@ -153,7 +166,6 @@ class Ant
 
 			return true
 		end
-					@want_dir = nil
 
 		false
 	end
@@ -169,7 +181,80 @@ class Ant
 	def evading?
 		!@next_dir.nil?
 	end
+
+	def check_attacked
+		distance = closest_enemy self, self.ai.enemy_ants 
+		unless distance.nil?
+			if ( distance[0].abs + distance[1].abs) < 20
+$logger.info "ant attacked!"
+				@attack_distance = distance
+				return
+			end
+		end
+
+		@attack_distance = nil
+	end
+
+	def attacked?
+		!@attack_distance.nil?
+	end
+
+	def attack_distance
+		@attack_distance
+	end
+
+	def set_order square, what
+		@orders.each do |o|
+			# order already present
+			return if o.square == square
+		end
+
+		@orders << Order.new(square, what)
+	end
+
+	def orders?
+		@orders.size > 0
+	end
+
+	def handle_orders
+		return false if moved?
+
+
+
+		while orders?
+			if self.square == @orders[0].square
+				# Done with this order, reached the target
+				@orders = @orders[1..-1]
+				next
+			end
+
+			# Check if in-range when visible for food
+			sq = @orders[0].square
+			closest = closest_ant [ sq.row, sq.col], @ai
+			unless closest.nil?
+				distance = [ sq.row - closest.row, sq.col - closest.col ]
+				norm_distance ai, distance
+				in_view = ( distance[0]*distance[0] + distance[1]*distance[1] ) <= @ai.viewradius2
+
+				if in_view and !@ai.map[ sq.row ][sq.col].food?
+					# food is already gone. Skip order
+					@orders = @orders[1..-1]
+					next
+				end
+			end
+
+			break
+		end
+		return false if !orders?
+
+		dir = move_to self.ai, @square, @orders[0].square
+		move self, dir
+
+		true
+	end
 end
+
+
 
 
 # Represent a single field of the map.
@@ -187,6 +272,7 @@ class Square
 		@water, @food, @ant, @row, @col, @ai = water, food, ant, row, col, ai
 
 		@moved_here = nil
+		@visited = 0
 	end
 	
 	# Returns true if this square is not water.
@@ -247,6 +333,17 @@ class Square
 		end
 		
 		return @ai.map[row][col]
+	end
+
+	def visited= val
+		@visited = val
+	end
+	def visited
+		@visited
+	end
+
+	def == n
+		self.row == n.row and self.col == n.col
 	end
 end
 
@@ -410,11 +507,13 @@ class AI
 
 						a=Ant.new true, owner, @map[row][col], self
 						@map[row][col].ant = a
+						@map[row][col].visited += 1
 						my_ants.push a
 					else
 						$logger.info "Moved ant."
 						a = @map[row][col].moved_here 
 						@map[row][col].ant = a
+						@map[row][col].visited += 1
 						a.square = @map[row][col] 
 					end
 
