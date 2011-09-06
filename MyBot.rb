@@ -3,56 +3,6 @@ require 'ants.rb'
 
 # Local methods
 
-def norm_distance ai, distance, ll = nil
-	# If the distance is greater than half the width/height,
-	# try the other side of the torus
-	if distance[0].abs > ai.rows/2
-		if distance[0] > 0
-			distance[0] -= ai.rows
-			ll[0] -= ai.rows unless ll.nil?
-		else
-			distance[0] += ai.rows
-			ll[0] += ai.rows unless ll.nil?
-		end
-	end
-
-	if distance[1].abs > ai.cols/2
-		if distance[1] > 0
-			distance[1] -= ai.cols
-			ll[1] -= ai.cols unless ll.nil?
-		else
-			distance[1] += ai.cols
-			ll[1] += ai.cols unless ll.nil?
-		end
-	end
-end
-
-
-def closest_food ant, ai 
-
-	food = ai.food 
-
-	cur_best = nil
-	cur_dist = nil
-
-	food.each do |l|
-		ll = l.clone
-
-		distance = [ l[0] - ant.row, l[1] - ant.col ]
-
-		norm_distance ai, distance, ll
-
-		dist = distance[0].abs + distance[1].abs
-
-		if !cur_dist || dist < cur_dist
-			cur_dist = dist
-			cur_best = distance
-		end
-	end
-
-	cur_best
-end
-
 def closest_enemy ant, enemies 
 
 	cur_best = nil
@@ -67,23 +17,20 @@ def closest_enemy ant, enemies
 		next if l === ant
 		if l.moved?
 			sq = l.square.neighbor( l.moved_to )
-			distance = [ sq.row - ant.row, sq.col - ant.col ]
+			to = sq.row
 		else
-			distance = [ l.row - ant.row, l.col - ant.col ]
+			to = l.row
 		end
 		next if l.evading?		# Needed because you can trap an evading ant by following it
 
-
-		norm_distance ant.ai, distance
-
-		dist = distance[0].abs + distance[1].abs
+		d = Distance.new ant, to
 
 		# safeguard
-		next if dist == 0
+		next if d.dist == 0
 
-		if !cur_dist || dist < cur_dist
-			cur_dist = dist
-			cur_best = distance
+		if !cur_dist || d.dist < cur_dist
+			cur_dist = d.dist
+			cur_best = d
 		end
 	end
 
@@ -100,16 +47,10 @@ def closest_ant l, ai
 
 	ants.each do |ant|
 
-		ll = l.clone
+		d = Distance.new ant, l
 
-		distance = [ l[0] - ant.row, l[1] - ant.col ]
-
-		norm_distance ai, distance, ll
-
-		dist = distance[0].abs + distance[1].abs
-
-		if !cur_dist || dist < cur_dist
-			cur_dist = dist
+		if !cur_dist || d.dist < cur_dist
+			cur_dist = d.dist
 			cur_best = ant
 		end
 	end
@@ -139,83 +80,12 @@ def default_move ant
 	best_dir = :E if best_dir.nil?
 	#best_dir = [ :N, :E, :S, :W ][ rand(4) ] if best_dir.nil?
 
-	move ant, best_dir 
+	ant.move best_dir 
 end
 
 
-def move_distance square, distance
-	dir = nil
-
-	rdif = distance[0]
-	cdif = distance[1]
-
-	if rdif > 0
-		rowdir = :S
-	else
-		rowdir = :N
-	end
-
-	if cdif > 0
-		coldir = :E
-	else
-		coldir = :W
-	end
-
-	# If one of the directions is zero, choose the other one
-	if rdif == 0
-		dir = coldir
-	elsif cdif == 0
-		dir = rowdir
-	end
-	return dir unless dir.nil?
 
 
-	# If one of the directions is blocked,
-	# and the other isn't, choose the other one
-	if !square.neighbor(rowdir).passable?
-		if square.neighbor(coldir).passable?
-			dir = coldir
-		end
-	elsif !square.neighbor(coldir).passable?
-		if square.neighbor(rowdir).passable?
-			dir = rowdir
-		end
-	end
-	
-	if dir.nil?
-		# Otherwise, choose shortest distance
-		if rdif.abs > cdif.abs
-			dir = rowdir
-		else
-			dir = coldir
-		end
-	end
-
-	dir
-end
-
-def move_to ai, from, to
-	distance = [ to.row - from.row, to.col - from.col ]
-	norm_distance ai, distance
-	move_distance from, distance
-end
-
-def move ant, dir
-	if ant.square.neighbor(dir).passable?
-		ant.order dir
-	else
-		ant.evade dir
-	end
-end
-
-
-def get_food ant, ai
-
-	distance = closest_food ant, ai
-	return nil unless distance
-
-	move_distance ant.square, distance
-end
 
 
 def handle_conflict ant
@@ -236,7 +106,7 @@ if false
 			if n.mine? and n.moved? 
 				# if neighbour moved, attempt the same move
 				$logger.info "neighbour moved."
-				move ant, n.moved_to
+				ant.move n.moved_to
 				done = true
 				break
 			end
@@ -247,25 +117,23 @@ if false
 		if has_neighbour
 			# Neighbours didn´t move, perform attack yourself
 			$logger.info "Attack."
-			distance = ant.attack_distance
-			dir = move_distance ant.square, distance
-			move ant, dir
+
+			ant.move_dir ant.attack_distance
 			return true
 		end
 
 		# Find a close neighbour and move to him
 		# TODO: following should take moved ant into account
-		distance = closest_enemy ant, ant.ai.my_ants 
-		unless distance.nil?
-			dist = distance[0].abs + distance[1].abs
+		d = closest_enemy ant, ant.ai.my_ants 
+		unless d.nil?
+			dist = d.dist
 			if dist == 1 
 				$logger.info "next to friend."
 				# already next to other ant
 				ant.stay
 			elsif dist < 20
 				$logger.info "Moving to friend."
-				dir = move_distance ant.square, distance
-				move ant, dir
+				ant.move_dir d
 			end
 			return true
 		end
@@ -273,11 +141,7 @@ end
 
 		# Otherwise, just run away
 		$logger.info "Retreat."
-		distance = ant.attack_distance
-		distance[0] *= -1
-		distance[1] *= -1
-		dir = move_distance ant.square, distance
-		move ant, dir
+		ant.move_dir ant.attack_distance.invert
 		return true
 	end
 
@@ -289,6 +153,7 @@ end
 #
 
 ai=AI.new
+Distance.set_ai ai
 
 ai.setup do |ai|
 	# your setup code here, if any
@@ -319,11 +184,6 @@ ai.run do |ai|
 			next if ant.moved?
 
 			ant.set_order ai.map[ l[0] ][ l[1] ], :FORAGE
-#			dir = get_food ant, ai
-#			if dir.nil?
-#				dir = move_to ai, ant.square, ai.map[ l[0] ][ l[1] ]
-#			end
-#			move ant, dir
 		end
 	end 
 

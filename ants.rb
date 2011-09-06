@@ -1,6 +1,8 @@
 # Ants AI Challenge framework
 # by Matma Rex (matma.rex@gmail.com)
 # Released under CC-BY 3.0 license
+require 'distance.rb'
+
 
 class Logger
 	def initialize
@@ -178,16 +180,41 @@ class Ant
 		@moved
 	end
 
+
+	def move dir
+		if square.neighbor(dir).passable?
+			order dir
+		else
+			evade dir
+		end
+	end
+
+	#
+	# Move ant to specified direction vector
+	#
+	def move_dir d
+		move d.dir( @square)
+	end
+
+	#
+	# Move ant in the direction of the specified square
+	# 
+	def move_to to
+		move_dir Distance.new( @square, to)
+	end
+
+
 	def evading?
 		!@next_dir.nil?
 	end
 
 	def check_attacked
-		distance = closest_enemy self, self.ai.enemy_ants 
-		unless distance.nil?
-			if ( distance[0].abs + distance[1].abs) < 20
-$logger.info "ant attacked!"
-				@attack_distance = distance
+		d = closest_enemy self, self.ai.enemy_ants 
+		unless d.nil?
+			if d.dist < 20
+				$logger.info "ant attacked!"
+
+				@attack_distance = d
 				return
 			end
 		end
@@ -232,11 +259,9 @@ $logger.info "ant attacked!"
 			sq = @orders[0].square
 			closest = closest_ant [ sq.row, sq.col], @ai
 			unless closest.nil?
-				distance = [ sq.row - closest.row, sq.col - closest.col ]
-				norm_distance ai, distance
-				in_view = ( distance[0]*distance[0] + distance[1]*distance[1] ) <= @ai.viewradius2
+				d = Distance.new closest, sq
 
-				if in_view and !@ai.map[ sq.row ][sq.col].food?
+				if d.in_view? and !@ai.map[ sq.row ][sq.col].food?
 					# food is already gone. Skip order
 					@orders = @orders[1..-1]
 					next
@@ -247,8 +272,7 @@ $logger.info "ant attacked!"
 		end
 		return false if !orders?
 
-		dir = move_to self.ai, @square, @orders[0].square
-		move self, dir
+		move_to @orders[0].square
 
 		true
 	end
