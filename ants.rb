@@ -5,16 +5,16 @@ require 'distance.rb'
 
 
 class Logger
-	def initialize
+	def initialize ai
 		@log = false
+		@@ai = ai
 	end
 
 	def info str
-		puts "- #{ str }" if @log
+		@@ai.stdout.puts "- #{ str }" if @log
 	end
 end
 
-$logger = Logger.new
 
 
 def right dir
@@ -101,6 +101,7 @@ class Ant
 	def stay
 		$logger.info "Ant stays."
 		@square.moved_here = self
+		@moved = true
 	end
 
 	def evade_dir dir
@@ -185,7 +186,24 @@ class Ant
 		if square.neighbor(dir).passable?
 			order dir
 		else
-			evade dir
+			if square.neighbor( dir ).water?
+				evade dir
+			else
+				unless attacked?
+					# Just pick any direction we can move to
+					directions = [:N, :E, :S, :W ]
+					directions.each do |dir|
+						sq = square.neighbor( dir )
+						if sq.passable?
+							order dir
+							return
+						end
+					end
+				end
+
+				# no directions left or under attack
+				stay
+			end
 		end
 	end
 
@@ -203,6 +221,13 @@ class Ant
 		move_dir Distance.new( @square, to)
 	end
 
+	def retreat
+		return if attack_distance.nil?
+
+		$logger.info "Retreat."
+		move_dir attack_distance.invert
+	end
+
 
 	def evading?
 		!@next_dir.nil?
@@ -211,15 +236,16 @@ class Ant
 	def check_attacked
 		d = closest_enemy self, self.ai.enemy_ants 
 		unless d.nil?
-			if d.dist < 20
+			if d.in_view? and d.clear_view @square
 				$logger.info "ant attacked!"
 
 				@attack_distance = d
-				return
+				return true
 			end
 		end
 
 		@attack_distance = nil
+		false
 	end
 
 	def attacked?
@@ -246,7 +272,7 @@ class Ant
 	def handle_orders
 		return false if moved?
 
-
+		prev_order = (orders?) ? @orders[0].square: nil
 
 		while orders?
 			if self.square == @orders[0].square
@@ -272,9 +298,35 @@ class Ant
 		end
 		return false if !orders?
 
+		if evading?
+			if prev_order != @orders[0].square
+				# order changed; reset evasion
+				@want_dir = nil
+				@next_dir = nil
+			else
+				# Handle evasion elsewhere
+				return false
+			end
+		end
+
 		move_to @orders[0].square
 
 		true
+	end
+
+	#
+	# Return actual position of ant, taking
+	# movement into account.
+	#
+	# In effect, this is the position of the ant
+	# in the next turn.
+	#
+	def pos
+		if moved? and not moved_to.nil?
+			square.neighbor( moved_to )
+		else
+			square
+		end
 	end
 end
 
@@ -315,9 +367,10 @@ class Square
 		if ant?
 			return false if @ant.enemy?
 
-			# If there was an ant there, but it is moving this turn,
+			# If there was an ant there,
+			# but it is moving this turn,
 			# then you can safely enter the square
-			return false unless @ant.moved?
+			return false if @ant.pos == self
 		end
 
 		true
@@ -388,6 +441,7 @@ class AI
 	attr_accessor :players
 	# Array of scores of players (you are player 0).
 	attr_accessor :score
+	attr_accessor :stdout
 
 	# Initialize a new AI object.
 	# Arguments are streams this AI will read from and write to.
@@ -524,21 +578,21 @@ class AI
 
 				@food << [ row, col ]
 			when 'a'
-				
+				a=Ant.new true, owner, @map[row][col], self
+
 				if owner==0
 					unless @map[row][col].moved_here?
 						$logger.info "New ant."
 
-						a=Ant.new true, owner, @map[row][col], self
 						@map[row][col].ant = a
 						@map[row][col].visited += 1
 						my_ants.push a
 					else
 						$logger.info "Moved ant."
-						a = @map[row][col].moved_here 
-						@map[row][col].ant = a
+						b = @map[row][col].moved_here 
+						@map[row][col].ant = b
 						@map[row][col].visited += 1
-						a.square = @map[row][col] 
+						b.square = @map[row][col] 
 					end
 
 				else

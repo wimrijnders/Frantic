@@ -8,7 +8,7 @@ class Distance
 		@@ai = ai
 	end
 
-	def initialize from, to
+	def initialize from, to = nil
 		if to.respond_to? :row
 			@row = to.row
 			@col = to.col
@@ -55,14 +55,15 @@ class Distance
 	end
 
 	def invert
-		@row *= -1
-		@col *= -1
-
-		self
+		Distance.new [0,0], [ -self.row, -self.col ]
 	end
 
 	def in_view?
 		( @row*@row + @col*@col ) <= @@ai.viewradius2
+	end
+
+	def in_attack_range?
+		( @row*@row + @col*@col ) <= @@ai.attackradius2
 	end
 
 	#
@@ -120,6 +121,34 @@ class Distance
 		end
 	
 		ret_dir
+	end
+
+	def clear_view square
+		sq = square.clone
+		d = self.clone
+
+		while d.dist > 0 and not d.in_attack_range?
+			dir = d.dir
+
+			if sq.neighbor( dir).water?
+				return d.in_attack_range?
+			end
+
+			sq = sq.neighbor( dir)
+			case dir
+			when :N
+				d.row += 1
+			when :E
+				d.col -= 1
+			when :S
+				d.row -= 1
+			when :W
+				d.col += 1
+			end
+		end
+
+		d.in_attack_range?
+		#true
 	end
 end
 
