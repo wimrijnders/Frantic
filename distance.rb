@@ -112,7 +112,7 @@ class Distance
 		end
 		
 		if ret_dir.nil?
-			# Otherwise, choose shortest distance
+			# Otherwise, choose longest distance
 			if rdif.abs > cdif.abs
 				ret_dir = rowdir
 			else

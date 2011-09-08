@@ -92,7 +92,45 @@ end
 
 
 
+def handle_conflict2 ant
+	#return false if ant.moved?
 
+	if ant.attacked? 
+		if not ant.collective?
+			ant.make_collective
+
+			# recruit near neighbours for a collective
+			ant.ai.my_ants.each do |l|
+				next if l.collective?
+				next if l === ant
+
+				d = Distance.new ant.pos, l.pos	
+				if d.in_view?
+					ant.add_collective l
+				end
+			end
+
+		end
+
+		return
+	else
+		if !ant.collective?
+
+			ant.ai.my_ants.each do |l|
+				next unless l.collective_leader?
+				next if l === ant
+
+				d = Distance.new ant.pos, l.pos	
+
+				if d.in_view?
+					l.add_collective ant
+				end
+			end
+		end
+	end
+
+
+end
 
 
 def handle_conflict ant
@@ -192,15 +230,32 @@ ai.run do |ai|
 	end
 
 
-	if conflict
+	#if conflict
 		ai.my_ants.each do |ant|
-			handle_conflict ant
+			handle_conflict2 ant
 		end
-	end
+	#end
 
 
 	ai.my_ants.each do |ant|
 		ant.handle_orders
+	end
+
+	# Move collectives as a whole
+	ai.my_ants.each do |ant|
+		next unless ant.collective_leader?
+
+		next unless ant.collective.threatened
+
+		if !ant.moved? 
+			if ant.collective.size == 1 and ant.attacked?
+				ant.retreat
+			else
+				ant.stay
+			end
+		end
+
+		ant.move_collective
 	end
 
 
@@ -208,6 +263,7 @@ ai.run do |ai|
 		ant = closest_ant l, ai
 		unless ant.nil?
 			#next if ant.moved?
+			next if ant.collective?
 
 			ant.set_order ai.map[ l[0] ][ l[1] ], :FORAGE
 		end
@@ -216,9 +272,16 @@ ai.run do |ai|
 
 	ai.my_ants.each do |ant|
 		next if ant.moved?
+		next if ant.collective? and not ant.orders?
 
 		if !ant.evading
 			default_move ant
 		end
+	end
+
+	# Anything left here stays on the spot
+	ai.my_ants.each do |ant|
+		next if ant.moved?
+		ant.stay
 	end
 end

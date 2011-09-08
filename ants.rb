@@ -6,7 +6,7 @@ require 'distance.rb'
 
 class Logger
 	def initialize ai
-		@log = false
+		@log = true
 		@@ai = ai
 	end
 
@@ -39,12 +39,138 @@ def left dir
 	newdir
 end
 
-class Order
-	attr_accessor :square
+class Coord
+	attr_accessor :row, :col
 
-	def initialize square, order
+	def initialize sq
+		@row = sq.row
+		@col = sq.col
+	end
+
+	def == a
+		@row == a.row and @col == a.col
+	end
+
+end
+
+	
+
+class Order
+	attr_accessor :order
+
+	def initialize square, order, offset = nil
 		@square = square
 		@order = order
+		@offset = offset
+	end
+
+	def square
+		if @square.respond_to? :square
+			sq = Coord.new @square.square
+		else
+			sq = Coord.new @square
+		end
+
+		if !@offset.nil?
+			sq.row += @offset[0]
+			sq.col += @offset[1]
+		end
+
+		sq
+	end
+
+	def target? t
+		@square === t
+	end
+end
+
+
+class Collective
+	def initialize
+		@ants = []
+		@safe_count = 0
+	end
+
+	def add a
+		@ants << a
+	end
+
+	def size
+		@ants.length
+	end
+
+	def leader? a
+		@ants[0] == a
+	end
+
+	def remove a
+		is_leader = leader? a
+
+		@ants.delete a
+
+		if is_leader
+			$logger.info "Removing leader."
+			@ants.each do |b|
+				b.remove_target_from_order a
+			end
+		end
+
+		reassemble
+	end	
+
+	def move
+		@ants.each do |a|
+			next if a.moved?
+
+			a.stay unless a.orders?
+		end
+	end
+
+	def reassemble
+		leader = nil
+	
+		count = 1	
+		@ants.each do |a|
+			if leader.nil?
+				leader = a 
+				next 
+			end
+
+			a.set_order( leader, :ASSEMBLE, [ count/2 , count % 2 ] )
+			count += 1
+		end
+	end
+
+	def threatened
+		ret = false
+		@ants.each do |a|
+			ret = true and break if a.attacked?
+		end
+
+		if ret 
+			@safe_count = 0
+		else
+			@safe_count += 1
+		end
+
+		if @safe_count > 10
+			disband
+		end
+
+		ret
+	end
+
+	def disband
+		$logger.info "Disbanding"
+		leader = nil
+		@ants.each do |a|
+			leader = a if leader.nil?
+
+			a.collective = nil
+			a.remove_target_from_order leader
+		end
+
+		@ants = []
 	end
 end
 
@@ -59,6 +185,7 @@ class Ant
 	attr_accessor :square, :moved_to
 	
 	attr_accessor :alive, :ai
+	attr_accessor :collective
 
 	
 	def initialize alive, owner, square, ai
@@ -74,6 +201,14 @@ class Ant
 
 		@attack_distance = nil
 		@orders = []
+	end
+
+
+	#
+	# Perform some cleanup stuff when an ant dies
+	#
+	def die
+		@collective.remove self	if collective?
 	end
 	
 	def alive?; @alive; end
@@ -102,6 +237,7 @@ class Ant
 		$logger.info "Ant stays."
 		@square.moved_here = self
 		@moved = true
+		@moved_to = nil
 	end
 
 	def evade_dir dir
@@ -256,17 +392,35 @@ class Ant
 		@attack_distance
 	end
 
-	def set_order square, what
+	def set_order square, what, offset = nil
+		n = Order.new(square, what, offset)
+
 		@orders.each do |o|
 			# order already present
-			return if o.square == square
+			return if o.square == n.square
 		end
 
-		@orders << Order.new(square, what)
+		# ASSEMBLE overrides the rest of the orders
+		if what == :ASSEMBLE
+			@orders = []
+		end
+
+		@orders << n
 	end
 
 	def orders?
 		@orders.size > 0
+	end
+
+	def remove_target_from_order t
+		if orders?
+			p = nil
+			@orders.each do |o|
+				p = o and $logger.info("Found p") and break if o.target? t
+			end
+
+			@orders.delete p unless p.nil?
+		end
 	end
 
 	def handle_orders
@@ -277,20 +431,23 @@ class Ant
 		while orders?
 			if self.square == @orders[0].square
 				# Done with this order, reached the target
+				$logger.info "Reached the target at #{ @orders[0].square.row }, #{ @orders[0].square.col }"
 				@orders = @orders[1..-1]
 				next
 			end
 
 			# Check if in-range when visible for food
-			sq = @orders[0].square
-			closest = closest_ant [ sq.row, sq.col], @ai
-			unless closest.nil?
-				d = Distance.new closest, sq
+			if @orders[0].order == :FORAGE
+				sq = @orders[0].square
+				closest = closest_ant [ sq.row, sq.col], @ai
+				unless closest.nil?
+					d = Distance.new closest, sq
 
-				if d.in_view? and !@ai.map[ sq.row ][sq.col].food?
-					# food is already gone. Skip order
-					@orders = @orders[1..-1]
-					next
+					if d.in_view? and !@ai.map[ sq.row ][sq.col].food?
+						# food is already gone. Skip order
+						@orders = @orders[1..-1]
+						next
+					end
 				end
 			end
 
@@ -309,6 +466,9 @@ class Ant
 			end
 		end
 
+		if @orders[0].order == :ASSEMBLE
+			$logger.info "Moving to #{ @orders[0].square.row }, #{ @orders[0].square.col }"
+		end
 		move_to @orders[0].square
 
 		true
@@ -327,6 +487,39 @@ class Ant
 		else
 			square
 		end
+	end
+
+	def collective?
+		not @collective.nil? # and @collective.size > 0
+	end
+
+	def collective_leader?
+		collective? and @collective.leader? self
+	end
+
+	def add_collective a
+		if @collective.nil?
+			@collective = Collective.new
+			@collective.add self
+		end
+
+		@collective.add a
+		a.set_collective @collective
+		count = @collective.size() -1
+		a.set_order( self, :ASSEMBLE, [ count/2, count%2 ] )
+	end
+
+	def set_collective c 
+		@collective = c
+	end
+
+	def make_collective 
+		@collective =Collective.new 
+		@collective.add self
+	end
+
+	def move_collective 
+		@collective.move
 	end
 end
 
@@ -423,6 +616,7 @@ class Square
 		self.row == n.row and self.col == n.col
 	end
 end
+
 
 class AI
 	# Map, as an array of arrays.
@@ -556,7 +750,6 @@ class AI
 		@map.each do |row|
 			row.each do |square|
 				square.food=false
-				square.ant=nil
 			end
 		end
 		
@@ -602,9 +795,16 @@ class AI
 				if owner==0
 					if @map[row][col].moved_here?
 						$logger.info "My ant died!."
+						
+						@map[row][col].moved_here.die
 						my_ants.delete @map[row][col].moved_here
 					else
 						$logger.info "Dead ant unexpected!"
+						if @map[row][col].ant
+							$logger.info "But there WAS an ant here..."
+							@map[row][col].ant.die
+							@map[row][col].ant = nil
+						end
 					end
 				end
 
@@ -622,7 +822,9 @@ class AI
 			row.each do |square|
 				unless square.moved_here.nil?
 					square.moved_here.moved = false
+					square.moved_here.moved_to = nil
 					square.moved_here = nil
+					square.ant=nil
 				end
 			end
 		end
@@ -674,14 +876,3 @@ class AI
 		@cols
 	end
 end
-
-
-
-
-
-
-
-
-
-
-
