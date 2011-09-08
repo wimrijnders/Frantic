@@ -94,6 +94,7 @@ class Distance
 			ret_dir = rowdir
 		end
 		return ret_dir unless ret_dir.nil?
+		#return ret_dir unless ret_dir.nil? or ( !square.nil? and !square.neighbor( ret_dir).passable? )
 	
 
 		# If specified, take passability from square into account

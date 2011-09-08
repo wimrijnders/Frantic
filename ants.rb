@@ -222,10 +222,6 @@ class Ant
 	def row; @square.row; end
 	def col; @square.col; end
 
-	def to_s
-		"( #{ row }, #{col} )"
-	end
-	
 	# Order this ant to go in given direction.
 	# Equivalent to ai.order ant, direction.
 
@@ -327,19 +323,26 @@ class Ant
 
 
 	def move dir
+		str = "move from #{ square.to_s } to #{ dir } - "
+
 		if square.neighbor(dir).passable?
+			str +=  "passable"
 			order dir
 		else
+			evade dir
+if false
+			str += "Not passable"
 			if square.neighbor( dir ).water?
 				evade dir
 			else
 				unless attacked?
 					# Just pick any direction we can move to
 					directions = [:N, :E, :S, :W ]
-					directions.each do |dir|
-						sq = square.neighbor( dir )
+					directions.each do |d|
+						sq = square.neighbor( d )
 						if sq.passable?
-							order dir
+							order d
+							$logger.info str + "; picked #{ d }"
 							return
 						end
 					end
@@ -348,7 +351,9 @@ class Ant
 				# no directions left or under attack
 				stay
 			end
+end
 		end
+		$logger.info str
 	end
 
 	#
@@ -381,7 +386,7 @@ class Ant
 		d = closest_enemy self, self.ai.enemy_ants 
 		unless d.nil?
 			if d.in_view? and d.clear_view @square
-				$logger.info "ant attacked!"
+				$logger.info "ant #{ @square.to_s } attacked!"
 
 				@attack_distance = d
 				return true
@@ -414,6 +419,10 @@ class Ant
 		end
 
 		@orders << n
+	end
+
+	def clear_orders
+		@orders = []
 	end
 
 	def orders?
@@ -524,6 +533,7 @@ class Ant
 	def make_collective 
 		@collective =Collective.new 
 		@collective.add self
+		clear_orders
 	end
 
 	def move_collective 
@@ -559,12 +569,20 @@ class Square
 	# Returns true if this square contains food.
 	def food?; @food; end
 
+	def to_s
+		"( #{ row }, #{col} )"
+	end
+	
+
 	# Square is passable if it's not water,
 	# it doesn't contain alive ants and it doesn't contain food.
 	#
 	# In addition, no other friendly ant should have moved here.
 	def passable?
+
 		return false if water? or food?  or moved_here? 
+
+		$logger.info "passable #{ self.to_s }: #{ ant? }, #{ @ant.pos.to_s if ant? }"
 		if ant?
 			return false if @ant.enemy?
 
@@ -758,6 +776,7 @@ class AI
 		@map.each do |row|
 			row.each do |square|
 				square.food=false
+				square.ant=nil
 			end
 		end
 		
@@ -771,29 +790,31 @@ class AI
 			row, col = row.to_i, col.to_i
 			owner = owner.to_i if owner
 			
+			sq = @map[row][col]
+
 			case type
 			when 'w'
-				@map[row][col].water=true
+				sq.water = true
 			when 'f'
-				@map[row][col].food=true
+				sq.food=true
 
 				@food << [ row, col ]
 			when 'a'
-				a=Ant.new true, owner, @map[row][col], self
+				a=Ant.new true, owner, sq, self
 
 				if owner==0
-					unless @map[row][col].moved_here?
+					unless sq.moved_here?
 						$logger.info "New ant."
 
-						@map[row][col].ant = a
-						@map[row][col].visited += 1
+						sq.ant = a
+						sq.visited += 1
 						my_ants.push a
 					else
-						$logger.info "Moved ant."
-						b = @map[row][col].moved_here 
-						@map[row][col].ant = b
-						@map[row][col].visited += 1
-						b.square = @map[row][col] 
+						b = sq.moved_here 
+						$logger.info "Moved ant from #{ b.square } to #{ sq }."
+						sq.ant = b
+						sq.visited += 1
+						b.square =  sq
 					end
 
 				else
@@ -801,18 +822,13 @@ class AI
 				end
 			when 'd'
 				if owner==0
-					if @map[row][col].moved_here?
+					if sq.moved_here?
 						$logger.info "My ant died!."
 						
-						@map[row][col].moved_here.die
-						my_ants.delete @map[row][col].moved_here
+						sq.moved_here.die
+						my_ants.delete sq.moved_here
 					else
-						$logger.info "Dead ant unexpected!"
-						if @map[row][col].ant
-							$logger.info "But there WAS an ant here..."
-							@map[row][col].ant.die
-							@map[row][col].ant = nil
-						end
+						$logger.info "Dead ant at #{ sq } unexpected!"
 					end
 				end
 
@@ -832,7 +848,6 @@ class AI
 					square.moved_here.moved = false
 					square.moved_here.moved_to = nil
 					square.moved_here = nil
-					square.ant=nil
 				end
 			end
 		end
