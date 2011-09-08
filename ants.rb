@@ -51,6 +51,10 @@ class Coord
 		@row == a.row and @col == a.col
 	end
 
+	def to_s
+		"( #{ row }, #{col} )"
+	end
+	
 end
 
 	
@@ -217,6 +221,10 @@ class Ant
 	def enemy?; owner!=0; end
 	def row; @square.row; end
 	def col; @square.col; end
+
+	def to_s
+		"( #{ row }, #{col} )"
+	end
 	
 	# Order this ant to go in given direction.
 	# Equivalent to ai.order ant, direction.
@@ -234,7 +242,7 @@ class Ant
 	end
 
 	def stay
-		$logger.info "Ant stays."
+		$logger.info "Ant stays at #{ @square.to_s }."
 		@square.moved_here = self
 		@moved = true
 		@moved_to = nil
@@ -467,7 +475,7 @@ class Ant
 		end
 
 		if @orders[0].order == :ASSEMBLE
-			$logger.info "Moving to #{ @orders[0].square.row }, #{ @orders[0].square.col }"
+			$logger.info "Moving to #{ @orders[0].square.to_s }"
 		end
 		move_to @orders[0].square
 
