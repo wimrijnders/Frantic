@@ -214,6 +214,7 @@ end
 ai=AI.new
 $logger = Logger.new ai
 Distance.set_ai ai
+Coord.set_ai ai
 
 ai.setup do |ai|
 	# your setup code here, if any
@@ -224,36 +225,30 @@ ai.run do |ai|
 
 	# Determine which ant are being attacked
 	# if an enemy close by, move to your closest neighbour if present
-	conflict = false
 	ai.my_ants.each do |ant|
-		conflict ||= ant.check_attacked
+		# WOW WHAT A STUPID BUG!
+		#conflict ||= ant.check_attacked
+		ant.check_attacked
 	end
 
 
-	#if conflict
-		ai.my_ants.each do |ant|
-			handle_conflict2 ant
-		end
-	#end
+	ai.my_ants.each do |ant|
+		handle_conflict2 ant
+	end
+	ai.my_ants.each do |ant|
+		next if ant.collective?
+		handle_conflict ant
+	end
 
 
 	ai.my_ants.each do |ant|
+		#next if ant.collective_leader?
 		ant.handle_orders
 	end
 
 	# Move collectives as a whole
 	ai.my_ants.each do |ant|
 		next unless ant.collective_leader?
-
-		next unless ant.collective.threatened
-
-		if !ant.moved? 
-			if ant.collective.size == 1 and ant.attacked?
-				ant.retreat
-			else
-				ant.stay
-			end
-		end
 
 		ant.move_collective
 	end
@@ -272,11 +267,14 @@ ai.run do |ai|
 
 	ai.my_ants.each do |ant|
 		next if ant.moved?
-		next if ant.collective? and not ant.orders?
+		ant.evading
+	end
 
-		if !ant.evading
-			default_move ant
-		end
+	ai.my_ants.each do |ant|
+		next if ant.moved?
+		next if ant.collective?
+
+		default_move ant
 	end
 
 	# Anything left here stays on the spot

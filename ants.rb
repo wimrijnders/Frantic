@@ -6,7 +6,7 @@ require 'distance.rb'
 
 class Logger
 	def initialize ai
-		@log = true
+		@log = false
 		@@ai = ai
 	end
 
@@ -40,11 +40,28 @@ def left dir
 end
 
 class Coord
+	@@ai = nil;
+
 	attr_accessor :row, :col
 
-	def initialize sq
-		@row = sq.row
-		@col = sq.col
+	def self.set_ai ai
+		@@ai = ai
+	end
+
+	def normalize
+		@row, @col = @@ai.normalize @row, @col
+	end
+
+	def initialize sq, col = nil
+		if col
+			@row = sq
+			@col = col
+		else
+			@row = sq.row
+			@col = sq.col
+		end
+
+		normalize
 	end
 
 	def == a
@@ -54,7 +71,16 @@ class Coord
 	def to_s
 		"( #{ row }, #{col} )"
 	end
-	
+
+	def row= v
+		@row = v
+		normalize
+	end	
+
+	def col= v
+		@col = v
+		normalize
+	end	
 end
 
 	
@@ -84,7 +110,11 @@ class Order
 	end
 
 	def target? t
-		@square === t
+		@square == t
+	end
+
+	def == a
+		square == a.square and order == a.order
 	end
 end
 
@@ -93,6 +123,8 @@ class Collective
 	def initialize
 		@ants = []
 		@safe_count = 0
+		@do_reassemble = true
+		@incomplete_count = 0
 	end
 
 	def add a
@@ -119,62 +151,312 @@ class Collective
 			end
 		end
 
-		reassemble
+		@do_reassemble = true
 	end	
 
-	def move
-		@ants.each do |a|
-			next if a.moved?
+	def attack_dir d
+		if d.row.abs < 1
+			if d.col > 0
+				return :E
+			else
+				return :W
+			end
+		end
+		if d.col.abs < 1
+			if d.row > 0
+				return :S
+			else
+				return :N
+			end
+		end
 
-			a.stay unless a.orders?
+		if d.row.abs < d.col.abs
+			if d.row > 0
+				return :S
+			else
+				return :N
+			end
+		else
+			if d.col > 0
+				return :E
+			else
+				return :W
+			end
 		end
 	end
 
+	def move_intern dir
+		# order of ant movement depends on where they are
+		# within the collective
+		order = case dir
+		when :N; [0,1,2,3]
+		when :E; [1,3,0,2]
+		when :S; [2,3,0,1]
+		when :W; [0,2,1,3]
+		end
+
+		# can we pass that way?
+		ok = true
+		order[0,2].each do |n|
+			a = @ants[n]
+			next if a.nil?	# TODO: if ant is missing, can we still pass?
+			next unless in_location? a, n
+
+			ok =false and break unless a.square.neighbor( dir ).passable?
+		end
+
+		# NOTE: this means that collectives can get stuck
+		# TODO: fix this.
+		return false unless ok
+
+		order.each do |n|
+			a = @ants[n]
+			next if a.nil?
+			#next if a.orders?
+			next unless in_location? a, n
+
+			a.move dir
+		end
+
+		true
+	end
+
+	def can_assemble?
+		# TODO: How can following happen????
+		return false if @ants[0].nil?
+
+		sq = @ants[0].square
+
+		return false unless ( sq.neighbor( :E ).land? and
+		  sq.neighbor( :S ).land? and
+		  sq.neighbor( :E ).neighbor( :S ).land?  )
+
+		# Check presence of foreign member on given square
+		if @ants[1].nil? or !in_location? @ants[1], 1
+			return false if sq.neighbor( :E ).ant?
+		end
+		if @ants[2].nil? or !in_location? @ants[2], 2
+			return false if sq.neighbor( :S ).ant?
+		end
+		if @ants[3].nil? or !in_location? @ants[3], 3
+			return false if sq.neighbor( :E ).neighbor(:S).ant?
+		end
+	
+		return true	
+	end
+
+
+	def move
+		leader = @ants[0]
+		return if leader.moved?
+	
+		return if incomplete
+		return if safe
+		reassemble
+
+		dist = attack_distance
+
+		if dist and dist.in_view?
+			done = false
+			if !assembled?
+				# retreat
+				dist = dist.invert
+				done = move_intern dist.dir
+			else
+				done = move_intern attack_dir( dist )
+			end
+
+			if !done
+				# We may be stuck - do something random
+				move_intern [ :N, :E, :S, :W ][ rand(4) ]
+			end
+		else
+			if assembled?
+				# We're in place but not attacked.
+				# go pick a fight if possible
+				d = closest_enemy leader, leader.ai.enemy_ants 
+
+				# If more or less close, go for it
+				if d and d.dist < 30
+					# Following ensures that collectives get 
+					# disbanded if stuck too long
+					if move_intern d.dir
+						@safe_count = 0
+					end
+				end
+			else
+				check_assembly
+
+				if !can_assemble?
+					# Location is not good, move away
+					move_intern [ :N, :E, :S, :W ][ rand(4) ]
+				else
+					#if not assembled yet, wait for the missing ants
+					#to join
+					@ants.each do |a|
+						next if a.nil?
+						next if a.moved?
+						next if a.orders?
+
+						a.stay
+					end
+				end
+			end
+		end
+	end
+
+	def in_location? a, count
+		leader = @ants[0]
+		return true if a == leader
+
+		# NOTE: the from-square of the ant is used!
+		a.square == Coord.new( (leader.row + count/2), (leader.col + count%2) )
+	end
+
+	def assembled?
+		return false unless filled?
+
+		leader = @ants[0]
+
+		count = 0
+		okay = true
+		@ants.each do |a|
+			unless in_location? a, count
+				okay = false
+				break
+			end
+			count += 1
+			#break if count >= 4
+		end
+
+		okay
+	end
+
+	#
+	# members may have drifted. Ensure that they are in the right place
+	#
+	def check_assembly
+		ok = true
+
+		leader = @ants[0]
+		return if leader.nil?
+
+		count = 1
+		@ants.each do |a|
+			next if a === leader
+
+			unless a.nil? or a.orders?
+				unless in_location? a, count
+					a.set_order( leader, :ASSEMBLE, [ count/2 , count % 2 ] )
+					ok = false
+				end
+			end
+
+			count += 1
+		end
+	end
+
+
+	#
+	# Do a forced reassembly, if the constituency of a collective
+	# has changed
+	#
 	def reassemble
+		return unless @do_reassemble
+		@do_reassemble = false
+
 		leader = nil
+
+		disband and return if size == 1
 	
 		count = 1	
 		@ants.each do |a|
 			if leader.nil?
 				leader = a 
+				leader.clear_orders
 				next 
 			end
 
-			a.set_order( leader, :ASSEMBLE, [ count/2 , count % 2 ] )
+			if !in_location? a, count
+				a.set_order( leader, :ASSEMBLE, [ count/2 , count % 2 ] ) 
+			end
+
 			count += 1
 		end
+	
 	end
 
-	def threatened
-		ret = false
-		@ants.each do |a|
-			ret = true and break if a.attacked?
+	def incomplete
+		if size < 4 
+			@incomplete_count += 1
+		else
+			@incomplete_count = 0
 		end
 
-		if ret 
+		if @incomplete_count > 30
+			disband
+		end
+
+		( @incomplete_count > 30 )
+	end
+
+	def safe
+		ret = false
+		tmp = false
+		@ants.each do |a|
+			tmp = true and break if a.attacked? and not a.orders?
+		end
+
+		if tmp 
 			@safe_count = 0
 		else
 			@safe_count += 1
 		end
 
-		if @safe_count > 10
+		if @safe_count > 20
 			disband
+			ret = true
 		end
 
 		ret
 	end
 
+
+	def attack_distance
+		best = nil
+		@ants.each do |a|
+			if a.attacked? and not a.orders?
+				tmp = a.attack_distance
+
+				if !best or tmp.dist < best.dist
+					best = tmp
+				end
+			end
+		end
+
+		best
+	end
+
+
 	def disband
 		$logger.info "Disbanding"
 		leader = nil
 		@ants.each do |a|
-			leader = a if leader.nil?
-
-			a.collective = nil
-			a.remove_target_from_order leader
+			if leader.nil?
+				leader = a
+				a.clear_orders
+				a.collective = nil
+			else
+				a.collective = nil
+				a.remove_target_from_order leader
+			end
 		end
 
 		@ants = []
+	end
+
+	def filled?
+		size == 4
 	end
 end
 
@@ -410,7 +692,7 @@ end
 
 		@orders.each do |o|
 			# order already present
-			return if o.square == n.square
+			return if o == n
 		end
 
 		# ASSEMBLE overrides the rest of the orders
@@ -419,10 +701,22 @@ end
 		end
 
 		@orders << n
+
+		# Nearest orders first
+		@orders.sort! do |a,b|
+			adist = Distance.new( self.pos, a.square)
+			bdist = Distance.new( self.pos, b.square)
+
+			adist.dist <=> bdist.dist
+		end
 	end
 
 	def clear_orders
 		@orders = []
+
+		# reset evasion, if any
+		#@want_dir = nil
+		#@next_dir = nil
 	end
 
 	def orders?
@@ -433,7 +727,11 @@ end
 		if orders?
 			p = nil
 			@orders.each do |o|
-				p = o and $logger.info("Found p") and break if o.target? t
+				if o.target? t
+					p = o 
+					$logger.info("Found p")
+					break
+				end
 			end
 
 			@orders.delete p unless p.nil?
@@ -445,12 +743,22 @@ end
 
 		prev_order = (orders?) ? @orders[0].square: nil
 
+		success = false
 		while orders?
 			if self.square == @orders[0].square
 				# Done with this order, reached the target
 				$logger.info "Reached the target at #{ @orders[0].square.row }, #{ @orders[0].square.col }"
+				success = true if @orders[0].order == :ASSEMBLE
+
 				@orders = @orders[1..-1]
 				next
+			end
+
+			if @orders[0].order == :ASSEMBLE
+				if !collective
+					@orders = @orders[1..-1]
+					next
+				end
 			end
 
 			# Check if in-range when visible for food
@@ -470,6 +778,17 @@ end
 
 			break
 		end
+
+		# TODO: verify if following needed
+		if success
+			# reset evasion, if any
+			@want_dir = nil
+			@next_dir = nil
+
+			stay
+			return true
+		end
+
 		return false if !orders?
 
 		if evading?
@@ -515,10 +834,12 @@ end
 	end
 
 	def add_collective a
+
 		if @collective.nil?
 			@collective = Collective.new
 			@collective.add self
 		end
+		return if @collective.filled?
 
 		@collective.add a
 		a.set_collective @collective
@@ -582,7 +903,7 @@ class Square
 
 		return false if water? or food?  or moved_here? 
 
-		$logger.info "passable #{ self.to_s }: #{ ant? }, #{ @ant.pos.to_s if ant? }"
+		#$logger.info "passable #{ self.to_s }: #{ ant? }, #{ @ant.pos.to_s if ant? }"
 		if ant?
 			return false if @ant.enemy?
 

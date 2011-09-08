@@ -9,6 +9,15 @@ class Distance
 	end
 
 	def initialize from, to = nil
+	if to.nil?
+		if from.respond_to? :row
+			@row = from.row
+			@col = from.col
+		else
+			@row = from[0]
+			@col = from[1]
+		end
+	else
 		if to.respond_to? :row
 			@row = to.row
 			@col = to.col
@@ -24,6 +33,7 @@ class Distance
 			@row -= from[0]
 			@col -= from[1]
 		end
+	end
 
 		normalize
 	end
@@ -125,8 +135,8 @@ class Distance
 	end
 
 	def clear_view square
-		sq = square.clone
-		d = self.clone
+		sq = square
+		d = Distance.new self
 
 		while d.dist > 0 and not d.in_attack_range?
 			dir = d.dir
