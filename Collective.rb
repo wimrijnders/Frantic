@@ -1,10 +1,24 @@
 
 class Collective
+
+	# order of ant movement depends on where they are
+	# within the collective
+	@@move_order = { 
+		:N => [0,1,2,3],
+		:E => [1,3,0,2],
+		:S => [2,3,0,1],
+		:W => [0,2,1,3]
+	}
+
+	include Evasion
+
 	def initialize
 		@ants = []
 		@safe_count = 0
 		@do_reassemble = true
 		@incomplete_count = 0
+
+		evade_init
 	end
 
 	def add a
@@ -20,6 +34,9 @@ class Collective
 	end
 
 	def remove a
+		#disband
+		#return
+
 		is_leader = leader? a
 
 		@ants.delete a
@@ -65,31 +82,32 @@ class Collective
 		end
 	end
 
-	def move_intern dir
-		# order of ant movement depends on where they are
-		# within the collective
-		order = case dir
-		when :N; [0,1,2,3]
-		when :E; [1,3,0,2]
-		when :S; [2,3,0,1]
-		when :W; [0,2,1,3]
-		end
+	def can_pass? dir
+		order = @@move_order[ dir ]
 
-		# can we pass that way?
 		ok = true
 		order[0,2].each do |n|
 			a = @ants[n]
 			next if a.nil?	# TODO: if ant is missing, can we still pass?
 			next unless in_location? a, n
 
-			ok =false and break unless a.square.neighbor( dir ).passable?
+			ok =false and break unless a.can_pass? dir
 		end
 
-		# NOTE: this means that collectives can get stuck
-		# TODO: fix this.
-		return false unless ok
+		ok
+	end
 
-		order.each do |n|
+
+	def move_intern dir
+		return false unless can_pass? dir
+
+		order dir
+		true
+	end
+
+
+	def order dir
+		@@move_order[dir].each do |n|
 			a = @ants[n]
 			next if a.nil?
 			#next if a.orders?
@@ -97,9 +115,8 @@ class Collective
 
 			a.move dir
 		end
-
-		true
 	end
+
 
 	def can_assemble?
 		# TODO: How can following happen????
@@ -130,6 +147,7 @@ class Collective
 		leader = @ants[0]
 		return if leader.moved?
 	
+		return if evading
 		return if incomplete
 		return if safe
 		reassemble
@@ -137,18 +155,18 @@ class Collective
 		dist = attack_distance
 
 		if dist and dist.in_view?
-			done = false
+			dir = nil
 			if !assembled?
 				# retreat
-				dist = dist.invert
-				done = move_intern dist.dir
+				dir = dist.invert.dir
 			else
-				done = move_intern attack_dir( dist )
+				dir = attack_dir( dist )
 			end
 
-			if !done
-				# We may be stuck - do something random
-				move_intern [ :N, :E, :S, :W ][ rand(4) ]
+			if !move_intern dir 
+				evade dir
+				## We may be stuck - do something random
+				#move_intern [ :N, :E, :S, :W ][ rand(4) ]
 			end
 		else
 			if assembled?
@@ -158,10 +176,11 @@ class Collective
 
 				# If more or less close, go for it
 				if d and d.dist < 30
-					# Following ensures that collectives get 
-					# disbanded if stuck too long
 					if move_intern d.dir
+						# Don't disband when not threatened
 						@safe_count = 0
+					else
+						evade d.dir
 					end
 				end
 			else
@@ -173,17 +192,23 @@ class Collective
 				else
 					#if not assembled yet, wait for the missing ants
 					#to join
-					@ants.each do |a|
-						next if a.nil?
-						next if a.moved?
-						next if a.orders?
-
-						a.stay
-					end
+					stay
 				end
 			end
 		end
 	end
+
+
+	def stay
+		@ants.each do |a|
+			next if a.nil?
+			next if a.moved?
+			next if a.orders?
+
+			a.stay
+		end
+	end
+
 
 	def in_location? a, count
 		leader = @ants[0]

@@ -1,7 +1,6 @@
 
 # Represents a single ant.
 class Ant
-	@@curleft = true
 
 	# Owner of this ant. If it's 0, it's your ant.
 	attr_accessor :owner
@@ -11,20 +10,17 @@ class Ant
 	attr_accessor :alive, :ai
 	attr_accessor :collective
 
+	include Evasion
 	
 	def initialize alive, owner, square, ai
 		@alive, @owner, @square, @ai = alive, owner, square, ai
-
-		@want_dir = nil
-		@next_dir = nil
-
-		@left = @@curleft
-		@@curleft = !@@curleft
 
 		@moved= false
 
 		@attack_distance = nil
 		@orders = []
+
+		evade_init
 	end
 
 
@@ -64,74 +60,6 @@ class Ant
 		@moved_to = nil
 	end
 
-	def evade_dir dir
-		if @left
-			left dir
-		else 
-			right dir
-		end
-	end
-
-	def evade2_dir dir
-		if @left
-			right dir
-		else 
-			left dir
-		end
-	end
-
-	def evade dir
-		# The direction we want to go is blocked;
-		# go round the obstacle
-		$logger.info "Starting evasion" if @want_dir.nil?
-	
-		done = false
-		newdir = dir
-
-		# Don't try original direction again
-		(0..2).each do
-			newdir = evade_dir newdir
-			if square.neighbor(newdir).passable?
-				done = true
-				break
-			end
-		end
-	
-		if done
-			@want_dir = dir if @want_dir.nil?
-			@next_dir = evade2_dir newdir
-			order newdir
-		else
-			stay
-		end
-	end
-
-
-	def evading
-		unless @next_dir.nil?
-			$logger.info "evading next_dir"
-
-			if square.neighbor( @next_dir ).passable?
-				order @next_dir
-
-				# if the direction went corresponds with the
-				# direction wanted, we are done.
-				if @next_dir == @want_dir
-					$logger.info "evasion complete"
-					@next_dir = nil
-					@want_dir = nil
-				else
-					@next_dir = evade2_dir @next_dir
-				end
-			else 
-				evade @next_dir
-			end
-
-			return true
-		end
-
-		false
-	end
 
 	def moved= val
 		@moved = val
@@ -141,11 +69,14 @@ class Ant
 		@moved
 	end
 
+	def can_pass? newdir
+		square.neighbor(newdir).passable?
+	end
 
 	def move dir
 		str = "move from #{ square.to_s } to #{ dir } - "
 
-		if square.neighbor(dir).passable?
+		if can_pass? dir
 			str +=  "passable"
 			order dir
 		else
@@ -198,10 +129,6 @@ end
 	end
 
 
-	def evading?
-		!@next_dir.nil?
-	end
-
 	def check_attacked
 		d = closest_enemy self, self.ai.enemy_ants 
 		unless d.nil?
@@ -252,9 +179,7 @@ end
 	def clear_orders
 		@orders = []
 
-		# reset evasion, if any
-		#@want_dir = nil
-		#@next_dir = nil
+		#evade_reset
 	end
 
 	def orders?
@@ -319,9 +244,7 @@ end
 
 		# TODO: verify if following needed
 		if success
-			# reset evasion, if any
-			@want_dir = nil
-			@next_dir = nil
+			evade_reset
 
 			stay
 			return true
@@ -332,8 +255,7 @@ end
 		if evading?
 			if prev_order != @orders[0].square
 				# order changed; reset evasion
-				@want_dir = nil
-				@next_dir = nil
+				evade_reset
 			else
 				# Handle evasion elsewhere
 				return false

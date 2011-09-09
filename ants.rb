@@ -1,7 +1,8 @@
 # Ants AI Challenge framework
 # by Matma Rex (matma.rex@gmail.com)
 # Released under CC-BY 3.0 license
-require 'suppor.rb'
+require 'support.rb'
+require 'Evasion.rb'
 require 'Distance.rb'
 require 'Collective.rb'
 require 'Ant.rb'
