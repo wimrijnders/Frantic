@@ -1,5 +1,14 @@
 $:.unshift File.dirname($0)
+#######################################
+# TODO
+#
+# - Don't assemble if not enough buddies around
+# - Staying put is a good strategy for small playing fields.
+# - 1-x ant combat; best approach is diagonal on corner ant. You die but you also kill one enemy.
+#
+#######################################
 require 'ants.rb'
+
 
 # Local methods
 
