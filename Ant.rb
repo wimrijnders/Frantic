@@ -186,6 +186,13 @@ end
 		@orders.size > 0
 	end
 
+
+	def order_distance
+		return nil unless orders?
+
+		Distance.new pos, @orders[0].square
+	end
+
 	def remove_target_from_order t
 		if orders?
 			p = nil

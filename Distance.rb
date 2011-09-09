@@ -161,5 +161,41 @@ class Distance
 		d.in_attack_range?
 		#true
 	end
+
+
+	#
+	# Following is a good approach if the ant attacking has buddies.
+	# A single ant has less chance.
+	#
+	def attack_dir 
+		if row.abs < 1
+			if col > 0
+				return :E
+			else
+				return :W
+			end
+		end
+		if col.abs < 1
+			if row > 0
+				return :S
+			else
+				return :N
+			end
+		end
+
+		if row.abs < col.abs
+			if row > 0
+				return :S
+			else
+				return :N
+			end
+		else
+			if col > 0
+				return :E
+			else
+				return :W
+			end
+		end
+	end
 end
 

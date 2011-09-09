@@ -5,6 +5,11 @@ $:.unshift File.dirname($0)
 # - Don't assemble if not enough buddies around
 # - Staying put is a good strategy for small playing fields.
 # - 1-x ant combat; best approach is diagonal on corner ant. You die but you also kill one enemy.
+# - On evasion, select shortest route (fast-forward?)
+# - Sad but true: collectives are a bad strategy for small, cramped (lots of water and enemies) maps.
+# - Second previous comment; 4-collectives absolutely suck
+# - :-) Even on big maps with >4 players (symmetric_4), non-collectives are better (crying now)
+# - Strategy: consider making 2-collectives
 #
 #######################################
 require 'ants.rb'
@@ -49,36 +54,59 @@ end
 
 
 def handle_conflict2 ant
-	#return false if ant.moved?
-	return if ant.collective?
 
 	if ant.attacked? 
 		#ant.make_collective
+		if ant.collective?
+			return if ant.collective.filled?
+			ant = ant.collective.leader
+		end
 
 		# recruit near neighbours for a collective
+		recruits = []
 		ant.ai.my_ants.each do |l|
 			next if l.collective?
 			next if l === ant
 
 			d = Distance.new ant.pos, l.pos	
-			if d.in_view?
+			if d.dist < 20
+			#if d.in_view?
+				recruits << l
+			end
+		end
+
+		# If there are enough, make the collective
+		if recruits.size >= 3
+			# Nearest recruit first
+			recruits.sort! do |a,b|
+				adist = Distance.new( ant.pos, a.pos)
+				bdist = Distance.new( ant.pos, b.pos)
+
+				adist.dist <=> bdist.dist
+			end
+
+			recruits.each do |l|
 				ant.add_collective l
+				break if ant.collective.filled?
 			end
 		end
 	else
+		return
+
+		return if ant.collective?
+
 		ant.ai.my_ants.each do |l|
 			next unless l.collective_leader?
 			next if l === ant
 
 			d = Distance.new ant.pos, l.pos	
 
-			if d.in_view?
+			if d.dist < 20	and not l.collective.filled?
+			#if d.in_view?
 				l.add_collective ant
 			end
 		end
 	end
-
-
 end
 
 
@@ -86,6 +114,12 @@ def handle_conflict ant
 	return false if ant.moved?
 
 	if ant.attacked?
+		# continue with current order if closer than attacker
+		order_dist = ant.order_distance
+		if !order_dist.nil? and order_dist.dist < ant.attack_distance.dist 
+			return false
+		end
+
 		$logger.info "Conflict!"
 		# Check for direct friendly neighbours 
 		done = false
@@ -113,7 +147,8 @@ def handle_conflict ant
 			# Neighbours didn´t move, perform attack yourself
 			$logger.info "Attack."
 
-			ant.move_dir ant.attack_distance
+			#ant.move_dir ant.attack_distance
+			ant.move ant.attack_distance.attack_dir
 			return true
 		end
 

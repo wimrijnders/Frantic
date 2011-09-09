@@ -1,6 +1,8 @@
 
 class Collective
 
+	SIZE = 4
+
 	# order of ant movement depends on where they are
 	# within the collective
 	@@move_order = { 
@@ -33,10 +35,12 @@ class Collective
 		@ants[0] == a
 	end
 
-	def remove a
-		#disband
-		#return
+	def leader
+		@ants[0]
+	end
 
+
+	def remove a
 		is_leader = leader? a
 
 		@ants.delete a
@@ -48,39 +52,13 @@ class Collective
 			end
 		end
 
-		@do_reassemble = true
+		if size == 1
+			disband
+		else
+			@do_reassemble = true
+		end
 	end	
 
-	def attack_dir d
-		if d.row.abs < 1
-			if d.col > 0
-				return :E
-			else
-				return :W
-			end
-		end
-		if d.col.abs < 1
-			if d.row > 0
-				return :S
-			else
-				return :N
-			end
-		end
-
-		if d.row.abs < d.col.abs
-			if d.row > 0
-				return :S
-			else
-				return :N
-			end
-		else
-			if d.col > 0
-				return :E
-			else
-				return :W
-			end
-		end
-	end
 
 	def can_pass? dir
 		order = @@move_order[ dir ]
@@ -160,13 +138,11 @@ class Collective
 				# retreat
 				dir = dist.invert.dir
 			else
-				dir = attack_dir( dist )
+				dir = dist.attack_dir
 			end
 
 			if !move_intern dir 
 				evade dir
-				## We may be stuck - do something random
-				#move_intern [ :N, :E, :S, :W ][ rand(4) ]
 			end
 		else
 			if assembled?
@@ -187,7 +163,7 @@ class Collective
 
 				if !can_assemble?
 					# Location is not good, move away
-					move_intern [ :N, :E, :S, :W ][ rand(4) ]
+					move_intern [ :N, :E, :S, :W ][ rand(SIZE) ]
 				else
 					#if not assembled yet, wait for the missing ants
 					#to join
@@ -297,7 +273,7 @@ class Collective
 	end
 
 	def incomplete
-		if size < 4 
+		if size < SIZE 
 			@incomplete_count += 1
 		else
 			@incomplete_count = 0
@@ -366,6 +342,6 @@ class Collective
 	end
 
 	def filled?
-		size == 4
+		size == SIZE 
 	end
 end
