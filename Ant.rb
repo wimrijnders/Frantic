@@ -206,12 +206,10 @@ end
 
 		prev_order = (orders?) ? @orders[0].square: nil
 
-		success = false
 		while orders?
 			if self.square == @orders[0].square
 				# Done with this order, reached the target
 				$logger.info "Reached the target at #{ @orders[0].square.row }, #{ @orders[0].square.col }"
-				success = true if @orders[0].order == :ASSEMBLE
 
 				@orders = @orders[1..-1]
 				next
@@ -240,14 +238,6 @@ end
 			end
 
 			break
-		end
-
-		# TODO: verify if following needed
-		if success
-			evade_reset
-
-			stay
-			return true
 		end
 
 		return false if !orders?

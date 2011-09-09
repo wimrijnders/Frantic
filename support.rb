@@ -81,7 +81,7 @@ end
 	
 
 class Order
-	attr_accessor :order
+	attr_accessor :order, :offset
 
 	def initialize square, order, offset = nil
 		@square = square
@@ -104,12 +104,22 @@ class Order
 		sq
 	end
 
+	def sq_int
+		@square
+	end
+
 	def target? t
 		@square == t
 	end
 
 	def == a
-		square == a.square and order == a.order
+		sq_int.class ==a.sq_int.class and 	# target square can have differing classes
+		sq_int.row == a.sq_int.row and		
+		sq_int.col == a.sq_int.col and
+		order == a.order and
+		( ( offset.nil? and a.offset.nil? ) or
+		  (	offset[0] == a.offset[0] and offset[1] == a.offset[1] )
+		)
 	end
 end
 

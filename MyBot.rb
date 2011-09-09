@@ -41,37 +41,30 @@ end
 
 def handle_conflict2 ant
 	#return false if ant.moved?
+	return if ant.collective?
 
 	if ant.attacked? 
-		if not ant.collective?
-			#ant.make_collective
+		#ant.make_collective
 
-			# recruit near neighbours for a collective
-			ant.ai.my_ants.each do |l|
-				next if l.collective?
-				next if l === ant
+		# recruit near neighbours for a collective
+		ant.ai.my_ants.each do |l|
+			next if l.collective?
+			next if l === ant
 
-				d = Distance.new ant.pos, l.pos	
-				if d.in_view?
-					ant.add_collective l
-				end
+			d = Distance.new ant.pos, l.pos	
+			if d.in_view?
+				ant.add_collective l
 			end
-
 		end
-
-		return
 	else
-		if !ant.collective?
+		ant.ai.my_ants.each do |l|
+			next unless l.collective_leader?
+			next if l === ant
 
-			ant.ai.my_ants.each do |l|
-				next unless l.collective_leader?
-				next if l === ant
+			d = Distance.new ant.pos, l.pos	
 
-				d = Distance.new ant.pos, l.pos	
-
-				if d.in_view?
-					l.add_collective ant
-				end
+			if d.in_view?
+				l.add_collective ant
 			end
 		end
 	end

@@ -147,10 +147,10 @@ class Collective
 		leader = @ants[0]
 		return if leader.moved?
 	
-		return if evading
 		return if incomplete
-		return if safe
 		reassemble
+		return if evading
+		return if safe
 
 		dist = attack_distance
 
@@ -176,10 +176,9 @@ class Collective
 
 				# If more or less close, go for it
 				if d and d.dist < 30
-					if move_intern d.dir
-						# Don't disband when not threatened
-						@safe_count = 0
-					else
+					# Don't disband when not threatened
+					@safe_count = 0
+					unless move_intern d.dir
 						evade d.dir
 					end
 				end
@@ -221,17 +220,21 @@ class Collective
 	def assembled?
 		return false unless filled?
 
-		leader = @ants[0]
-
 		count = 0
 		okay = true
 		@ants.each do |a|
-			unless in_location? a, count
+			if in_location? a, count
+				# Note: following is a side effect.
+				#       For the logic, this is the best place to put it.
+				a.clear_orders if a.orders?
+				a.evade_reset if a.evading?
+				# End side effect
+			else
 				okay = false
-				break
+				# Don't break here; if-block needs to be done for all members
 			end
+			
 			count += 1
-			#break if count >= 4
 		end
 
 		okay
@@ -244,7 +247,7 @@ class Collective
 		ok = true
 
 		leader = @ants[0]
-		return if leader.nil?
+		return false if leader.nil?
 
 		count = 1
 		@ants.each do |a|
@@ -259,6 +262,8 @@ class Collective
 
 			count += 1
 		end
+
+		ok
 	end
 
 
