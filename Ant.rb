@@ -293,15 +293,14 @@ end
 	def add_collective a
 
 		if @collective.nil?
-			@collective = Collective.new
-			@collective.add self
+			make_collective
 		end
 		return if @collective.filled?
 
 		@collective.add a
 		a.set_collective @collective
-		count = @collective.size() -1
-		a.set_order( self, :ASSEMBLE, [ count/2, count%2 ] )
+
+		@collective.rally a,
 	end
 
 	def set_collective c 
@@ -309,7 +308,7 @@ end
 	end
 
 	def make_collective 
-		@collective =Collective.new 
+		@collective = Collective2.new 
 		@collective.add self
 		clear_orders
 	end

@@ -1,27 +1,14 @@
 
 class Collective
-
-	SIZE = 4
-
-	# order of ant movement depends on where they are
-	# within the collective
-	@@move_order = { 
-		:N => [0,1,2,3],
-		:E => [1,3,0,2],
-		:S => [2,3,0,1],
-		:W => [0,2,1,3]
-	}
-
-	include Evasion
-
 	def initialize
 		@ants = []
 		@safe_count = 0
 		@do_reassemble = true
 		@incomplete_count = 0
-
 		evade_init
 	end
+
+	include Evasion
 
 	def add a
 		@ants << a
@@ -39,6 +26,14 @@ class Collective
 		@ants[0]
 	end
 
+	#
+	# Order the given ant to the specified position within the collective.
+	# If no position given, add to the end of the collective.
+	#
+	def rally ant, count = nil
+		count = size() -1 if count.nil?
+		ant.set_order( leader, :ASSEMBLE, relpos(count) ) 
+	end
 
 	def remove a
 		is_leader = leader? a
@@ -59,23 +54,6 @@ class Collective
 		end
 	end	
 
-
-	def can_pass? dir
-		order = @@move_order[ dir ]
-
-		ok = true
-		order[0,2].each do |n|
-			a = @ants[n]
-			next if a.nil?	# TODO: if ant is missing, can we still pass?
-			next unless in_location? a, n
-
-			ok =false and break unless a.can_pass? dir
-		end
-
-		ok
-	end
-
-
 	def move_intern dir
 		return false unless can_pass? dir
 
@@ -83,114 +61,20 @@ class Collective
 		true
 	end
 
-
-	def order dir
-		@@move_order[dir].each do |n|
-			a = @ants[n]
-			next if a.nil?
-			#next if a.orders?
-			next unless in_location? a, n
-
-			a.move dir
-		end
-	end
-
-
 	def can_assemble?
-		# TODO: How can following happen????
-		return false if @ants[0].nil?
-
 		sq = @ants[0].square
 
-		return false unless ( sq.neighbor( :E ).land? and
-		  sq.neighbor( :S ).land? and
-		  sq.neighbor( :E ).neighbor( :S ).land?  )
-
 		# Check presence of foreign member on given square
-		if @ants[1].nil? or !in_location? @ants[1], 1
-			return false if sq.neighbor( :E ).ant?
-		end
-		if @ants[2].nil? or !in_location? @ants[2], 2
-			return false if sq.neighbor( :S ).ant?
-		end
-		if @ants[3].nil? or !in_location? @ants[3], 3
-			return false if sq.neighbor( :E ).neighbor(:S).ant?
+		(1..fullsize).each do |n|
+			sq_rel =  sq.rel( relpos(n) )
+			return false unless ( sq_rel ).land?
+
+			if @ants[n].nil? or !in_location? @ants[n], n
+				return false if sq_rel.ant?
+			end
 		end
 	
 		return true	
-	end
-
-
-	def move
-		leader = @ants[0]
-		return if leader.moved?
-	
-		return if incomplete
-		reassemble
-		return if evading
-		return if safe
-
-		dist = attack_distance
-
-		if dist and dist.in_view?
-			dir = nil
-			if !assembled?
-				# retreat
-				dir = dist.invert.dir
-			else
-				dir = dist.attack_dir
-			end
-
-			if !move_intern dir 
-				evade dir
-			end
-		else
-			if assembled?
-				# We're in place but not attacked.
-				# go pick a fight if possible
-				d = closest_enemy leader, leader.ai.enemy_ants 
-
-				# If more or less close, go for it
-				if d and d.dist < 30
-					# Don't disband when not threatened
-					@safe_count = 0
-					unless move_intern d.dir
-						evade d.dir
-					end
-				end
-			else
-				check_assembly
-
-				if !can_assemble?
-					# Location is not good, move away
-					move_intern [ :N, :E, :S, :W ][ rand(SIZE) ]
-				else
-					#if not assembled yet, wait for the missing ants
-					#to join
-					stay
-				end
-			end
-		end
-	end
-
-
-	def stay
-		@ants.each do |a|
-			next if a.nil?
-			next if a.moved?
-			next if a.orders?
-
-			a.stay
-		end
-	end
-
-
-	def in_location? a, count
-		leader = @ants[0]
-		return true if a == leader
-
-		# NOTE: the from-square of the ant is used!
-		a.square == Coord.new( (leader.row + count/2), (leader.col + count%2) )
 	end
 
 	def assembled?
@@ -216,13 +100,123 @@ class Collective
 		okay
 	end
 
+	def can_pass? dir #, water_only = false
+		water_only = false
+
+		ok = true
+		pass_check(dir).each do |n|
+			a = @ants[n]
+			next if a.nil?	# TODO: if ant is missing, can we still pass?
+			next unless in_location? a, n
+
+			if water_only
+				ok =false and break if a.square.neighbor(dir).water?
+			else
+				ok =false and break unless a.can_pass? dir
+			end
+		end
+
+		ok
+	end
+
+	def order dir
+		move_list(dir).each do |n|
+			a = @ants[n]
+			next if a.nil?
+			#next if a.orders?
+			next unless in_location? a, n
+
+			a.move dir
+		end
+	end
+
+
+	def move
+		return if leader.moved?
+	
+		return if incomplete
+		reassemble
+		return if evading
+		return if safe
+
+		dist = attack_distance
+
+		if dist and dist.in_view?
+			dir = nil
+			if !assembled?
+				# retreat
+				dir = dist.invert.dir
+			else
+				dir = dist.attack_dir
+				return if orient dist.longest_dir
+			end
+
+			if !move_intern dir 
+				evade dir
+			end
+		else
+			if assembled?
+				# We're in place but not attacked.
+				# go pick a fight if possible
+				d = closest_enemy leader, leader.ai.enemy_ants 
+
+				# If more or less close, go for it
+				if d and d.dist < 30
+					# Don't disband when not threatened
+					@safe_count = 0
+					return if orient d.longest_dir
+					unless move_intern d.dir
+						evade d.dir
+						# This is a good idea for cramped maps, bad idea for open maps.
+						# how to diferentiate?
+						#if can_pass? d.dir, true
+						#	stay
+						#else
+						#	evade d.dir
+						#end
+					end
+				end
+			else
+				check_assembly
+
+				if !can_assemble?
+					# Location is not good, move away
+					random_move
+				else
+					#if not assembled yet, wait for the missing ants
+					#to join
+					stay
+				end
+			end
+		end
+	end
+
+
+	def stay
+		@ants.each do |a|
+			next if a.nil?
+			next if a.moved?
+			next if a.orders?
+
+			a.stay
+		end
+	end
+
+
+	def in_location? a, count
+		return true if count == 0 
+
+		# NOTE: the from-square of the ant is used!
+		#a.square == Coord.new( (leader.row + count/2), (leader.col + count%2) )
+		a.square == leader.square.rel( relpos( count) )
+	end
+
 	#
 	# members may have drifted. Ensure that they are in the right place
 	#
 	def check_assembly
 		ok = true
 
-		leader = @ants[0]
 		return false if leader.nil?
 
 		count = 1
@@ -231,7 +225,7 @@ class Collective
 
 			unless a.nil? or a.orders?
 				unless in_location? a, count
-					a.set_order( leader, :ASSEMBLE, [ count/2 , count % 2 ] )
+					rally a, count
 					ok = false
 				end
 			end
@@ -264,7 +258,7 @@ class Collective
 			end
 
 			if !in_location? a, count
-				a.set_order( leader, :ASSEMBLE, [ count/2 , count % 2 ] ) 
+				rally a, count
 			end
 
 			count += 1
@@ -273,7 +267,7 @@ class Collective
 	end
 
 	def incomplete
-		if size < SIZE 
+		if size < fullsize 
 			@incomplete_count += 1
 		else
 			@incomplete_count = 0
@@ -285,6 +279,7 @@ class Collective
 
 		( @incomplete_count > 30 )
 	end
+
 
 	def safe
 		ret = false
@@ -342,6 +337,142 @@ class Collective
 	end
 
 	def filled?
-		size == SIZE 
+		size == fullsize 
+	end
+
+	def random_move
+		move_intern [ :N, :E, :S, :W ][ rand(4) ]
+	end
+end
+
+
+class Collective4 < Collective
+
+	# order of ant movement depends on where they are
+	# within the collective
+	@@move_order = { 
+		:N => [0,1,2,3],
+		:E => [1,3,0,2],
+		:S => [2,3,0,1],
+		:W => [0,2,1,3]
+	}
+
+
+	def initialize
+		super
+	end
+
+	def fullsize; 4; end
+
+	def relpos count
+		[ count/2 , count % 2 ] 
+	end
+
+	def pass_check dir
+		@@move_order[dir][0,2]
+	end
+
+	def move_list dir
+		@@move_order[dir]
+	end
+
+	def orient d; false; end
+end
+
+
+class Collective2 < Collective
+
+	# order of ant movement depends on where they are
+	# within the collective
+	@@move_orderNS = { 
+		:N => [0,1],
+		:E => [1,0],
+		:S => [0,1],
+		:W => [0,1]
+	}
+
+	@@move_orderEW = { 
+		:N => [0,1],
+		:E => [0,1],
+		:S => [1,0],
+		:W => [0,1]
+	}
+
+
+
+	def initialize
+		super
+		@orient_dir = :N
+	end
+
+	def fullsize; 2; end
+
+	def relpos count
+		return [0,0] if count == 0
+
+		if [:E,:W].include? @orient_dir
+			[1,0]
+		else
+			[0,1]
+		end
+	end
+
+	def pass_check dir
+		if [:E,:W].include? @orient_dir
+			if [ :E, :W].include? dir
+				@@move_orderEW[dir]
+			else
+				@@move_orderEW[dir][0,1]
+			end
+		else
+			if [ :E, :W].include? dir
+				@@move_orderNS[dir][0,1]
+			else
+				@@move_orderNS[dir]
+			end
+		end
+	end
+
+
+	def move_list dir
+		if [:E,:W].include? @orient_dir
+			@@move_orderEW[dir]
+		else
+			@@move_orderNS[dir]
+		end
+	end
+
+	def orient d
+		# If orientations compatible, don't bother switching.
+		if [:E,:W].include?( d) and [:E,:W].include?( @orient_dir )
+			return false
+		end
+		return false if [:N,:S].include? d and [:N,:S].include? @orient_dir
+		$logger.info "Switching #{ @ants[0].square.to_s } from #{ @orient_dir } to #{ d }"
+
+		if [:N,:S].include? d
+			# Switch to NS orientation
+
+			n0, n1 = 0,1
+			move0, move1 = :W,:N
+		else
+			# Switch to EW orientation
+			# ant 1 needs to move first!
+			n0, n1 = 1, 0
+			move0, move1 = :S, :E
+		end
+
+		# switch orientation
+		if @ants[n0].can_pass?( move0 )		# DON't test second ant, it moving to the position of the first ant.
+			@ants[n0].move move0 
+			@ants[n1].move move1 
+			@orient_dir = d
+		else
+			# Can't switch, just do something
+			$logger.info "Can't switch."
+			random_move
+		end
+
+		true		
 	end
 end

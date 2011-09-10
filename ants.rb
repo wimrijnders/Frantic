@@ -95,6 +95,15 @@ class Square
 		return @ai.map[row][col]
 	end
 
+	def rel relpos
+		row, col = @row + relpos[0], @col + relpos[1]
+
+		row, col = @ai.normalize row, col
+
+		return @ai.map[row][col]
+	end
+
+
 	def visited= val
 		@visited = val
 	end

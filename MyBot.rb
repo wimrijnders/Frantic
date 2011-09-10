@@ -2,7 +2,8 @@ $:.unshift File.dirname($0)
 #######################################
 # TODO
 #
-# - Don't assemble if not enough buddies around
+# - DONE Don't assemble if not enough buddies around
+# - Attacking collective: if only blocked by non-water, stay instead of evade.
 # - Staying put is a good strategy for small playing fields.
 # - 1-x ant combat; best approach is diagonal on corner ant. You die but you also kill one enemy.
 # - On evasion, select shortest route (fast-forward?)
@@ -55,11 +56,17 @@ end
 
 def handle_conflict2 ant
 
-	if ant.attacked? 
+
+	#if ant.attacked? 
 		#ant.make_collective
 		if ant.collective?
+			return unless ant.collective.leader? ant
 			return if ant.collective.filled?
-			ant = ant.collective.leader
+			#ant = ant.collective.leader
+			threshold = 2 - ant.collective.size
+		else 
+			return unless ant.attacked? 
+			threshold = 1
 		end
 
 		# recruit near neighbours for a collective
@@ -76,7 +83,7 @@ def handle_conflict2 ant
 		end
 
 		# If there are enough, make the collective
-		if recruits.size >= 3
+		if recruits.size >= threshold 
 			# Nearest recruit first
 			recruits.sort! do |a,b|
 				adist = Distance.new( ant.pos, a.pos)
@@ -89,8 +96,14 @@ def handle_conflict2 ant
 				ant.add_collective l
 				break if ant.collective.filled?
 			end
+		else
+			# If not enough close by, disband the collective
+			# These may then be used for other incomplete collectives
+			ant.collective.disband if ant.collective?
 		end
-	else
+if false
+	#else
+		# Prob not effective any more, if collectives do their own recruiting
 		return
 
 		return if ant.collective?
@@ -106,7 +119,8 @@ def handle_conflict2 ant
 				l.add_collective ant
 			end
 		end
-	end
+	#end
+end
 end
 
 
@@ -216,9 +230,16 @@ ai.run do |ai|
 	end
 
 
+	# Collectives first
 	ai.my_ants.each do |ant|
+		next unless ant.collective?
 		handle_conflict2 ant
 	end
+	ai.my_ants.each do |ant|
+		next if ant.collective?
+		handle_conflict2 ant
+	end
+
 	ai.my_ants.each do |ant|
 		next if ant.collective?
 		handle_conflict ant

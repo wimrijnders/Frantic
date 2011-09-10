@@ -197,5 +197,21 @@ class Distance
 			end
 		end
 	end
+
+	def longest_dir 
+		if row.abs > col.abs
+			if row > 0
+				return :S
+			else
+				return :N
+			end
+		else
+			if col > 0
+				return :E
+			else
+				return :W
+			end
+		end
+	end
 end
 
