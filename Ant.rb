@@ -42,6 +42,15 @@ class Ant
 	# Equivalent to ai.order ant, direction.
 
 	def order direction
+		# Following needed because duplicate orders
+		# are filed as errors on the site.
+		# TODO: Fix this so that no duplicate errors occur
+		if moved?
+			$logger.info "ERROR - duplicate move detected"
+			# Original is retained
+			return
+		end
+
 		@square.neighbor( direction ).moved_here = self
 		@moved= true
 		@moved_to= direction
@@ -290,10 +299,10 @@ end
 		collective? and @collective.leader? self
 	end
 
-	def add_collective a
+	def add_collective a, size = nil
 
 		if @collective.nil?
-			make_collective
+			make_collective size
 		end
 		return if @collective.filled?
 
@@ -307,8 +316,12 @@ end
 		@collective = c
 	end
 
-	def make_collective 
-		@collective = Collective2.new 
+	def make_collective size = nil
+		if !size.nil? and size >= 3
+			@collective = Collective4.new 
+		else
+			@collective = Collective2.new 
+		end
 		@collective.add self
 		clear_orders
 	end

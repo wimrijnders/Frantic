@@ -10,7 +10,8 @@ $:.unshift File.dirname($0)
 # - Sad but true: collectives are a bad strategy for small, cramped (lots of water and enemies) maps.
 # - Second previous comment; 4-collectives absolutely suck
 # - :-) Even on big maps with >4 players (symmetric_4), non-collectives are better (crying now)
-# - Strategy: consider making 2-collectives
+# - Strategy: need balance between foraging and fighting. Sometimes
+#             this bot is too aggresive.
 #
 #######################################
 require 'ants.rb'
@@ -93,7 +94,7 @@ def handle_conflict2 ant
 			end
 
 			recruits.each do |l|
-				ant.add_collective l
+				ant.add_collective l, recruits.length
 				break if ant.collective.filled?
 			end
 		else
