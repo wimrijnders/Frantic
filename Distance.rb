@@ -2,7 +2,10 @@
 class Distance
 	attr_accessor :row, :col
 
-	@@ai
+	# Lesson learnt: need to set explicitly for class var's
+	@@ai = nil
+	@@danger_radius2 = nil
+	@@peril_radius2 = nil
 
 	def self.set_ai ai
 		@@ai = ai
@@ -38,6 +41,7 @@ class Distance
 		normalize
 	end
 
+
 	def normalize
 		ai = @@ai
 
@@ -67,6 +71,11 @@ class Distance
 	def invert
 		Distance.new [0,0], [ -self.row, -self.col ]
 	end
+
+	def clone
+		Distance.new [0,0], [ self.row, self.col ]
+	end
+
 
 	def in_view?
 		( @row*@row + @col*@col ) <= @@ai.viewradius2
@@ -212,6 +221,71 @@ class Distance
 				return :W
 			end
 		end
+	end
+
+
+	def longest_dist
+		if row.abs > col.abs
+			row
+		else
+			col
+		end
+	end
+
+
+	#
+	# Check if we are close to being attacked.
+	#
+	# Following adds 1 square around viewradius2 == 5, 
+	# it seems like a good heuristic. Other viewradiuses
+	# are untested.
+	#
+	def in_danger?
+		if @@danger_radius2.nil?
+			# Lazy fetch, because values are prob not 
+			# present when AI is added to this class
+			@@danger_radius2 = (@@ai.attackradius + Math.sqrt(2) ) ** 2
+			$logger.info "danger_radius2: #{ @@danger_radius2 }"
+		end
+
+		$logger.info "in_danger radius2: #{ ( @row*@row + @col*@col ) }"
+		( @row*@row + @col*@col ) <= @@danger_radius2
+	end
+
+	#
+	# Same as in_danger, but adds two squares around viewradius2 == 5
+	#
+	def in_peril?
+		if @@peril_radius2.nil?
+			# Lazy fetch, because values are prob not 
+			# present when AI is added to this class
+			@@peril_radius2 = (@@ai.attackradius + 2*Math.sqrt(2) ) ** 2
+			$logger.info "peril_radius2: #{ @@peril_radius2 }"
+		end
+
+		$logger.info "in_peril radius2: #{ ( @row*@row + @col*@col ) }"
+		( @row*@row + @col*@col ) <= @@peril_radius2
+	end
+
+
+	#
+	# Adjust distance for direction followed
+	#
+	def adjust dir
+		case dir
+		when :N
+			@row += 1
+		when :E
+			@col -= 1
+		when :S
+			@row -= 1
+		when :W
+			@col += 1
+		end
+	end
+
+	def to_s
+		"distance ( #{ row }, #{col} )"
 	end
 end
 

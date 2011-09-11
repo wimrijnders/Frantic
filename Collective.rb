@@ -1,5 +1,9 @@
 
 class Collective
+	SAFE_LIMIT       = 5 
+	INCOMPLETE_LIMIT = 15
+	FIGHT_DISTANCE   = 20
+
 	def initialize
 		@ants = []
 		@safe_count = 0
@@ -141,27 +145,61 @@ class Collective
 
 		dist = attack_distance
 
+		#
+		# NOTE: Following distance stategy does not take switching of opponents
+		#       into account. TODO: Fix this if strategy proves viable.
+		#
+		$logger.info "#{ @ants[0].square.to_s } dist: #{ dist.to_s }"
 		if dist and dist.in_view?
 			dir = nil
 			if !assembled?
-				# retreat
-				dir = dist.invert.dir
+				$logger.info "#{ @ants[0].square.to_s } not assembled"
+				if dist.in_peril?
+					# retreat if too close for comfort
+					dir = dist.invert.dir
+				else
+					@prev_dist = dist.clone
+					stay
+					return
+				end
 			else
 				dir = dist.attack_dir
+				$logger.info "Attack dir #{ @ants[0].square.to_s }: #{ dir }"
 				return if orient dist.longest_dir
+
+				if dist.in_peril? and not dist.in_danger?
+					$logger.info "In peril"
+					# Enemy is now two squares away from attack distance.
+					# For an aggresive enemy, now is a bad time to advance.
+					# Skip a turn so we can hit with extra force the next turn.
+					if @prev_dist and dist.longest_dist.abs < @prev_dist.longest_dist.abs()
+						$logger.info "Staying put"
+						@prev_dist = dist.clone
+						stay
+						return
+					end
+				end
 			end
 
+			@prev_dist = dist.clone
 			if !move_intern dir 
+				# Note that actual dir will be different
+				# prev_dist will be incorrect
 				evade dir
+			else
+				@prev_dist.adjust dir
 			end
 		else
+			$logger.info "#{ @ants[0].square.to_s } no attacker"
+			@prev_dist = nil
+
 			if assembled?
 				# We're in place but not attacked.
 				# go pick a fight if possible
 				d = closest_enemy leader, leader.ai.enemy_ants 
 
 				# If more or less close, go for it
-				if d and d.dist < 30
+				if d and d.dist < FIGHT_DISTANCE 
 					# Don't disband when not threatened
 					@safe_count = 0
 					return if orient d.longest_dir
@@ -273,11 +311,12 @@ class Collective
 			@incomplete_count = 0
 		end
 
-		if @incomplete_count > 30
+		if @incomplete_count > INCOMPLETE_LIMIT
 			disband
+			true
+		else false
 		end
 
-		( @incomplete_count > 30 )
 	end
 
 
@@ -294,7 +333,7 @@ class Collective
 			@safe_count += 1
 		end
 
-		if @safe_count > 20
+		if @safe_count > SAFE_LIMIT
 			disband
 			ret = true
 		end
@@ -304,6 +343,14 @@ class Collective
 
 
 	def attack_distance
+		# Do from leader only
+		ret = nil
+		if leader.attacked? # and not leader.orders?
+			ret = leader.attack_distance
+		end
+
+# :-( false was last statement so that was returned when 'ret' not present
+if false
 		best = nil
 		@ants.each do |a|
 			if a.attacked? and not a.orders?
@@ -316,6 +363,9 @@ class Collective
 		end
 
 		best
+end
+
+		ret
 	end
 
 
@@ -402,6 +452,7 @@ class Collective2 < Collective
 
 	def initialize
 		super
+		$logger.info "Creating Collective2"
 		@orient_dir = :N
 	end
 
@@ -474,5 +525,157 @@ class Collective2 < Collective
 		end
 
 		true		
+	end
+end
+
+
+class Collective3 < Collective
+
+	# order of ant movement depends on where they are
+	# within the collective
+	@@move_orderNS = { 
+		:N => [0,1,2],
+		:E => [2,0,1],
+		:S => [0,1,2],
+		:W => [1,0,2]
+	}
+
+	@@move_orderEW = { 
+		:N => [1,0,2],
+		:E => [0,1,2],
+		:S => [2,0,1],
+		:W => [0,1,2]
+	}
+
+
+
+	def initialize
+		super
+		$logger.info "Creating Collective3"
+		@orient_dir = :N
+	end
+
+	def fullsize; 3; end
+
+	def relpos count
+		$logger.info "Collective3 relpos count: #{count}, orient: #{ @orient_dir}"
+		return [0,0] if count == 0
+
+		if [:E,:W].include? @orient_dir
+			if count == 1
+				[-1,0]
+			else
+				[1,0]
+			end
+		elsif [:N,:S].include? @orient_dir
+			if count == 1
+				[0,-1]
+			else
+				[0,1]
+			end
+		else
+			# intern
+			if count == 1
+				[-1,-1]
+			else
+				[1,1]
+			end
+		end
+	end
+
+
+	def pass_check dir
+		ret = nil
+
+		if [:E,:W].include? @orient_dir
+			if [ :E, :W].include? dir
+				ret = @@move_orderEW[dir]
+			else
+				ret = @@move_orderEW[dir][0,1]
+			end
+		elsif [:N,:S].include? @orient_dir
+			if [ :E, :W].include? dir
+				ret = @@move_orderNS[dir][0,1]
+			else
+				ret = @@move_orderNS[dir]
+			end
+		else
+			# intern config - check all ants
+			ret = [0,1,2]
+		end
+
+		$logger.info "pass_check dir #{dir}, orient: #{ @orient_dir } returning #{ ret.to_s }"
+		ret
+	end
+
+
+	def move_list dir
+		if [:E,:W].include? @orient_dir
+			@@move_orderEW[dir]
+		elsif [:N,:S].include? @orient_dir
+			@@move_orderNS[dir]
+		else
+			[0,1,2]
+		end
+	end
+
+
+	def orient d
+		return false if [:E,:W].include? d and [:E,:W].include? @orient_dir
+		return false if [:N,:S].include? d and [:N,:S].include? @orient_dir
+		$logger.info "Switching #{ @ants[0].square.to_s } from #{ @orient_dir } to #{ d }"
+
+		moved = false
+		if @orient_dir != :intern
+			# switch to intern first
+			$logger.info "Switching to intern config."
+			if [:N,:S].include? @orient_dir
+				if @ants[1].can_pass? :N and @ants[2].can_pass? :S
+					@ants[1].move :N 
+					@ants[2].move :S
+					@orient_dir = :intern
+					moved = true
+				end
+			else
+				if @ants[1].can_pass? :W and @ants[2].can_pass? :E
+					@ants[1].move :W 
+					@ants[2].move :E
+					@orient_dir = :intern
+					moved = true
+				end
+			end
+
+		else
+			if [:N,:S].include? d
+				if @ants[1].can_pass? :S and @ants[2].can_pass? :N
+					@ants[1].move :S 
+					@ants[2].move :N
+					@orient_dir = d
+					moved = true
+				end
+			else
+				if @ants[1].can_pass? :E and @ants[2].can_pass? :W
+					@ants[1].move :E 
+					@ants[2].move :W
+					@orient_dir = d
+					moved = true
+				end
+			end
+		end
+
+		unless moved
+			# Can't move to intern config
+			random_move
+		end
+		moved
+	end
+
+	def move_intern dir
+		if @orient_dir == :intern
+			orient dir
+			return
+		end
+
+		super dir
 	end
 end

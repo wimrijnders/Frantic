@@ -58,13 +58,12 @@ end
 def handle_conflict2 ant
 
 
-	#if ant.attacked? 
 		#ant.make_collective
 		if ant.collective?
 			return unless ant.collective.leader? ant
 			return if ant.collective.filled?
 			#ant = ant.collective.leader
-			threshold = 2 - ant.collective.size
+			threshold = ant.collective.fullsize - ant.collective.size
 		else 
 			return unless ant.attacked? 
 			threshold = 1
@@ -102,26 +101,6 @@ def handle_conflict2 ant
 			# These may then be used for other incomplete collectives
 			ant.collective.disband if ant.collective?
 		end
-if false
-	#else
-		# Prob not effective any more, if collectives do their own recruiting
-		return
-
-		return if ant.collective?
-
-		ant.ai.my_ants.each do |l|
-			next unless l.collective_leader?
-			next if l === ant
-
-			d = Distance.new ant.pos, l.pos	
-
-			if d.dist < 20	and not l.collective.filled?
-			#if d.in_view?
-				l.add_collective ant
-			end
-		end
-	#end
-end
 end
 
 

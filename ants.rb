@@ -1,6 +1,7 @@
 # Ants AI Challenge framework
 # by Matma Rex (matma.rex@gmail.com)
 # Released under CC-BY 3.0 license
+
 require 'support.rb'
 require 'Evasion.rb'
 require 'Distance.rb'
@@ -183,15 +184,25 @@ class AI
 	
 	# Turn logic. If setup wasn't yet called, it will call it (and yield the block in it once).
 	def run &b # :yields: self
-		setup &b if !@did_setup
+		# Wierdest thin ever: just by adding the rescue block
+		# the error SystemStackError - stack too deep disappeared
+		#
+		# Actually, it didn't; the bug is erratic :-(
+		begin
+			setup &b if !@did_setup
 		
-		over=false
-		until over
-			over = read_turn
-			yield self
+			over=false
+			until over
+				over = read_turn
+				yield self
 			
-			@stdout.puts 'go'
-			@stdout.flush
+				@stdout.puts 'go'
+				@stdout.flush
+			end
+		rescue => e
+			puts "Exception - SystemStackError?"
+			print e.backtrace.join("\n")
+			raise e
 		end
 	end
 

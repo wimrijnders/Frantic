@@ -317,8 +317,8 @@ end
 	end
 
 	def make_collective size = nil
-		if !size.nil? and size >= 3
-			@collective = Collective4.new 
+		if !size.nil? and size >= 2
+			@collective = Collective3.new 
 		else
 			@collective = Collective2.new 
 		end
