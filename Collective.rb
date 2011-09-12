@@ -1,8 +1,9 @@
 
 class Collective
-	SAFE_LIMIT       = 5 
-	INCOMPLETE_LIMIT = 15
-	FIGHT_DISTANCE   = 20
+
+	SAFE_LIMIT       = 5 	# Disband if there was no threat to the collective for given number of moves
+	INCOMPLETE_LIMIT = 15	# Disband if could not assemble collective for given number of moves
+	FIGHT_DISTANCE   = 20	# If not attacked and enemy detected within given distance, move there to pick a fight
 
 	def initialize
 		@ants = []
@@ -193,7 +194,7 @@ class Collective
 			$logger.info "#{ @ants[0].square.to_s } no attacker"
 			@prev_dist = nil
 
-			if assembled?
+			if !leader.ai.defensive? and assembled?
 				# We're in place but not attacked.
 				# go pick a fight if possible
 				d = closest_enemy leader, leader.ai.enemy_ants 
@@ -391,7 +392,20 @@ end
 	end
 
 	def random_move
-		move_intern [ :N, :E, :S, :W ][ rand(4) ]
+		$logger.info "Doing random move."
+		moves = [ :N, :E, :S, :W, :N, :E, :S, :W ]
+
+		#
+		# Given random move may be not passable.
+		# Following searches for the next passable direction.
+		# If not found, give up
+		#
+		moves[rand(4),4].each do |dir|
+			return if move_intern dir
+		end
+
+		# Can not move at all - give up
+		disband
 	end
 end
 
@@ -495,10 +509,9 @@ class Collective2 < Collective
 
 	def orient d
 		# If orientations compatible, don't bother switching.
-		if [:E,:W].include?( d) and [:E,:W].include?( @orient_dir )
-			return false
-		end
+		return false if [:E,:W].include? d and [:E,:W].include? @orient_dir
 		return false if [:N,:S].include? d and [:N,:S].include? @orient_dir
+
 		$logger.info "Switching #{ @ants[0].square.to_s } from #{ @orient_dir } to #{ d }"
 
 		if [:N,:S].include? d
@@ -521,6 +534,7 @@ class Collective2 < Collective
 		else
 			# Can't switch, just do something
 			$logger.info "Can't switch."
+
 			random_move
 		end
 
@@ -664,16 +678,38 @@ class Collective3 < Collective
 		end
 
 		unless moved
-			# Can't move to intern config
-			random_move
+			# Can't move to/from intern config
+			$logger.info "Collective3 stuck while turning."
+
+			# Can't use random_move or local intern_move here, 
+			# orient will be called again and there is danger of
+			# running out of stack.
+
+			[ :N, :E, :S, :W ].each do |dir|
+				return true if super_move_intern dir
+			end
+
+			# Can not move at all - give up
+			disband
+
+			# Note that true is still returned, so as not
+			# to confuse calling logic, even if this is 
+			# not an actual move.
+
+			# Geez, this was a lousy bug. Added commenting
+			# in this part post-mortem.
+		else
+			@ants[0].stay	# Center ant needs to stay put,
+							# could evade otherwise
 		end
 		moved
 	end
 
+	alias :super_move_intern :move_intern
+
 	def move_intern dir
 		if @orient_dir == :intern
-			orient dir
-			return
+			return orient dir
 		end
 
 		super dir

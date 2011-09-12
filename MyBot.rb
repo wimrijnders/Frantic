@@ -14,7 +14,7 @@ $:.unshift File.dirname($0)
 #             this bot is too aggresive.
 #
 #######################################
-require 'ants.rb'
+require 'AI.rb'
 
 
 # Local methods

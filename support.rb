@@ -1,7 +1,7 @@
 
 class Logger
 	def initialize ai
-		@log = false
+		@log = true
 		@@ai = ai
 	end
 
