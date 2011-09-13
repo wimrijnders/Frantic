@@ -6,14 +6,8 @@ $:.unshift File.dirname($0)
 # - Staying put is a good strategy for small playing fields.
 # - 1-x ant combat; best approach is diagonal on corner ant. You die but you also kill one enemy.
 # - On evasion, select shortest route (fast-forward?)
-# - Sad but true: collectives are a bad strategy for small, cramped (lots of water and enemies) maps.
-# - Second previous comment; 4-collectives absolutely suck
-# - :-) Even on big maps with >4 players (symmetric_4), non-collectives are better (crying now)
-# - Strategy: need balance between foraging and fighting. Sometimes
-#             this bot is too aggresive.
 # - Break off evasion if under attack for collectives
-# - Creating collectives: don't do it in the direct neighbourhood of other
-#   assembling collectives.
+# - Creating collectives: don't do it in the direct neighbourhood of water (fixed obstacles) 
 # - collective attack: break flip-flop deadlock
 #
 #######################################

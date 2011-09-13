@@ -1,7 +1,6 @@
 
 class Collective
 
-
 	def initialize
 		@ants = []
 		@safe_count = 0
@@ -12,20 +11,19 @@ class Collective
 
 	include Evasion
 
+
 	def add a
 		@ants << a
 	end
+
 
 	def size
 		@ants.length
 	end
 
-	def leader? a
-		@ants[0] == a
-	end
 
-	def leader
-		@ants[0]
+	def filled?
+		size == fullsize 
 	end
 
 	#
@@ -35,6 +33,31 @@ class Collective
 	def rally ant, count = nil
 		count = size() -1 if count.nil?
 		ant.set_order( leader, :ASSEMBLE, relpos(count) ) 
+	end
+
+	def to_s
+		str = ""
+		@ants.each do |a|
+			str << a.to_s
+		end
+		str
+	end
+
+	def leader? a
+		@ants[0] == a
+	end
+
+	def move
+		catch (:done) do 
+			return if leader.moved?
+	
+			test_incomplete
+			reassemble unless assembled?
+			return if evading
+			test_safe
+
+			move2
+		end
 	end
 
 	def remove a
@@ -57,6 +80,35 @@ class Collective
 			@do_reassemble = true
 		end
 	end	
+
+	def disband
+		$logger.info "Disbanding"
+		leader = nil
+		@ants.each do |a|
+			if leader.nil?
+				leader = a
+				a.clear_orders
+				a.collective = nil
+			else
+				a.collective = nil
+				a.remove_target_from_order leader
+			end
+		end
+
+		@ants = []
+
+		# Collective doesn't exist any more. Skip any other statements
+		$logger.info "Doing throw because collective disbanded."
+		throw :done
+	end
+
+
+	private
+
+	def leader
+		@ants[0]
+	end
+
 
 	def move_intern dir
 		return false unless can_pass? dir
@@ -123,6 +175,7 @@ class Collective
 		ok
 	end
 
+
 	def order dir
 		move_list(dir).each do |n|
 			a = @ants[n]
@@ -135,18 +188,6 @@ class Collective
 	end
 
 
-	def move
-		catch (:done) do 
-			return if leader.moved?
-	
-			test_incomplete
-			reassemble unless assembled?
-			return if evading
-			test_safe
-
-			move2
-		end
-	end
 
 	def move2
 		dist = attack_distance
@@ -155,11 +196,11 @@ class Collective
 		# NOTE: Following distance stategy does not take switching of opponents
 		#       into account. TODO: Fix this if strategy proves viable.
 		#
-		$logger.info "#{ @ants[0].square.to_s } dist: #{ dist.to_s }"
+		$logger.info "#{ leader.to_s } dist: #{ dist.to_s }"
 		if dist and dist.in_view?
 			dir = nil
 			if !assembled?
-				$logger.info "#{ @ants[0].square.to_s } not assembled"
+				$logger.info "#{ leader.to_s } not assembled"
 				if dist.in_peril?
 					# retreat if too close for comfort
 					dir = dist.invert.dir
@@ -220,7 +261,7 @@ class Collective
 				@prev_dist.adjust dir
 			end
 		else
-			$logger.info "#{ @ants[0].square.to_s } no attacker"
+			$logger.info "#{ leader.to_s } no attacker"
 			@prev_dist = nil
 
 			if !leader.ai.defensive? and assembled?
@@ -278,6 +319,7 @@ class Collective
 		#a.square == Coord.new( (leader.row + count/2), (leader.col + count%2) )
 		a.square == leader.square.rel( relpos( count) )
 	end
+
 
 	#
 	# members may have drifted. Ensure that they are in the right place
@@ -372,51 +414,10 @@ class Collective
 			ret = leader.attack_distance
 		end
 
-# :-( false was last statement so that was returned when 'ret' not present
-if false
-		best = nil
-		@ants.each do |a|
-			if a.attacked? and not a.orders?
-				tmp = a.attack_distance
-
-				if !best or tmp.dist < best.dist
-					best = tmp
-				end
-			end
-		end
-
-		best
-end
-
 		ret
 	end
 
 
-	def disband
-		$logger.info "Disbanding"
-		leader = nil
-		@ants.each do |a|
-			if leader.nil?
-				leader = a
-				a.clear_orders
-				a.collective = nil
-			else
-				a.collective = nil
-				a.remove_target_from_order leader
-			end
-		end
-
-		@ants = []
-
-		# Collective doesn't exist any more. Skip any other statements
-		$logger.info "Doing throw because collective disbanded."
-		throw :done
-	end
-
-
-	def filled?
-		size == fullsize 
-	end
 
 	def random_move
 		$logger.info "Doing random move."
@@ -438,6 +439,7 @@ end
 
 
 class Collective4 < Collective
+
 
 	# order of ant movement depends on where they are
 	# within the collective
@@ -539,7 +541,7 @@ class Collective2 < Collective
 		return false if [:E,:W].include? d and [:E,:W].include? @orient_dir
 		return false if [:N,:S].include? d and [:N,:S].include? @orient_dir
 
-		$logger.info "Switching #{ @ants[0].square.to_s } from #{ @orient_dir } to #{ d }"
+		$logger.info "Switching #{ leader.to_s } from #{ @orient_dir } to #{ d }"
 
 		if [:N,:S].include? d
 			# Switch to NS orientation
@@ -678,7 +680,7 @@ class Collective3 < Collective
 
 		return false if [:E,:W].include? d and [:E,:W].include? @orient_dir
 		return false if [:N,:S].include? d and [:N,:S].include? @orient_dir
-		$logger.info "Switching #{ leader.square.to_s } from #{ @orient_dir } to #{ d }"
+		$logger.info "Switching #{ leader.to_s } from #{ @orient_dir } to #{ d }"
 
 		moved = false
 		if @orient_dir != :intern
@@ -749,11 +751,4 @@ class Collective3 < Collective
 		moved
 	end
 
-	def to_s
-		str = ""
-		@ants.each do |a|
-			str << a.to_s
-		end
-		str
-	end
 end
