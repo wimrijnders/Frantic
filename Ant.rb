@@ -8,7 +8,7 @@ class Ant
 	attr_accessor :square, :moved_to
 	
 	attr_accessor :alive, :ai
-	attr_accessor :collective
+	attr_accessor :collective, :friends, :enemies
 
 	include Evasion
 	
@@ -202,6 +202,25 @@ end
 		Distance.new pos, @orders[0].square
 	end
 
+
+	#
+	# If the ant is within range, check if there is an order active.
+	# If so, and if the order target is closer than the enemy, return true.
+	#
+	# Otherwise, return false
+	#
+	def order_closer_than_attacker?
+		if attacked?
+			order_dist = order_distance
+			if !order_dist.nil? and order_dist.dist < attack_distance.dist 
+				return true
+			end
+		end
+
+		false
+	end
+
+
 	def remove_target_from_order t
 		if orders?
 			p = nil
@@ -225,7 +244,7 @@ end
 		while orders?
 			if self.square == @orders[0].square
 				# Done with this order, reached the target
-				$logger.info "Reached the target at #{ @orders[0].square.row }, #{ @orders[0].square.col }"
+				$logger.info "#{ to_s } reached target"
 
 				@orders = @orders[1..-1]
 				next
@@ -269,7 +288,7 @@ end
 		end
 
 		if @orders[0].order == :ASSEMBLE
-			$logger.info "Moving to #{ @orders[0].square.to_s }"
+			$logger.info "#{ to_s } moving to #{ @orders[0].square.to_s }"
 		end
 		move_to @orders[0].square
 
@@ -290,6 +309,79 @@ end
 			square
 		end
 	end
+
+
+	def closest_list list
+		closest = list.sort do |a,b|
+			adist = Distance.new( pos, a.pos)
+			bdist = Distance.new( pos, b.pos)
+
+			adist.dist <=> bdist.dist
+		end
+		closest
+	end
+
+
+	def make_friends
+		if @friends.nil?
+			$logger.info "Filling friends"
+			@friends = closest_list(ai.my_ants)	
+
+			#$logger.info "Remove self pre: #{ @friends.length }"
+			@friends.delete self
+			#$logger.info "Remove self post: #{ @friends.length }"
+		end
+	end
+
+	def make_enemies
+		if @enemies.nil?
+			$logger.info "Filling enemies"
+			@enemies = closest_list(ai.enemy_ants)	
+		end
+	end
+
+
+	#
+	# Return all friendly ants within the specified distance
+	#
+	def neighbor_friends dist
+		make_friends
+
+		neighbors = []
+		@friends.each do |a|
+			adist = Distance.new( pos, a.pos)
+			break if adist.dist > dist
+
+			neighbors << a
+		end
+
+		neighbors
+	end
+
+	def neighbor_enemies dist
+		make_enemies
+
+		neighbors = []
+		@enemies.each do |a|
+			adist = Distance.new( pos, a.pos)
+			break if adist.dist > dist
+
+			neighbors << a
+		end
+
+		neighbors
+	end
+
+
+	#
+	# Reset variables at the start of a turn
+	# TODO: Why does this screw up movement?
+	#
+	def reset_turn
+		moved = false
+		moved_to = nil
+	end
+
 
 	def collective?
 		not @collective.nil? # and @collective.size > 0
@@ -328,6 +420,10 @@ end
 
 	def move_collective 
 		@collective.move
+	end
+
+	def to_s
+		square.to_s
 	end
 end
 

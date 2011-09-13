@@ -2,7 +2,6 @@ $:.unshift File.dirname($0)
 #######################################
 # TODO
 #
-# - DONE Don't assemble if not enough buddies around
 # - Attacking collective: if only blocked by non-water, stay instead of evade.
 # - Staying put is a good strategy for small playing fields.
 # - 1-x ant combat; best approach is diagonal on corner ant. You die but you also kill one enemy.
@@ -12,6 +11,9 @@ $:.unshift File.dirname($0)
 # - :-) Even on big maps with >4 players (symmetric_4), non-collectives are better (crying now)
 # - Strategy: need balance between foraging and fighting. Sometimes
 #             this bot is too aggresive.
+# - Break off evasion if under attack for collectives
+# - Creating collectives: don't do it in the direct neighbourhood of other
+#   assembling collectives.
 #
 #######################################
 require 'AI.rb'
@@ -58,29 +60,51 @@ end
 def handle_conflict2 ant
 
 
-		#ant.make_collective
 		if ant.collective?
 			return unless ant.collective.leader? ant
 			return if ant.collective.filled?
-			#ant = ant.collective.leader
 			threshold = ant.collective.fullsize - ant.collective.size
 		else 
 			return unless ant.attacked? 
+
+			# Don't even think about assembling if not enough ants around
+			return if ant.ai.my_ants.length < Config::ASSEMBLE_LIMIT
+
+			if ant.ai.defensive? 
+				return if ant.order_closer_than_attacker?
+
+				# If collective nearby, don't bother creating a new one
+				collective_near = false
+				ant.neighbor_friends( 20 ).each do |a|
+					if a.collective?
+						$logger.info "#{ ant.square.to_s } has collective nearby"
+						collective_near = true
+						break
+					end
+				end
+
+				return if collective_near
+			end
+
+			# If too close too an assembling collective, don't bother
+			# If collective nearby, don't bother creating a new one
+			collective_near = false
+			ant.neighbor_friends( 3 ).each do |a|
+				if a.collective?
+					$logger.info "#{ ant.square.to_s } assembling collective too close "
+					collective_near = true
+					break
+				end
+			end
+			return if collective_near
+
+
 			threshold = 1
 		end
 
 		# recruit near neighbours for a collective
-		recruits = []
-		ant.ai.my_ants.each do |l|
-			next if l.collective?
-			next if l === ant
-
-			d = Distance.new ant.pos, l.pos	
-			if d.dist < 20
-			#if d.in_view?
-				recruits << l
-			end
-		end
+		recruits = ant.neighbor_friends 20 
+		recruits.delete_if { |a| a.collective? }
 
 		# If there are enough, make the collective
 		if recruits.size >= threshold 
@@ -96,6 +120,7 @@ def handle_conflict2 ant
 				ant.add_collective l, recruits.length
 				break if ant.collective.filled?
 			end
+			$logger.info "Created collective #{ ant.collective.to_s}"
 		else
 			# If not enough close by, disband the collective
 			# These may then be used for other incomplete collectives
@@ -108,11 +133,8 @@ def handle_conflict ant
 	return false if ant.moved?
 
 	if ant.attacked?
-		# continue with current order if closer than attacker
-		order_dist = ant.order_distance
-		if !order_dist.nil? and order_dist.dist < ant.attack_distance.dist 
-			return false
-		end
+		ant.retreat and return true if ant.ai.defensive?
+		return false if ant.order_closer_than_attacker?
 
 		$logger.info "Conflict!"
 		# Check for direct friendly neighbours 

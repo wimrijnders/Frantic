@@ -1,9 +1,6 @@
 
 class Collective
 
-	SAFE_LIMIT       = 5 	# Disband if there was no threat to the collective for given number of moves
-	INCOMPLETE_LIMIT = 15	# Disband if could not assemble collective for given number of moves
-	FIGHT_DISTANCE   = 20	# If not attacked and enemy detected within given distance, move there to pick a fight
 
 	def initialize
 		@ants = []
@@ -140,7 +137,7 @@ class Collective
 		return if leader.moved?
 	
 		return if incomplete
-		reassemble
+		reassemble unless assembled?
 		return if evading
 		return if safe
 
@@ -165,8 +162,32 @@ class Collective
 				end
 			else
 				dir = dist.attack_dir
-				$logger.info "Attack dir #{ @ants[0].square.to_s }: #{ dir }"
+				$logger.info "Attack dir #{ leader.to_s }: #{ dir }"
 				return if orient dist.longest_dir
+
+				if leader.ai.defensive? and !dist.in_peril?
+					$logger.info "#{ leader.to_s} defensive - holding ground"
+					@prev_dist = dist.clone
+					stay
+					return
+				end
+
+				if leader.ai.defensive? 
+					enemies = leader.neighbor_enemies 10
+
+					if enemies.length > size() -1	
+						$logger.info "#{ leader.to_s} too many enemies"
+				
+						if dist.in_peril?
+							# stay away ffrom the hordes
+							dir = dist.invert.dir
+						else
+							@prev_dist = dist.clone
+							stay
+							return
+						end
+					end
+				end
 
 				if dist.in_peril? and not dist.in_danger?
 					$logger.info "In peril"
@@ -200,7 +221,7 @@ class Collective
 				d = closest_enemy leader, leader.ai.enemy_ants 
 
 				# If more or less close, go for it
-				if d and d.dist < FIGHT_DISTANCE 
+				if d and d.dist < Config::FIGHT_DISTANCE 
 					# Don't disband when not threatened
 					@safe_count = 0
 					return if orient d.longest_dir
@@ -312,12 +333,12 @@ class Collective
 			@incomplete_count = 0
 		end
 
-		if @incomplete_count > INCOMPLETE_LIMIT
+		if @incomplete_count > Config::INCOMPLETE_LIMIT
 			disband
 			true
-		else false
+		else
+			false
 		end
-
 	end
 
 
@@ -334,7 +355,7 @@ class Collective
 			@safe_count += 1
 		end
 
-		if @safe_count > SAFE_LIMIT
+		if @safe_count > Config::SAFE_LIMIT
 			disband
 			ret = true
 		end
@@ -572,7 +593,7 @@ class Collective3 < Collective
 	def fullsize; 3; end
 
 	def relpos count
-		$logger.info "Collective3 relpos count: #{count}, orient: #{ @orient_dir}"
+		$logger.info "Collective3 #{ leader.square.to_s } relpos count: #{count}, orient: #{ @orient_dir}"
 		return [0,0] if count == 0
 
 		if [:E,:W].include? @orient_dir
@@ -634,10 +655,24 @@ class Collective3 < Collective
 	end
 
 
+	alias :super_move_intern :move_intern
+	def move_intern dir
+		if @orient_dir == :intern
+			return orient dir
+		end
+
+		super dir
+	end
+
+
+
 	def orient d
+		# Collective could have been disbanded in the meantime
+		return true unless filled?
+
 		return false if [:E,:W].include? d and [:E,:W].include? @orient_dir
 		return false if [:N,:S].include? d and [:N,:S].include? @orient_dir
-		$logger.info "Switching #{ @ants[0].square.to_s } from #{ @orient_dir } to #{ d }"
+		$logger.info "Switching #{ leader.square.to_s } from #{ @orient_dir } to #{ d }"
 
 		moved = false
 		if @orient_dir != :intern
@@ -691,6 +726,8 @@ class Collective3 < Collective
 
 			# Can not move at all - give up
 			disband
+			# After this point, the collective is empty.
+			# Need to get the hell out
 
 			# Note that true is still returned, so as not
 			# to confuse calling logic, even if this is 
@@ -702,16 +739,15 @@ class Collective3 < Collective
 			@ants[0].stay	# Center ant needs to stay put,
 							# could evade otherwise
 		end
+
 		moved
 	end
 
-	alias :super_move_intern :move_intern
-
-	def move_intern dir
-		if @orient_dir == :intern
-			return orient dir
+	def to_s
+		str = ""
+		@ants.each do |a|
+			str << a.to_s
 		end
-
-		super dir
+		str
 	end
 end

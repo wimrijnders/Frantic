@@ -12,22 +12,25 @@ require 'Ant.rb'
 
 
 class AI
-	#
-	# Configuration options
-	#
-	DEFENSIVE_LIMIT = 20	# Number of ants needed to be present before ants start attacking as well
-
 	def defensive?
-		false #my_ants.length < DEFENSIVE_LIMIT
+		my_ants.length < Config::DEFENSIVE_LIMIT
 	end
+
 
 	# Map, as an array of arrays.
 	attr_accessor :map
-	# Number of current turn. If it's 0, we're in setup turn. If it's :game_over, you don't need to give any orders; instead, you can find out the number of players and their scores in this game.
+
+	# Number of current turn.
+	#
+	# If it's 0, we're in setup turn.
+	# If it's :game_over, you don't need to give any orders; instead,
+	# you can find out the number of players and their scores in this game.
 	attr_accessor	:turn_number
 	
 	# Game settings. Integers.
-	attr_accessor :loadtime, :turntime, :rows, :cols, :turns, :viewradius2, :attackradius2, :spawnradius2, :seed
+	attr_accessor :loadtime, :turntime, :rows, :cols, :turns,
+		:viewradius2, :attackradius2, :spawnradius2, :seed
+
 	# Radii, unsquared. Floats.
 	attr_accessor :viewradius, :attackradius, :spawnradius
 	
@@ -231,8 +234,12 @@ class AI
 		@map.each do |row|
 			row.each do |square|
 				unless square.moved_here.nil?
-					square.moved_here.moved = false
-					square.moved_here.moved_to = nil
+					# For some reason, can't create a method within ant
+					# which handles these resets. It screws up the movement
+					square.moved_here.moved=false
+					square.moved_here.moved_to=nil
+					square.moved_here.friends=nil
+					square.moved_here.enemies=nil
 					square.moved_here = nil
 				end
 			end
