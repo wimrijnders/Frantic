@@ -14,6 +14,7 @@ $:.unshift File.dirname($0)
 # - Break off evasion if under attack for collectives
 # - Creating collectives: don't do it in the direct neighbourhood of other
 #   assembling collectives.
+# - collective attack: break flip-flop deadlock
 #
 #######################################
 require 'AI.rb'

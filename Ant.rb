@@ -419,7 +419,7 @@ end
 	end
 
 	def move_collective 
-		@collective.move
+		@collective.move unless @collective.nil?
 	end
 
 	def to_s
