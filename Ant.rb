@@ -311,6 +311,11 @@ end
 	end
 
 
+	#
+	# create a sorted list from the given ant list.
+	#
+	# Sorted ascending by closest distance to current ant
+	#
 	def closest_list list
 		closest = list.sort do |a,b|
 			adist = Distance.new( pos, a.pos)

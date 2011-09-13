@@ -104,19 +104,17 @@ def handle_conflict2 ant
 		end
 
 		# recruit near neighbours for a collective
-		recruits = ant.neighbor_friends 20 
+		if ant.ai.defensive?
+			friend_distance = 10
+		else
+			friend_distance = 20
+		end
+
+		recruits = ant.neighbor_friends friend_distance 
 		recruits.delete_if { |a| a.collective? }
 
 		# If there are enough, make the collective
 		if recruits.size >= threshold 
-			# Nearest recruit first
-			recruits.sort! do |a,b|
-				adist = Distance.new( ant.pos, a.pos)
-				bdist = Distance.new( ant.pos, b.pos)
-
-				adist.dist <=> bdist.dist
-			end
-
 			recruits.each do |l|
 				ant.add_collective l, recruits.length
 				break if ant.collective.filled?
