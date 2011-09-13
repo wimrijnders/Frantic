@@ -50,7 +50,9 @@ class Collective
 		end
 
 		if size == 1
-			disband
+			catch (:done) do 
+				disband
+			end
 		else
 			@do_reassemble = true
 		end
@@ -134,13 +136,19 @@ class Collective
 
 
 	def move
-		return if leader.moved?
+		catch (:done) do 
+			return if leader.moved?
 	
-		return if incomplete
-		reassemble unless assembled?
-		return if evading
-		return if safe
+			test_incomplete
+			reassemble unless assembled?
+			return if evading
+			test_safe
 
+			move2
+		end
+	end
+
+	def move2
 		dist = attack_distance
 
 		#
@@ -326,7 +334,7 @@ class Collective
 	
 	end
 
-	def incomplete
+	def test_incomplete
 		if size < fullsize 
 			@incomplete_count += 1
 		else
@@ -335,15 +343,11 @@ class Collective
 
 		if @incomplete_count > Config::INCOMPLETE_LIMIT
 			disband
-			true
-		else
-			false
 		end
 	end
 
 
-	def safe
-		ret = false
+	def test_safe
 		tmp = false
 		@ants.each do |a|
 			tmp = true and break if a.attacked? and not a.orders?
@@ -357,10 +361,7 @@ class Collective
 
 		if @safe_count > Config::SAFE_LIMIT
 			disband
-			ret = true
 		end
-
-		ret
 	end
 
 
@@ -406,7 +407,12 @@ end
 		end
 
 		@ants = []
+
+		# Collective doesn't exist any more. Skip any other statements
+		$logger.info "Doing throw because collective disbanded."
+		throw :done
 	end
+
 
 	def filled?
 		size == fullsize 

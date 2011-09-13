@@ -125,7 +125,9 @@ def handle_conflict2 ant
 		else
 			# If not enough close by, disband the collective
 			# These may then be used for other incomplete collectives
-			ant.collective.disband if ant.collective?
+			catch :done do
+				ant.collective.disband if ant.collective?
+			end
 		end
 end
 
