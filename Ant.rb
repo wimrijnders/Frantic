@@ -203,24 +203,6 @@ end
 	end
 
 
-	#
-	# If the ant is within range, check if there is an order active.
-	# If so, and if the order target is closer than the enemy, return true.
-	#
-	# Otherwise, return false
-	#
-	def order_closer_than_attacker?
-		if attacked?
-			order_dist = order_distance
-			if !order_dist.nil? and order_dist.dist < attack_distance.dist 
-				return true
-			end
-		end
-
-		false
-	end
-
-
 	def remove_target_from_order t
 		if orders?
 			p = nil
@@ -235,6 +217,7 @@ end
 			@orders.delete p unless p.nil?
 		end
 	end
+
 
 	def handle_orders
 		return false if moved?
@@ -363,6 +346,7 @@ end
 		neighbors
 	end
 
+
 	def neighbor_enemies dist
 		make_enemies
 
@@ -375,6 +359,54 @@ end
 		end
 
 		neighbors
+	end
+
+
+	def enemies_in_view
+		make_enemies
+
+		neighbors = []
+		@enemies.each do |a|
+			adist = Distance.new( pos, a.pos)
+			break unless adist.in_view?
+
+			neighbors << a
+		end
+
+		neighbors
+	end
+
+
+	#
+	# Return true if after check, we are still continuing with orders
+	#
+	def check_orders
+		enemies = enemies_in_view
+
+		catch :done do
+			enemies.each do |e|
+				while orders?
+					# If enemy is closer to order target (foraging only),
+					# cancel order
+					break unless @orders[0].order == :FORAGE
+	
+					da = Distance.new( pos, @orders[0].square )
+					de = Distance.new( e.pos, @orders[0].square )
+	
+					if da.dist > de.dist
+						# we lucked out - skip this order
+						$logger.info "check_orders #{ to_s } skipping."
+						@orders = @orders[1..-1]
+					else
+						# We can still make it first! Even if we die...
+						$logger.info "check_orders #{ to_s } we can make it!"
+						throw :done
+					end
+				end
+			end
+		end
+
+		orders?
 	end
 
 
