@@ -5,7 +5,8 @@ class Ant
 	# Owner of this ant. If it's 0, it's your ant.
 	attr_accessor :owner
 	# Square this ant sits on.
-	attr_accessor :square, :moved_to
+	attr_accessor :square, :moved_to, 
+		:abspos # absolute position relative to leader, if part of collective
 	
 	attr_accessor :alive, :ai
 	attr_accessor :collective, :friends, :enemies

@@ -47,9 +47,9 @@ class Collective
 	def to_s
 		str = ""
 		@ants.each do |a|
-			str << a.to_s
+			str << a.square.to_s
 		end
-		str
+		"collective [#{ str }]"
 	end
 
 	def leader? a
@@ -136,34 +136,52 @@ class Collective
 		okay
 	end
 
+
 	def add_recruit a
+		return if assembled? false
+
 		if filled?
 			# Check if new recruit is nearer to the leader than one
 			# of the current members
 			# BUG: [1...size].each do |n|
 			#    - member below became an array of ants
 			#        TODO: Examine why
-			(1...size).each do |n|
+			dista = Distance.new leader, a
+
+			# Pick best member to replace
+			bestn = nil
+			bestdist = nil
+			max = size() -1
+			(1..max).each do |n|
 				member = @ants[n]
 
 				next if in_location? member, n
 
-				dista = Distance.new leader, a
 				distn = Distance.new leader, member
 
 				if dista.dist < distn.dist	
-					$logger.info "Collective #{ leader.to_s } replacing assembling member #{ member.to_s }, dist #{ distn.dist }, with #{ a.to_s }, dist #{ dista.dist }"
-					# Replace current member with new ant
-					member.clear_orders
-					member.set_collective nil
-
-					a.clear_orders
-					@ants[n] = a
-					a.set_collective self
-					rally a
-
-					return if assembled? false
+					if bestdist.nil? or distn.dist < bestdist
+						bestn = n
+						bestdist = distn.dist
+					end
 				end
+			end
+
+			unless bestn.nil?
+				member = @ants[bestn]
+
+				$logger.info "Collective #{ leader.to_s } replacing assembling member #{ member.to_s } n #{ bestn }, dist #{ bestdist }, with #{ a.to_s }, dist #{ dista.dist }"
+
+				# Replace current member with new ant
+				member.clear_orders
+				member.set_collective nil
+
+				a.clear_orders
+				@ants[bestn] = a
+				a.set_collective self
+				rally a
+
+				return if assembled? false
 			end
 
 		else
@@ -283,8 +301,11 @@ class Collective
 				return if orient dist.longest_dir
 
 
-				if leader.ai.defensive? 
-					enemies = leader.neighbor_enemies 10
+				# If there is only one enemy, attack always.
+				# TODO: following creates timeout problems!
+
+				enemies = leader.enemies_in_view
+				if enemies.length() > 1 and leader.ai.defensive? 
 
 					if enemies.length > size() -1	
 						$logger.info "#{ leader.to_s} too many enemies"
@@ -369,9 +390,12 @@ class Collective
 	def in_location? a, count
 		return true if count == 0 
 
+		if a.abspos.nil?
+			a.abspos = leader.square.rel( relpos( count) )
+		end
+
 		# NOTE: the from-square of the ant is used!
-		#a.square == Coord.new( (leader.row + count/2), (leader.col + count%2) )
-		a.square == leader.square.rel( relpos( count) )
+		a.square == a.abspos 
 	end
 
 

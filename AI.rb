@@ -231,6 +231,7 @@ class AI
 					square.moved_here.moved_to=nil
 					square.moved_here.friends=nil
 					square.moved_here.enemies=nil
+					square.moved_here.abspos=nil
 					square.moved_here = nil
 				end
 			end
