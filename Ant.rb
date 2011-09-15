@@ -20,6 +20,7 @@ class Ant
 
 		@attack_distance = nil
 		@orders = []
+		@enemies = [] 
 
 		evade_init
 	end
@@ -323,6 +324,9 @@ end
 	end
 
 	def make_enemies
+		# WRI DEBUG: do nothing, the enemies list is created at a higher level
+		return
+
 		if @enemies.nil?
 			#$logger.info "Filling enemies"
 			@enemies = closest_list(ai.enemy_ants)	
@@ -466,6 +470,20 @@ end
 
 	def to_s
 		"ant" + square.to_s
+	end
+
+	def add_enemy e
+		# Only add if within reasonable distance
+		dist = Distance.new self, e
+
+		if dist.dist < 20
+			@enemies << e
+		end
+	end
+
+
+	def sort_enemies
+		@enemies = closest_list @enemies
 	end
 end
 

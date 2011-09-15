@@ -8,6 +8,7 @@ $:.unshift File.dirname($0)
 # - On evasion, select shortest route (fast-forward?)
 # - Break off evasion if under attack for collectives
 # - Creating collectives: don't do it in the direct neighbourhood of water (fixed obstacles) 
+#
 # - URGENT! collective attack: 
 #		- break flip-flop deadlock 
 #		- detect ants which ignore you and keep on going in the same direction
@@ -17,7 +18,17 @@ $:.unshift File.dirname($0)
 #		- if ant is sure to die, let him take an enemy down
 # - Retreat: for multiple attackers, select good escape route
 #
+# - BUG: Following appearing in the logs:
+#
+#   - 87756: collective3 ( 55, 82 ) relpos count: 3, orient: n # unknown action
+#
+#   Ie. one member too many TODO: Fix
+#
 # DOING
+#
+# - URGENT: Timeout problem because of sorting enemy ants.
+#            TODO: NEEDS TO BE FIXED
+#
 # - Assembling collective: if new ants are made closer by than assembling ants,
 #     use these new ants instead
 #     	- ideal case: in exact necessary position

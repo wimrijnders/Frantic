@@ -159,7 +159,11 @@ class AI
 				square.ant=nil
 			end
 		end
-		
+	
+		@my_ants.each do |a|
+			a.enemies = []
+		end
+	
 		# @my_ants=[]
 		@enemy_ants=[]
 
@@ -199,6 +203,10 @@ class AI
 
 				else
 					enemy_ants.push a
+		
+					@my_ants.each do |b|
+						b.add_enemy a 
+					end
 				end
 			when 'd'
 				if owner==0
@@ -230,11 +238,15 @@ class AI
 					square.moved_here.moved=false
 					square.moved_here.moved_to=nil
 					square.moved_here.friends=nil
-					square.moved_here.enemies=nil
+		#			square.moved_here.enemies=nil
 					square.moved_here.abspos=nil
 					square.moved_here = nil
 				end
 			end
+		end
+
+		@my_ants.each do |b|
+			b.sort_enemies
 		end
 
 		return ret
