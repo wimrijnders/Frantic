@@ -312,7 +312,7 @@ end
 
 	def make_friends
 		if @friends.nil?
-			$logger.info "Filling friends"
+			#$logger.info "Filling friends"
 			@friends = closest_list(ai.my_ants)	
 
 			#$logger.info "Remove self pre: #{ @friends.length }"
@@ -323,7 +323,7 @@ end
 
 	def make_enemies
 		if @enemies.nil?
-			$logger.info "Filling enemies"
+			#$logger.info "Filling enemies"
 			@enemies = closest_list(ai.enemy_ants)	
 		end
 	end
@@ -429,16 +429,20 @@ end
 	end
 
 	def add_collective a, size = nil
+		return if a.collective?
 
 		if @collective.nil?
 			make_collective size
 		end
-		return if @collective.filled?
+		return if @collective.assembled? false
 
-		@collective.add a
-		a.set_collective @collective
+		@collective.add_recruit a
+	end
 
-		@collective.rally a,
+	def collective_assembled?
+		return false if @collective.nil?
+
+		@collective.assembled? false
 	end
 
 	def set_collective c 
@@ -460,7 +464,7 @@ end
 	end
 
 	def to_s
-		square.to_s
+		"ant" + square.to_s
 	end
 end
 

@@ -8,16 +8,28 @@ $:.unshift File.dirname($0)
 # - On evasion, select shortest route (fast-forward?)
 # - Break off evasion if under attack for collectives
 # - Creating collectives: don't do it in the direct neighbourhood of water (fixed obstacles) 
-# - collective attack: break flip-flop deadlock and ants which ignore
-#   you and keep on going in the same direction
+# - URGENT! collective attack: 
+#		- break flip-flop deadlock 
+#		- detect ants which ignore you and keep on going in the same direction
+#		- defensive: detect inert enemies, these render you immobile.
+#
 # - If attacked with no way of escape, defend as well as possible
+#		- if ant is sure to die, let him take an enemy down
+# - Retreat: for multiple attackers, select good escape route
 #
 # DOING
-#
-# - If you can grab food before the enemy, so much the better. They will
-#   have one ant less. If you can do this and escape, even better.
+# - Assembling collective: if new ants are made closer by than assembling ants,
+#     use these new ants instead
+#     	- ideal case: in exact necessary position
 #
 #######################################
+require 'Config.rb'
+require 'support.rb'
+require 'Square.rb'
+require 'Evasion.rb'
+require 'Distance.rb'
+require 'Collective.rb'
+require 'Ant.rb'
 require 'AI.rb'
 
 
@@ -29,77 +41,37 @@ def default_move ant
 
 	directions = [:N, :E, :S, :W, :N, :E, :S, :W ]
 
-
-# go to the least visited square
-best_visited = nil
-best_dir = nil
-
-# Select preferred direction as longest direction on map.
-# This fills the map up faster with following approach
-index = 0
-if ant.ai.rows < ant.ai.cols
-	index = 1
-end
-( directions[ index, 4] ).each do |dir|
-	sq = ant.square.neighbor( dir )
-
-	next unless sq.passable?
-
-	val = sq.visited
-	if !best_visited || val < best_visited
-		best_visited = val
-		best_dir = dir
+	# go to the least visited square
+	best_visited = nil
+	best_dir = nil
+	
+	# Select preferred direction as longest direction on map.
+	# This fills the map up faster with following approach
+	index = 0
+	if ant.ai.rows < ant.ai.cols
+		index = 1
 	end
-end
 
-best_dir = directions[ index ] if best_dir.nil?
-
-ant.move best_dir 
+	( directions[ index, 4] ).each do |dir|
+		sq = ant.square.neighbor( dir )
+	
+		next unless sq.passable?
+	
+		val = sq.visited
+		if !best_visited || val < best_visited
+			best_visited = val
+			best_dir = dir
+		end
+	end
+	
+	best_dir = directions[ index ] if best_dir.nil?
+	
+	ant.move best_dir 
 end
 
 
 
 def recruit ant
-
-	if ant.collective?
-		return unless ant.collective.leader? ant
-		return if ant.collective.filled?
-		threshold = ant.collective.fullsize - ant.collective.size
-	else 
-		return unless ant.attacked? 
-
-		# Don't even think about assembling if not enough ants around
-		return if ant.ai.my_ants.length < Config::ASSEMBLE_LIMIT
-
-		if ant.ai.defensive? 
-			# If collective nearby, don't bother creating a new one
-			collective_near = false
-			ant.neighbor_friends( 10 ).each do |a|
-				if a.collective?
-					$logger.info "#{ ant.square.to_s } has collective nearby"
-					collective_near = true
-					break
-				end
-			end
-
-			return if collective_near
-		end
-
-		# If too close too an assembling collective, 
-		# don't bother creating a new one
-		collective_near = false
-		ant.neighbor_friends( 3 ).each do |a|
-			if a.collective?
-				$logger.info "#{ ant.square.to_s } assembling collective too close "
-				collective_near = true
-				break
-			end
-		end
-		return if collective_near
-
-
-		threshold = 1
-	end
 
 	# recruit near neighbours for a collective
 	if ant.ai.defensive?
@@ -112,10 +84,10 @@ def recruit ant
 	recruits.delete_if { |a| a.collective? }
 
 	# If there are enough, make the collective
-	if recruits.size >= threshold 
+	if recruits.size > 0 
 		recruits.each do |l|
 			ant.add_collective l, recruits.length
-			break if ant.collective.filled?
+			break if ant.collective_assembled?
 		end
 		$logger.info "Created collective #{ ant.collective.to_s}"
 	else
@@ -138,7 +110,6 @@ def handle_conflict ant
 
 	if ant.attacked?
 		ant.retreat and return if ant.ai.defensive?
-		return if ant.order_closer_than_attacker?
 
 		$logger.info "Conflict!"
 		# Check for direct friendly neighbours 
@@ -235,8 +206,7 @@ end
 ai.run do |ai|
 	# your turn code here
 
-	# Determine which ant are being attacked
-	# if an enemy close by, move to your closest neighbour if present
+	# Determine which ants are being attacked
 	ai.my_ants.each do |ant|
 		# WOW WHAT A STUPID BUG!
 		#conflict ||= ant.check_attacked
@@ -244,13 +214,50 @@ ai.run do |ai|
 	end
 
 
-	# Collectives first
+	# Complete existing collectives first
 	ai.my_ants.each do |ant|
 		next unless ant.collective?
+		next if ant.collective.assembled? false
+
 		recruit ant
 	end
+
+
+	# Assemble new collectives
 	ai.my_ants.each do |ant|
 		next if ant.collective?
+
+		next unless ant.attacked? 
+
+		# Don't even think about assembling if not enough ants around
+		next if ant.ai.my_ants.length < Config::ASSEMBLE_LIMIT
+
+		if ant.ai.defensive? 
+			# If collective nearby, don't bother creating a new one
+			collective_near = false
+			ant.neighbor_friends( 10 ).each do |a|
+				if a.collective?
+					$logger.info "#{ ant.square.to_s } has collective nearby"
+					collective_near = true
+					break
+				end
+			end
+
+			next if collective_near
+		end
+
+		# If too close too an assembling collective, 
+		# don't bother creating a new one
+		collective_near = false
+		ant.neighbor_friends( 3 ).each do |a|
+			if a.collective?
+				$logger.info "#{ ant.square.to_s } assembling collective too close "
+				collective_near = true
+				break
+			end
+		end
+		next if collective_near
+
 		recruit ant
 	end
 

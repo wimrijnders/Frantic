@@ -16,7 +16,7 @@ map4 = [
 	'blank', 10,11,16,
 	21, # big, open map! Coll2+4 should have won
 	23, 28,
-	36 # to beat - beating it since version 21
+	36 # to beat - beating it since version 21, 24 does well but does not win
 ]
 
 map5 = [

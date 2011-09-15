@@ -12,31 +12,32 @@ class Distance
 	end
 
 	def initialize from, to = nil
-	if to.nil?
-		if from.respond_to? :row
-			@row = from.row
-			@col = from.col
-		else
-			@row = from[0]
-			@col = from[1]
-		end
-	else
-		if to.respond_to? :row
-			@row = to.row
-			@col = to.col
-		else
-			@row = to[0]
-			@col = to[1]
-		end
 
-		if from.respond_to? :row
-			@row -= from.row
-			@col -= from.col
+		if to.nil?
+			if from.respond_to? :row
+				@row = from.row
+				@col = from.col
+			else
+				@row = from[0]
+				@col = from[1]
+			end
 		else
-			@row -= from[0]
-			@col -= from[1]
+			if to.respond_to? :row
+				@row = to.row
+				@col = to.col
+			else
+				@row = to[0]
+				@col = to[1]
+			end
+	
+			if from.respond_to? :row
+				@row -= from.row
+				@col -= from.col
+			else
+				@row -= from[0]
+				@col -= from[1]
+			end
 		end
-	end
 
 		normalize
 	end
@@ -230,6 +231,28 @@ class Distance
 		else
 			col
 		end
+	end
+
+	def shortest_dir
+		if row.abs < col.abs
+			return nil if row == 0
+
+			if row > 0
+				dir = :S
+			else
+				dir = :N
+			end
+		else
+			return nil if col == 0
+
+			if col > 0
+				dir = :E
+			else
+				dir = :W
+			end
+		end
+
+		dir
 	end
 
 

@@ -26,6 +26,15 @@ class Collective
 		size == fullsize 
 	end
 
+#	def [] n
+#		@ants[n]
+#	end
+#
+#	def []= n,a
+#		@ants[n] = a
+#	end
+
+
 	#
 	# Order the given ant to the specified position within the collective.
 	# If no position given, add to the end of the collective.
@@ -103,6 +112,68 @@ class Collective
 	end
 
 
+	def assembled? side_effect = true
+		return false unless filled?
+
+		count = 0
+		okay = true
+		@ants.each do |a|
+			if in_location? a, count
+				# Note: following is a side effect.
+				#       For the logic, this is the best place to put it.
+				if side_effect
+					a.clear_orders if a.orders?
+					a.evade_reset if a.evading?
+				end
+			else
+				okay = false
+				# Don't break here; if-block needs to be done for all members
+			end
+			
+			count += 1
+		end
+
+		okay
+	end
+
+	def add_recruit a
+		if filled?
+			# Check if new recruit is nearer to the leader than one
+			# of the current members
+			# BUG: [1...size].each do |n|
+			#    - member below became an array of ants
+			#        TODO: Examine why
+			(1...size).each do |n|
+				member = @ants[n]
+
+				next if in_location? member, n
+
+				dista = Distance.new leader, a
+				distn = Distance.new leader, member
+
+				if dista.dist < distn.dist	
+					$logger.info "Collective #{ leader.to_s } replacing assembling member #{ member.to_s }, dist #{ distn.dist }, with #{ a.to_s }, dist #{ dista.dist }"
+					# Replace current member with new ant
+					member.clear_orders
+					member.set_collective nil
+
+					a.clear_orders
+					@ants[n] = a
+					a.set_collective self
+					rally a
+
+					return if assembled? false
+				end
+			end
+
+		else
+			add a
+			a.set_collective self 
+			rally a
+		end
+	end
+
+
 	private
 
 	def leader
@@ -131,29 +202,6 @@ class Collective
 		end
 	
 		return true	
-	end
-
-	def assembled?
-		return false unless filled?
-
-		count = 0
-		okay = true
-		@ants.each do |a|
-			if in_location? a, count
-				# Note: following is a side effect.
-				#       For the logic, this is the best place to put it.
-				a.clear_orders if a.orders?
-				a.evade_reset if a.evading?
-				# End side effect
-			else
-				okay = false
-				# Don't break here; if-block needs to be done for all members
-			end
-			
-			count += 1
-		end
-
-		okay
 	end
 
 	def can_pass? dir #, water_only = false
@@ -188,6 +236,33 @@ class Collective
 	end
 
 
+	def hold_ground dist
+		$logger.info "#{ leader.to_s} holding ground"
+		@prev_dist = dist.clone
+
+		# Allow sideways movement for better conflict placement
+		dir = dist.shortest_dir
+		if dir.nil? 
+			stay
+		else
+			$logger.info "#{ leader.to_s } placement to #{ dir }."
+			move_intern dir 
+			# Note: don't do evasion here, we're holding ground
+			# and don't want to move away
+		end
+		throw :done
+	end
+
+
+	def stay_away dist
+		if dist.in_peril?
+			# retreat if too close for comfort
+			dir = dist.invert.dir
+		else
+			hold_ground dist
+		end
+		dir
+	end
 
 	def move2
 		dist = attack_distance
@@ -201,53 +276,33 @@ class Collective
 			dir = nil
 			if !assembled?
 				$logger.info "#{ leader.to_s } not assembled"
-				if dist.in_peril?
-					# retreat if too close for comfort
-					dir = dist.invert.dir
-				else
-					@prev_dist = dist.clone
-					stay
-					return
-				end
+				dir = stay_away dist
 			else
 				dir = dist.attack_dir
 				$logger.info "Attack dir #{ leader.to_s }: #{ dir }"
 				return if orient dist.longest_dir
 
-				if leader.ai.defensive? and !dist.in_peril?
-					$logger.info "#{ leader.to_s} defensive - holding ground"
-					@prev_dist = dist.clone
-					stay
-					return
-				end
 
 				if leader.ai.defensive? 
 					enemies = leader.neighbor_enemies 10
 
 					if enemies.length > size() -1	
 						$logger.info "#{ leader.to_s} too many enemies"
-				
-						if dist.in_peril?
-							# stay away ffrom the hordes
-							dir = dist.invert.dir
-						else
-							@prev_dist = dist.clone
-							stay
-							return
-						end
+						dir = stay_away dist
+					else
+						# Advance up to peril distance
+						hold_ground dist if dist.in_peril?
 					end
-				end
+				else
 
-				if dist.in_peril? and not dist.in_danger?
-					$logger.info "In peril"
-					# Enemy is now two squares away from attack distance.
-					# For an aggresive enemy, now is a bad time to advance.
-					# Skip a turn so we can hit with extra force the next turn.
-					if @prev_dist and dist.longest_dist.abs < @prev_dist.longest_dist.abs()
-						$logger.info "Staying put"
-						@prev_dist = dist.clone
-						stay
-						return
+					if dist.in_peril? and not dist.in_danger?
+						$logger.info "In peril"
+						# Enemy is now two squares away from attack distance.
+						# For an aggresive enemy, now is a bad time to advance.
+						# Skip a turn so we can hit with extra force the next turn.
+						if @prev_dist and dist.longest_dist.abs < @prev_dist.longest_dist.abs()
+							hold_ground dist
+						end
 					end
 				end
 			end
@@ -292,8 +347,7 @@ class Collective
 					# Location is not good, move away
 					random_move
 				else
-					#if not assembled yet, wait for the missing ants
-					#to join
+					#if not assembled yet, wait for the missing ants to join
 					stay
 				end
 			end

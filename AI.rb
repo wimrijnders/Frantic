@@ -2,15 +2,6 @@
 # by Matma Rex (matma.rex@gmail.com)
 # Released under CC-BY 3.0 license
 
-require 'support.rb'
-require 'Square.rb'
-require 'Evasion.rb'
-require 'Distance.rb'
-require 'Collective.rb'
-require 'Ant.rb'
-
-
-
 class AI
 	def defensive?
 		my_ants.length < Config::DEFENSIVE_LIMIT
