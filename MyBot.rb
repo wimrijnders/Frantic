@@ -81,101 +81,6 @@ class Strategy < BaseStrategy
 	end
 	
 	
-	def handle_conflict ant
-		return if ant.moved?
-	
-		# If we can complete the order before being in conflict, 
-		# the order will take precedence.
-		return if ant.check_orders
-	
-		if ant.attacked?
-			ant.retreat and return if ant.ai.defensive?
-
-			if ( ant.ai.my_ants.length >= AntConfig::AGGRESIVE_LIMIT and ant.enemies.length == 1 ) or
-			   ( ant.ai.my_ants.length >= AntConfig::KAMIKAZE_LIMIT )
-				$logger.info "Banzai!"
-				ant.move ant.attack_distance.attack_dir
-				return 
-			end
-	
-			$logger.info "Conflict!"
-			# Check for direct friendly neighbours 
-			done = false
-			has_neighbour = false
-			[ :N, :E, :S, :W ].each do |dir|
-				n = ant.square.neighbor( dir ).ant
-				next if n.nil?
-	
-				has_neighbour = true
-	
-				if n.mine?
-					if n.moved? and not n.moved_to.nil?
-						# if neighbour moved, attempt the same move
-						$logger.info "neighbour moved."
-						ant.move n.moved_to
-						done = true
-						break
-					end
-				end
-			end
-			return if done
-	
-	
-			if has_neighbour
-				# Neighbours didn´t move, perform attack yourself
-				$logger.info "Attack."
-	
-				#ant.move_dir ant.attack_distance
-				ant.move ant.attack_distance.attack_dir
-				return 
-			end
-	
-			# Find a close neighbour and move to him
-			d = closest_enemy ant, ant.ai.my_ants
-			unless d.nil?
-				dist = d.dist
-				if dist == 1 
-					$logger.info "next to friend."
-					# already next to other ant
-					ant.stay
-				elsif dist < 20
-					$logger.info "Moving to friend."
-					ant.move_dir d
-				end
-				return 
-			end
-	
-			# Otherwise, just run away
-			ant.retreat
-			return 
-		else
-			order_dist = ant.order_distance
-	
-			# Find an attacked neighbour and move in to help
-			ant.ai.my_ants.each do |l|
-				next unless l.attacked?
-	
-				d = Distance.new ant, l.pos	
-	
-				# Only help out if current ant has no order,
-				# or ant in distress is nearer
-				if order_dist and order_dist.dist < d.dist
-					# Skip helping friend, we have other things to do
-					next
-				end
-	
-				if d.dist == 1 
-					$logger.info "Moving in - next to friend."
-					ant.stay
-					return 
-				elsif d.in_view?
-					$logger.info "Moving in to help attacked buddy."
-					ant.move_to l.pos
-					return
-				end
-			end
-		end
-	end
 
 	def default_move ant
 		return if ant.moved?
@@ -275,7 +180,7 @@ class Strategy < BaseStrategy
 	def ant_conflict ai
 		ai.my_ants.each do |ant|
 			next if ant.collective?
-			handle_conflict ant
+			ant.handle_conflict
 		end
 	end
 

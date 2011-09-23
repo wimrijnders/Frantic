@@ -5,7 +5,7 @@ def is_number? a
 end
 
 bot_num = nil 
-turns = 600 
+turns = 200 
 flags = "" #"--turntime=20000" # "--nolaunch"
 
 map = ARGV[0]

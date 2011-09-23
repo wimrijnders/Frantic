@@ -141,7 +141,6 @@ end
 
 
 	def check_attacked
-		#d = closest_enemy self, self.ai.enemy_ants 
 		d = Distance.new self, @enemies[0]
 
 		unless d.nil?
@@ -325,16 +324,6 @@ end
 		end
 	end
 
-	def make_enemies
-		# WRI DEBUG: do nothing, the enemies list is created at a higher level
-		return
-
-		if @enemies.nil?
-			#$logger.info "Filling enemies"
-			@enemies = closest_list(ai.enemy_ants)	
-		end
-	end
-
 
 	#
 	# Return all friendly ants within the specified distance
@@ -353,10 +342,23 @@ end
 		neighbors
 	end
 
+	def closest_friend_dist
+		make_friends
+
+		return nil if @friends[0].nil?
+
+		Distance.new self, @friends[0]
+	end
+
+	def closest_enemy_dist
+		return nil if @enemies[0].nil?
+
+		Distance.new self, @enemies[0]
+	end
+
+
 
 	def neighbor_enemies dist
-		make_enemies
-
 		neighbors = []
 		@enemies.each do |a|
 			adist = Distance.new( pos, a.pos)
@@ -370,8 +372,6 @@ end
 
 
 	def enemies_in_view
-		make_enemies
-
 		neighbors = []
 		@enemies.each do |a|
 			adist = Distance.new( pos, a.pos)
@@ -474,6 +474,7 @@ end
 		"ant" + square.to_s
 	end
 
+
 	def add_enemy e
 		# Only add if within reasonable distance
 		dist = Distance.new self, e
@@ -486,6 +487,112 @@ end
 
 	def sort_enemies
 		@enemies = closest_list @enemies
+	end
+
+
+	def neighbor_attack
+		# Check for direct friendly neighbours 
+		done = false
+		has_neighbour = false
+		[ :N, :E, :S, :W ].each do |dir|
+			n = square.neighbor( dir ).ant
+			next if n.nil?
+	
+			has_neighbour = true
+	
+			if n.mine?
+				if n.moved? and not n.moved_to.nil?
+					# if neighbour moved, attempt the same move
+					$logger.info "neighbour moved."
+					move n.moved_to
+					done = true
+					break
+				end
+			end
+		end
+		return if done
+	
+	
+		if has_neighbour
+			# Neighbours didn´t move, perform attack yourself
+			$logger.info "Attack."
+	
+			move attack_distance.attack_dir
+			return 
+		end
+	
+		# Find a close neighbour and move to him
+		d = closest_friend_dist
+		$logger.info "closest friend: #{ d.to_s }"
+		unless d.nil?
+			dist = d.dist
+			if dist == 1 
+				$logger.info "next to friend."
+				# already next to other ant
+				stay
+			elsif dist < 20
+				$logger.info "Moving to friend."
+				move_dir d
+			end
+			return 
+		end
+	
+		# Otherwise, just run away
+		retreat
+		return 
+	end
+
+
+	def neighbor_help
+		order_dist = order_distance
+	
+		# Find an attacked neighbour and move in to help
+		ai.my_ants.each do |l|
+			next unless l.attacked?
+	
+			d = Distance.new self, l.pos	
+	
+			# Only help out if current ant has no order,
+			# or ant in distress is nearer
+			if order_dist and order_dist.dist < d.dist
+				# Skip helping friend, we have other things to do
+				next
+			end
+	
+			if d.dist == 1 
+				$logger.info "Moving in - next to friend."
+				stay
+			elsif d.in_view?
+				$logger.info "Moving in to help attacked buddy."
+				move_to l.pos
+			end
+		end
+	end
+
+
+	def handle_conflict
+		return if moved?
+	
+		# If we can complete the order before being in conflict, 
+		# the order will take precedence.
+		return if check_orders
+	
+		if attacked?
+			retreat and return if ai.defensive?
+
+			if ( ai.my_ants.length >= AntConfig::AGGRESIVE_LIMIT and enemies.length == 1 ) or
+			   ( ai.my_ants.length >= AntConfig::KAMIKAZE_LIMIT )
+				$logger.info "Banzai!"
+				move attack_distance.attack_dir
+				return 
+			end
+	
+			$logger.info "Conflict!"
+
+			neighbor_attack
+		else
+			neighbor_help
+		end
 	end
 end
 

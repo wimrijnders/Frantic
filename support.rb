@@ -134,43 +134,6 @@ class Order
 end
 
 
-#
-# Deprecated: ants have @enemies list, sorted by distance
-#
-# TODO: check if also OK for friendly ants.
-#
-def closest_enemy ant, enemies
-
-	cur_best = nil
-	cur_dist = nil
-
-	enemies.each do |l|
-		next if l.nil?
-
-		# Stuff for friendly ants
-		if l.mine?
-			# skip self
-			next if l === ant
-			to = l.pos
-			next if l.evading?		# Needed because you can trap an evading ant by following it
-		else
-			to = l.square
-		end
-
-		d = Distance.new ant, to
-
-		# safeguard
-		next if d.dist == 0
-
-		if !cur_dist || d.dist < cur_dist
-			cur_dist = d.dist
-			cur_best = d
-		end
-	end
-
-	cur_best
-end
-
 
 def closest_ant l, ai 
 

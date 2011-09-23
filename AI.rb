@@ -6,6 +6,7 @@ require 'support.rb'
 require 'Square.rb'
 require 'Evasion.rb'
 require 'Distance.rb'
+require 'AttackDistance.rb'
 require 'Collective.rb'
 require 'Ant.rb'
 
