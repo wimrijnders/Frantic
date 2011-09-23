@@ -5,7 +5,7 @@ def is_number? a
 end
 
 bot_num = nil 
-turns = 100 
+turns = 600 
 flags = "" #"--turntime=20000" # "--nolaunch"
 
 map = ARGV[0]
@@ -19,6 +19,7 @@ map2 = {
 map4 = [ 
 	'blank', 10,11,16,
 	21, # big, open map! Coll2+4 should have won
+		# Good one for using the test bots
 	23, 28,
 	36 # to beat
 ]
@@ -31,8 +32,8 @@ map5 = [
 
 bots = [
 	"ruby ../MyBot.rb",		# Frantic
-	"ruby ../Twitcher.rb",
 	"ruby ../GoSouth.rb",
+	"ruby ../Twitcher.rb",
 	"ruby ../Inertia.rb",
 	"python sample_bots/python/HunterBot.py",
 	"python sample_bots/python/GreedyBot.py",

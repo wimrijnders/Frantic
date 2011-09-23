@@ -179,6 +179,11 @@ class Distance
 	# A single ant has less chance.
 	#
 	def attack_dir 
+		# As long as we are too far away to receive damage, lessen the distance
+		return longest_dir if not in_peril? 
+
+		# Move sideways to optimize the attack force.
+		# eg. more ants will hit the enemy at the same time
 		if row.abs < 1
 			if col > 0
 				return :E

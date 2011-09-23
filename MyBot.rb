@@ -90,6 +90,13 @@ class Strategy < BaseStrategy
 	
 		if ant.attacked?
 			ant.retreat and return if ant.ai.defensive?
+
+			if ( ant.ai.my_ants.length >= AntConfig::AGGRESIVE_LIMIT and ant.enemies.length == 1 ) or
+			   ( ant.ai.my_ants.length >= AntConfig::KAMIKAZE_LIMIT )
+				$logger.info "Banzai!"
+				ant.move ant.attack_distance.attack_dir
+				return 
+			end
 	
 			$logger.info "Conflict!"
 			# Check for direct friendly neighbours 
@@ -287,12 +294,12 @@ class Strategy < BaseStrategy
 	def turn ai
 		check_attacked ai	
 		complete_collectives ai
-		create_collectives ai
+		create_collectives ai unless ( ai.my_ants.length >= AntConfig::KAMIKAZE_LIMIT )
 		ant_conflict ai
 		ant_orders ai
 		move_collectives ai
 
-		super ai, false
+		super ai, false, ( ai.my_ants.length < AntConfig::KAMIKAZE_LIMIT )
 	end
 end
 

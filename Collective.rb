@@ -23,7 +23,7 @@ class AttackDistance
 			calc_dir Distance.new prev.dist, dist
 
 			unless too_far?
-				@advancing = prev.longest_dist.abs < longest_dist.abs
+				@advancing = prev.longest_dist.abs > longest_dist.abs
 			end
 		end
 	end
@@ -145,10 +145,23 @@ class AttackDistanceList
 
 
 	def twitch?
-		return false if @list.length < TURN_LIMIT
+		# Twitching can not be detected from the first item in the list,
+		# if current collective leader has not moved. For that reason,
+		# we skip the leader and test the rest
+
+		return false if @list.length < TURN_LIMIT + 1
+
+		distance = @list[-2].dist.dist.abs
+		@list[-(TURN_LIMIT)..-3].reverse.each do |d|
+			# Twitching is only a problem if we are not getting
+			# any closer; ie. the twitching is perpendicular
+			return false if distance != d.dist.dist.abs
+		end
 
 		# Note: indexes start with lowest
-		(-((TURN_LIMIT - 1)/2)..-1).each do |i|
+		(-(TURN_LIMIT/2)..-2).each do |i|
+			# Not staying put; every other move is the same
+			# consecutive moves are not the same.
 			return false if @list[i].dir == :STAY or
 				@list[i].dir != @list[i-2].dir or
 				not inverse? @list[i].dir, @list[i-1].dir
@@ -462,6 +475,12 @@ class Collective
 		if dist.in_peril?
 			# retreat if too close for comfort
 			dir = dist.invert.dir
+
+			if @prev_dist.straight_line? and @prev_dist.advancing
+				# possibly ignoring you; change direction
+				$logger.info "Evading ignorer"
+				dir = left dir
+			end
 		else
 			hold_ground dist
 		end
@@ -477,7 +496,7 @@ class Collective
 		#
 		$logger.info "#{ leader.to_s } dist: #{ dist.to_s }"
 		if dist and dist.in_view?
-			# Conflict; any enemy is in view range
+			# Conflict; enemy is in view range
 
 			@prev_dist.add dist
 			dir = nil
@@ -504,6 +523,22 @@ class Collective
 						hold_ground dist if dist.in_peril?
 					end
 				else
+					if @prev_dist.straight_line? and not @prev_dist.advancing
+						# This is an ant ignoring you and moving in a fixed direction
+						# Don't bother chasing if it's not moving toward you
+						$logger.info "Not chasing straight liner."
+						stay
+						throw :done
+
+						# TODO: Perhaps concentrate on the next closest ant
+					end
+
+					if @prev_dist.twitch?
+						# break the twitch, otherwise we'll be twitching in unison forever
+						$logger.info "Breaking the twitch."
+						# Just plain attack
+						dir = dist.longest_dir
+					end
 
 					if dist.in_peril? and not dist.in_danger?
 						$logger.info "In peril"
@@ -523,7 +558,9 @@ class Collective
 			end
 			@prev_dist.adjust dir
 
-			$logger.info @prev_dist.to_s
+			# Following log computationally expensive
+			# Enable only when needed
+			#$logger.info @prev_dist.to_s
 		else
 			$logger.info "#{ leader.to_s } no attacker"
 			@prev_dist.clear

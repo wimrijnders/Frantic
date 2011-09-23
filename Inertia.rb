@@ -6,7 +6,7 @@ require 'BaseStrategy'
 #
 # main routine
 #
-
+$logger.log = false
 strategy = BaseStrategy.new
 
 $ai.setup

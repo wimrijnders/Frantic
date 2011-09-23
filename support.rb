@@ -13,6 +13,10 @@ class Logger
 			@@ai.stdout.flush
 		end
 	end
+
+	def log= val
+		@log = val
+	end
 end
 
 

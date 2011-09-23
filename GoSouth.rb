@@ -15,6 +15,7 @@ end
 # main routine
 #
 
+$logger.log = false
 strategy = Strategy.new
 
 $ai.setup

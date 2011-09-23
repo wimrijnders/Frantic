@@ -47,9 +47,9 @@ class BaseStrategy
 
 
 
-	def turn ai, do_orders = true
+	def turn ai, do_orders = true, do_food = true
 		ant_orders ai if do_orders
-		find_food ai
+		find_food ai  if do_food
 		evade ai
 
 		ai.my_ants.each do |ant|
