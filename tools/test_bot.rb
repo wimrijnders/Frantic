@@ -5,8 +5,8 @@ def is_number? a
 end
 
 bot_num = nil 
-turns = 300
-flags = "" # "--nolaunch"
+turns = 300 
+flags = "" #"--turntime=20000" # "--nolaunch"
 
 map = ARGV[0]
 map = map.to_i if is_number? map
@@ -21,14 +21,15 @@ map4 = [
 
 map5 = [
 	4,
+	8,
 	35	# to beat
 ]
 
 bots = [
+	"ruby ../MyBot.rb",		# Frantic
 	"python sample_bots/python/HunterBot.py",
 	"python sample_bots/python/GreedyBot.py",
 	"python sample_bots/python/GreedyBot.py",
-	"ruby ../MyBot.rb",		# Frantic is always fourth player
 	"python sample_bots/python/GreedyBot.py",
 	"python submission_test/TestBot.py"
 ]

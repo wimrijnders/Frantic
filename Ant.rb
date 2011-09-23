@@ -141,7 +141,9 @@ end
 
 
 	def check_attacked
-		d = closest_enemy self, self.ai.enemy_ants 
+		#d = closest_enemy self, self.ai.enemy_ants 
+		d = Distance.new self, @enemies[0]
+
 		unless d.nil?
 			if d.in_view? and d.clear_view @square
 				$logger.info "ant #{ @square.to_s } attacked!"
@@ -288,7 +290,7 @@ end
 	# in the next turn.
 	#
 	def pos
-		if moved? and not moved_to.nil?
+		if not moved_to.nil? and moved?
 			square.neighbor( moved_to )
 		else
 			square

@@ -34,6 +34,10 @@ $:.unshift File.dirname($0)
 #     	- ideal case: in exact necessary position
 #
 #######################################
+
+ENABLE_PROFILING = false
+NUM_TURNS 		 = 265
+
 require 'Config.rb'
 require 'support.rb'
 require 'Square.rb'
@@ -43,6 +47,13 @@ require 'Collective.rb'
 require 'Ant.rb'
 require 'AI.rb'
 
+
+if ENABLE_PROFILING
+	require 'ruby-prof'
+
+	 # Profile the code
+	RubyProf.start
+end
 
 # Local methods
 
@@ -114,7 +125,6 @@ end
 def handle_conflict ant
 	return if ant.moved?
 
-	# Orders take precedence over attacks.
 	# If we can complete the order before being in conflict, 
 	# the order will take precedence.
 	return if ant.check_orders
@@ -216,6 +226,7 @@ end
 
 ai.run do |ai|
 	# your turn code here
+	$logger.info "Start turn."
 
 	# Determine which ants are being attacked
 	ai.my_ants.each do |ant|
@@ -241,7 +252,7 @@ ai.run do |ai|
 		next unless ant.attacked? 
 
 		# Don't even think about assembling if not enough ants around
-		next if ant.ai.my_ants.length < Config::ASSEMBLE_LIMIT
+		next if ant.ai.my_ants.length < AntConfig::ASSEMBLE_LIMIT
 
 		if ant.ai.defensive? 
 			# If collective nearby, don't bother creating a new one
@@ -292,6 +303,7 @@ ai.run do |ai|
 
 
 	ai.food.each do |l|
+
 		ant = closest_ant l, ai
 		unless ant.nil?
 			#next if ant.moved?
@@ -319,4 +331,32 @@ ai.run do |ai|
 		next if ant.moved?
 		ant.stay
 	end
+
+	
+	$logger.info "End turn."
+
+if ENABLE_PROFILING
+	# Need to put this within the loop, otherwise 
+	# no output is generated. I think this is something
+	# to do with how IO is handled by the calling program
+	#
+	# Turn number should ideally be next to last. This
+	# can't be determined while the program is running.
+	#
+	# -2 because zero-based and we want next-to-last turn.
+	#
+	if ai.turn_number == NUM_TURNS - 2
+		result = RubyProf.stop
+
+		#printer = RubyProf::FlatPrinter.new(result)
+		printer = RubyProf::GraphPrinter.new(result)
+		#printer.print(STDOUT)
+		printer.print( File.new("profile4.txt","w"))
+
+		$logger.info "Done."
+	end
 end
+
+end
+
+

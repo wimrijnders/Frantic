@@ -4,7 +4,7 @@
 
 class AI
 	def defensive?
-		my_ants.length < Config::DEFENSIVE_LIMIT
+		my_ants.length < AntConfig::DEFENSIVE_LIMIT
 	end
 
 
@@ -80,10 +80,6 @@ class AI
 	
 	# Turn logic. If setup wasn't yet called, it will call it (and yield the block in it once).
 	def run &b # :yields: self
-		# Wierdest thin ever: just by adding the rescue block
-		# the error SystemStackError - stack too deep disappeared
-		#
-		# Actually, it didn't; the bug is erratic :-(
 		begin
 			setup &b if !@did_setup
 		
@@ -203,10 +199,6 @@ class AI
 
 				else
 					enemy_ants.push a
-		
-					@my_ants.each do |b|
-						b.add_enemy a 
-					end
 				end
 			when 'd'
 				if owner==0
@@ -245,9 +237,14 @@ class AI
 			end
 		end
 
+		$logger.info "Sorting pre"
 		@my_ants.each do |b|
+			@enemy_ants.each do |a|
+				b.add_enemy a 
+			end
 			b.sort_enemies
 		end
+		$logger.info "Sorting post"
 
 		return ret
 	end

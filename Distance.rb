@@ -48,19 +48,21 @@ class Distance
 
 		# If the distance is greater than half the width/height,
 		# try the other side of the torus
-		if @row.abs > ai.rows/2
+		rows = ai.rows
+		if @row.abs > rows/2
 			if @row > 0
-				@row -= ai.rows
+				@row -= rows
 			else
-				@row += ai.rows
+				@row += rows
 			end
 		end
-	
-		if @col.abs > ai.cols/2
+
+		cols = ai.cols	
+		if @col.abs > cols/2
 			if @col > 0
-				@col -= ai.cols
+				@col -= cols
 			else
-				@col += ai.cols
+				@col += cols
 			end
 		end
 	end
@@ -114,7 +116,6 @@ class Distance
 			ret_dir = rowdir
 		end
 		return ret_dir unless ret_dir.nil?
-		#return ret_dir unless ret_dir.nil? or ( !square.nil? and !square.neighbor( ret_dir).passable? )
 	
 
 		# If specified, take passability from square into account
@@ -232,6 +233,7 @@ class Distance
 			col
 		end
 	end
+
 
 	def shortest_dir
 		if row.abs < col.abs

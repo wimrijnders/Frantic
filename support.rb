@@ -1,7 +1,7 @@
 
 class Logger
 	def initialize ai
-		@log = Config::LOG_OUTPUT
+		@log = AntConfig::LOG_OUTPUT
 		@@ai = ai
 		@start = Time.now
 	end
@@ -130,6 +130,11 @@ class Order
 end
 
 
+#
+# Deprecated: ants have @enemies list, sorted by distance
+#
+# TODO: check if also OK for friendly ants.
+#
 def closest_enemy ant, enemies
 
 	cur_best = nil

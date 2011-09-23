@@ -1,10 +1,10 @@
 
 
-class Config
+module AntConfig
 
 	LOG_OUTPUT      = true	# Output logging info to stdout
 
-	DEFENSIVE_LIMIT = 30	# Number of ants needed to be present
+	DEFENSIVE_LIMIT = 20	# Number of ants needed to be present
 							# before ants start attacking as well
 
 	ASSEMBLE_LIMIT = 10		# Number of ants in game before we 
