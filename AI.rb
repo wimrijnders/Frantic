@@ -75,9 +75,9 @@ class AI
 	end
 	
 	# Zero-turn logic. 
-	def setup # :yields: self
+	def setup 
 		read_intro
-		yield self
+		yield self if block_given?
 		
 		@stdout.puts 'go'
 		@stdout.flush
@@ -85,6 +85,7 @@ class AI
 		@map=Array.new(@rows){|row| Array.new(@cols){|col| Square.new false, false, nil, row, col, self } }
 		@did_setup=true
 	end
+
 	
 	# Turn logic. If setup wasn't yet called, it will call it (and yield the block in it once).
 	def run &b # :yields: self
