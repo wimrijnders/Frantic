@@ -1,6 +1,14 @@
 # Ants AI Challenge framework
 # by Matma Rex (matma.rex@gmail.com)
 # Released under CC-BY 3.0 license
+require 'Config.rb'
+require 'support.rb'
+require 'Square.rb'
+require 'Evasion.rb'
+require 'Distance.rb'
+require 'Collective.rb'
+require 'Ant.rb'
+
 
 class AI
 	def defensive?
@@ -293,3 +301,14 @@ class AI
 		@cols
 	end
 end
+
+
+#
+# Global component initialization
+#
+
+
+$ai=AI.new
+$logger = Logger.new $ai
+Distance.set_ai $ai
+Coord.set_ai $ai

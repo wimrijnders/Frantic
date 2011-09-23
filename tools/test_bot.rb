@@ -27,6 +27,9 @@ map5 = [
 
 bots = [
 	"ruby ../MyBot.rb",		# Frantic
+	"ruby ../Twitcher.rb",
+	"ruby ../GoSouth.rb",
+	"ruby ../Inertia.rb",
 	"python sample_bots/python/HunterBot.py",
 	"python sample_bots/python/GreedyBot.py",
 	"python sample_bots/python/GreedyBot.py",
