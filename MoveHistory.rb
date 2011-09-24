@@ -93,9 +93,15 @@ class MoveHistory
 	end
 
 
-	# TODO
-	def advancing
-		first and first.advancing
+	def advancing? pos
+		if first and @list[-2]
+			dist1 = Distance.new pos, first.pos
+			dist2 = Distance.new pos, @list[-2].pos
+
+			return dist1.dist.abs < dist2.dist.abs
+		end
+
+		false
 	end
 
 	def stay?
@@ -117,21 +123,10 @@ class MoveHistory
 	end
 
 
-	def twitch? antpos = nil
+	def twitch? 
 		return false if @list.length < TURN_LIMIT
 
 		pos = @list[-1].pos
-
-		if antpos
-			distance = Distance.new antpos, pos
-			@list[-(TURN_LIMIT)..-2].reverse.each do |d|
-				# Twitching is only a problem if we are not getting
-				# any closer; ie. the twitching is perpendicular
-				dist = Distance.new antpos, d.pos
-	
-				return false if distance.dist.abs != dist.dist.abs
-			end
-		end
 
 		# Note: indexes start with lowest
 		(-( (TURN_LIMIT-1)/2 )..-1).each do |i|

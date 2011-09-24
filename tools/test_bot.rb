@@ -26,10 +26,11 @@ maps = [
 # End maps
 
 bots = [
+	"ruby ../GoSouth.rb",
 	"ruby ../MyBot.rb",		# Frantic
 	"ruby ../GoSouth.rb",
-	"ruby ../Twitcher.rb",
 	"ruby ../Inertia.rb",
+	"ruby ../Twitcher.rb",
 	"python sample_bots/python/GreedyBot.py",
 	"python sample_bots/python/HunterBot.py",
 	"python submission_test/TestBot.py",

@@ -7,7 +7,7 @@ class Collective
 		@safe_count = 0
 		@do_reassemble = true
 		@incomplete_count = 0
-		@prev_dist = AttackDistanceList.new
+		#@prev_dist = AttackDistanceList.new
 		evade_init
 	end
 
@@ -104,7 +104,7 @@ class Collective
 		end
 
 		@ants = []
-		@prev_dist.clear
+		#@prev_dist.clear
 
 		# Collective doesn't exist any more. Skip any other statements
 		$logger.info "Doing throw because collective disbanded."
@@ -263,7 +263,7 @@ class Collective
 		else
 			$logger.info "#{ leader.to_s } placement to #{ dir }."
 			if move_intern dir 
-				@prev_dist.adjust dir
+				#@prev_dist.adjust dir
 			end
 			# Note: don't do evasion here, we're holding ground
 			# and don't want to move away
@@ -272,12 +272,15 @@ class Collective
 	end
 
 
-	def stay_away dist
+	def stay_away enemy, dist
+
 		if dist.in_peril?
 			# retreat if too close for comfort
 			dir = dist.invert.dir
 
-			if @prev_dist.straight_line? and @prev_dist.advancing
+			# TODO: how can there not be an enemy if we are being attacked??
+			if enemy and enemy.straight_line? and not enemy.advancing? leader.pos
+			#if @prev_dist.straight_line? and @prev_dist.advancing
 				# possibly ignoring you; change direction
 				$logger.info "Evading ignorer"
 				dir = left dir
@@ -298,43 +301,51 @@ class Collective
 		$logger.info "#{ leader.to_s } dist: #{ dist.to_s }"
 		if dist and dist.in_view?
 			# Conflict; enemy is in view range
+			enemy = leader.enemies[0]
 
-			@prev_dist.add dist
+			#@prev_dist.add dist
 			dir = nil
 			if !assembled?
 				$logger.info "#{ leader.to_s } not assembled"
-				dir = stay_away dist
+				dir = stay_away enemy, dist
 			else
 				dir = dist.attack_dir
 				$logger.info "Attack dir #{ leader.to_s }: #{ dir }"
+
+				# TODO: changing orientation can also be caught by twitchers
+				#		eg. if two twitchers alternate in being the closest
 				return if orient dist.longest_dir
 
 
 				# If there is only one enemy, attack always.
-				# TODO: following creates timeout problems!
 
 				enemies = leader.enemies_in_view
 				if enemies.length() > 1 and leader.ai.defensive? 
 
 					if enemies.length > size() -1	
 						$logger.info "#{ leader.to_s} too many enemies"
-						dir = stay_away dist
+						dir = stay_away enemy, dist
 					else
 						# Advance up to peril distance
 						hold_ground dist if dist.in_peril?
 					end
 				else
-					if @prev_dist.straight_line? and not @prev_dist.advancing
+					#if @prev_dist.straight_line? and not @prev_dist.advancing
+					if enemy and enemy.straight_line? and not enemy.advancing? leader.pos
 						# This is an ant ignoring you and moving in a fixed direction
 						# Don't bother chasing if it's not moving toward you
 						$logger.info "Not chasing straight liner."
-						stay
+
+						# for good measure, move in the opposite direction.
+						# there may be more coming
+						move_intern dist.invert.dir
 						throw :done
 
 						# TODO: Perhaps concentrate on the next closest ant
 					end
 
-					if @prev_dist.twitch?
+					#if @prev_dist.twitch?
+					if enemy and enemy.twitch?
 						# break the twitch, otherwise we'll be twitching in unison forever
 						$logger.info "Breaking the twitch."
 						# Just plain attack
@@ -346,7 +357,8 @@ class Collective
 						# Enemy is now two squares away from attack distance.
 						# With an attacking enemy, now is a bad time to advance.
 						# Skip a turn so we can hit with extra force the next turn.
-						if @prev_dist.advancing
+						#if @prev_dist.advancing
+						if enemy.advancing? leader.pos
 							hold_ground dist
 						end
 					end
@@ -357,10 +369,8 @@ class Collective
 				# Actual dir will be different
 				dir = evade dir
 			end
-			@prev_dist.adjust dir
+			#@prev_dist.adjust dir
 
-			# Following log computationally expensive
-			# Enable only when needed
 			#$logger.info @prev_dist.to_s
 		else
 			$logger.info "#{ leader.to_s } no attacker"
@@ -370,14 +380,16 @@ class Collective
 				# go pick a fight if possible
 				$logger.info "picking a fight"
 				d = leader.closest_enemy_dist
+				enemy = leader.enemies[0]
 
 				# If more or less close, go for it
 				if d and d.dist < AntConfig::FIGHT_DISTANCE 
-					@prev_dist.add d
+					#@prev_dist.add d
 
-					if @prev_dist.straight_line? and not @prev_dist.advancing
+					#if @prev_dist.straight_line? and not @prev_dist.advancing
+					if enemy.straight_line? and not enemy.advancing? leader.pos
 						$logger.info "Not chasing straight liner 2."
-						stay
+						move_intern d.invert.dir
 						throw :done
 
 					end
@@ -395,12 +407,12 @@ class Collective
 						#	evade d.dir
 						#end
 					end
-					@prev_dist.adjust dir
+					#@prev_dist.adjust dir
 				else
-					@prev_dist.clear
+					#@prev_dist.clear
 				end
 			else
-				@prev_dist.clear
+				#@prev_dist.clear
 				check_assembly
 
 				if !can_assemble?
@@ -527,7 +539,7 @@ class Collective
 	def attack_distance
 		# Do from leader only
 		ret = nil
-		if leader.attacked? # and not leader.orders?
+		if leader.attacked? 
 			ret = leader.attack_distance
 		end
 

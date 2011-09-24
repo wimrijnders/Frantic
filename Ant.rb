@@ -65,6 +65,19 @@ class EnemyAnt < Ant
 	def to_s
 		super + "; " +  @state.to_s
 	end
+
+	def advancing? pos
+		@state.advancing? pos
+	end
+
+	def straight_line? 
+		@state.straight_line?
+	end
+
+	def twitch?
+		@state.twitch?
+	end
+
 end
 
 
@@ -631,7 +644,10 @@ end
 			# Pick the nearest enemy and go for it
 			$logger.info "Banzai!"
 			d = closest_enemy_dist
-			move d.attack_dir and return unless d
+			unless d.nil?
+				move d.attack_dir 
+				return
+			end
 		end
 	
 		if attacked?
@@ -644,8 +660,10 @@ end
 	
 			$logger.info "Conflict!"
 			#d = attack_distance
+
+			# TODO: how can there not be a distance. We are being attacked, right?
 			d = closest_enemy_dist
-			retreat if d.in_peril?
+			retreat if !d.nil? and  d.in_peril?
 
 			#neighbor_attack
 		else
