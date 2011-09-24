@@ -5,7 +5,7 @@ def is_number? a
 end
 
 bot_num = nil 
-turns = 200 
+turns = 150 
 flags = "" #"--turntime=20000" # "--nolaunch"
 
 map = ARGV[0]
@@ -28,8 +28,8 @@ maps = [
 bots = [
 	"ruby ../MyBot.rb",		# Frantic
 	"ruby ../GoSouth.rb",
-	"python sample_bots/python/HunterBot.py",
 	"python sample_bots/python/GreedyBot.py",
+	"python sample_bots/python/HunterBot.py",
 	"ruby ../Twitcher.rb",
 	"ruby ../Inertia.rb",
 	"python submission_test/TestBot.py",
@@ -53,7 +53,7 @@ end
 
 if map == 'test'
 	mapfile = "submission_test/test.map"
-	flags << " --food=none"		# Needed for asymmetric maps
+	flags << " --food=none"
 elsif map == 'blank'
 	mapfile  = "maps/symmetric_maps/symmetric_#{ map }.map"
 elsif map[0] == 'a'

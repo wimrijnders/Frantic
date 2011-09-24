@@ -171,7 +171,8 @@ class AI
 		end
 	
 		# @my_ants=[]
-		@enemy_ants=[]
+		#@enemy_ants=[]
+		new_enemy_ants=[]
 
 		@food = []
 		
@@ -190,25 +191,26 @@ class AI
 
 				@food << [ row, col ]
 			when 'a'
-				a=Ant.new true, owner, sq, self
 
 				if owner==0
+					a = MyAnt.new sq, self
+
 					unless sq.moved_here?
 						$logger.info "New ant."
-
-						sq.ant = a
-						sq.visited += 1
 						my_ants.push a
 					else
-						b = sq.moved_here 
-						$logger.info "Moved ant from #{ b.square } to #{ sq }."
-						sq.ant = b
-						sq.visited += 1
-						b.square =  sq
+						a = sq.moved_here 
+						$logger.info "Moved ant from #{ a.square } to #{ sq }."
+						a.square =  sq
 					end
 
+					sq.ant = a
+					sq.visited += 1
 				else
-					enemy_ants.push a
+					a= EnemyAnt.new owner, sq, self
+
+					sq.ant = a
+					new_enemy_ants.push a
 				end
 			when 'd'
 				if owner==0
@@ -246,6 +248,39 @@ class AI
 				end
 			end
 		end
+
+		# Match the previous enemy ants with the new ones
+		$logger.info "Match pre: #{ @enemy_ants.length} ants."
+		count = 0
+		found_some = true
+		while found_some  and @enemy_ants.length > 0
+			count += 1
+			found_some = false
+			@enemy_ants.each do |a|
+				list = []
+				b = a.square.ant
+				list << b if b and b.enemy? and b.alive? and not b.state?
+				b = a.square.neighbor( :N ).ant
+				list << b if b and b.enemy? and b.alive? and not b.state?
+				b = a.square.neighbor( :E ).ant
+				list << b if b and b.enemy? and b.alive? and not b.state?
+				b = a.square.neighbor( :S ).ant
+				list << b if b and b.enemy? and b.alive? and not b.state?
+				b = a.square.neighbor( :W ).ant
+				list << b if b and b.enemy? and b.alive? and not b.state?
+
+				if list.length == 1
+					#$logger.info "Found the ant."
+					list[0].state = true
+					@enemy_ants.delete a
+					found_some = true
+				end
+			end
+		end
+		$logger.info "Match post: #{ @enemy_ants.length} ants; iterations: #{ count }"
+		
+
+		@enemy_ants = new_enemy_ants
 
 		$logger.info "Sorting pre"
 		@my_ants.each do |b|

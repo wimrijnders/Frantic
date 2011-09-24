@@ -1,20 +1,67 @@
 
 # Represents a single ant.
 class Ant
-
 	# Owner of this ant. If it's 0, it's your ant.
 	attr_accessor :owner
+
 	# Square this ant sits on.
-	attr_accessor :square, :moved_to, 
+	attr_accessor :square
+
+	attr_accessor :alive, :ai
+
+	def initialize alive, owner, square, ai
+		@alive, @owner, @square, @ai = alive, owner, square, ai
+	end
+
+	def alive?; @alive; end
+	def dead?; !@alive; end
+	def mine?; owner==0; end
+	def enemy?; owner!=0; end
+	def row; @square.row; end
+	def col; @square.col; end
+
+	def square= sq
+		@square = sq
+	end
+
+	def pos
+		square
+	end
+
+end
+
+
+class EnemyAnt < Ant
+
+	def initialize owner, square, ai
+		super  true, owner, square, ai
+
+		@state = nil
+	end
+
+	def state= val
+		@state = val
+	end
+
+	def state?
+		!@state.nil?
+	end
+
+end
+
+
+class MyAnt < Ant
+
+	# Square this ant sits on.
+	attr_accessor :moved_to, 
 		:abspos # absolute position relative to leader, if part of collective
 	
-	attr_accessor :alive, :ai
 	attr_accessor :collective, :friends, :enemies
 
 	include Evasion
 	
-	def initialize alive, owner, square, ai
-		@alive, @owner, @square, @ai = alive, owner, square, ai
+	def initialize square, ai
+		super  true, 0, square, ai
 
 		@moved= false
 
@@ -25,7 +72,6 @@ class Ant
 		evade_init
 	end
 
-
 	#
 	# Perform some cleanup stuff when an ant dies
 	#
@@ -33,13 +79,6 @@ class Ant
 		@collective.remove self	if collective?
 	end
 	
-	def alive?; @alive; end
-	def dead?; !@alive; end
-	def mine?; owner==0; end
-	def enemy?; owner!=0; end
-	def row; @square.row; end
-	def col; @square.col; end
-
 	# Order this ant to go in given direction.
 	# Equivalent to ai.order ant, direction.
 
@@ -58,10 +97,6 @@ class Ant
 		@moved_to= direction
 
 		@ai.order self, direction
-	end
-
-	def square= sq
-		@square = sq
 	end
 
 	def stay
@@ -581,12 +616,12 @@ end
 		if ( ai.my_ants.length >= AntConfig::KAMIKAZE_LIMIT )
 			# Pick the nearest enemy and go for it
 			$logger.info "Banzai!"
-			d = closest_friend_dist
+			d = closest_enemy_dist
 			move d.attack_dir and return unless d
 		end
 	
 		if attacked?
-			retreat and return if ai.defensive?
+			#retreat and return if ai.defensive?
 
 			if ( ai.my_ants.length >= AntConfig::AGGRESIVE_LIMIT and enemies.length == 1 )
 				move attack_distance.attack_dir
@@ -594,10 +629,13 @@ end
 			end
 	
 			$logger.info "Conflict!"
+			#d = attack_distance
+			d = closest_enemy_dist
+			retreat if d.in_peril?
 
-			neighbor_attack
+			#neighbor_attack
 		else
-			neighbor_help
+			#neighbor_help
 		end
 	end
 end
