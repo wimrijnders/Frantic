@@ -7,6 +7,7 @@ require 'Square.rb'
 require 'Evasion.rb'
 require 'Distance.rb'
 require 'AttackDistance.rb'
+require 'MoveHistory.rb'
 require 'Collective.rb'
 require 'Ant.rb'
 
@@ -271,14 +272,39 @@ class AI
 
 				if list.length == 1
 					#$logger.info "Found the ant."
-					list[0].state = true
+					list[0].transfer_state a
 					@enemy_ants.delete a
 					found_some = true
 				end
 			end
 		end
+
+		# Anything that's left, we match in their current position.
+		found_some = true
+		while found_some  and @enemy_ants.length > 0
+			count += 1
+			found_some = false
+			@enemy_ants.each do |a|
+				list = []
+				b = a.square.ant
+				list << b if b and b.enemy? and b.alive? and not b.state?
+
+				if list.length == 1
+					$logger.info "Found the ant."
+					list[0].transfer_state a
+					@enemy_ants.delete a
+					found_some = true
+				end
+			end
+		end
+
+
 		$logger.info "Match post: #{ @enemy_ants.length} ants; iterations: #{ count }"
 		
+		new_enemy_ants.each do |a|
+			a.init_state unless a.state?
+			$logger.info a.to_s
+		end
 
 		@enemy_ants = new_enemy_ants
 

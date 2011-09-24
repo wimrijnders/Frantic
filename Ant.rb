@@ -28,6 +28,9 @@ class Ant
 		square
 	end
 
+	def to_s
+		"ant" + square.to_s
+	end
 end
 
 
@@ -39,14 +42,29 @@ class EnemyAnt < Ant
 		@state = nil
 	end
 
-	def state= val
-		@state = val
+	def state
+		@state
 	end
 
 	def state?
 		!@state.nil?
 	end
 
+	def transfer_state ant
+		@state = ant.state
+
+		@state.add ant.square
+	end
+
+	def init_state
+		@state = MoveHistory.new
+
+		@state.add @square
+	end
+
+	def to_s
+		super + "; " +  @state.to_s
+	end
 end
 
 
@@ -503,10 +521,6 @@ end
 
 	def move_collective 
 		@collective.move #unless @collective.nil?
-	end
-
-	def to_s
-		"ant" + square.to_s
 	end
 
 
