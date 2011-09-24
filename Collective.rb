@@ -364,7 +364,6 @@ class Collective
 			#$logger.info @prev_dist.to_s
 		else
 			$logger.info "#{ leader.to_s } no attacker"
-			@prev_dist.clear
 
 			if !leader.ai.defensive? and assembled?
 				# We're in place but not attacked.
@@ -374,11 +373,20 @@ class Collective
 
 				# If more or less close, go for it
 				if d and d.dist < AntConfig::FIGHT_DISTANCE 
+					@prev_dist.add d
+
+					if @prev_dist.straight_line? and not @prev_dist.advancing
+						$logger.info "Not chasing straight liner 2."
+						stay
+						throw :done
+
+					end
+
 					# Don't disband when not threatened
 					@safe_count = 0
 					return if orient d.longest_dir
 					unless move_intern d.dir
-						evade d.dir
+						dir = evade d.dir
 						# This is a good idea for cramped maps, bad idea for open maps.
 						# how to diferentiate?
 						#if can_pass? d.dir, true
@@ -387,8 +395,12 @@ class Collective
 						#	evade d.dir
 						#end
 					end
+					@prev_dist.adjust dir
+				else
+					@prev_dist.clear
 				end
 			else
+				@prev_dist.clear
 				check_assembly
 
 				if !can_assemble?

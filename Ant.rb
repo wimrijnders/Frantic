@@ -576,13 +576,19 @@ end
 		# If we can complete the order before being in conflict, 
 		# the order will take precedence.
 		return if check_orders
+
+
+		if ( ai.my_ants.length >= AntConfig::KAMIKAZE_LIMIT )
+			# Pick the nearest enemy and go for it
+			$logger.info "Banzai!"
+			d = closest_friend_dist
+			move d.attack_dir and return unless d
+		end
 	
 		if attacked?
 			retreat and return if ai.defensive?
 
-			if ( ai.my_ants.length >= AntConfig::AGGRESIVE_LIMIT and enemies.length == 1 ) or
-			   ( ai.my_ants.length >= AntConfig::KAMIKAZE_LIMIT )
-				$logger.info "Banzai!"
+			if ( ai.my_ants.length >= AntConfig::AGGRESIVE_LIMIT and enemies.length == 1 )
 				move attack_distance.attack_dir
 				return 
 			end
