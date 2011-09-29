@@ -238,6 +238,8 @@ end
 			return if o == n
 		end
 
+		$logger.info "Setting order #{ what } on square #{ square.to_s }"
+
 		# ASSEMBLE overrides the rest of the orders
 		if what == :ASSEMBLE
 			@orders = []
@@ -272,19 +274,25 @@ end
 	end
 
 
+	#
+	# Delete all orders aimed at specific square
+	#
 	def remove_target_from_order t
 		if orders?
 			p = nil
 			@orders.each do |o|
 				if o.target? t
 					p = o 
-					$logger.info("Found p")
+					#$logger.info("Found p")
 					break
 				end
 			end
 
 			@orders.delete p unless p.nil?
 		end
+
+		# return true if target was present
+		!p.nil? 
 	end
 
 
@@ -296,9 +304,20 @@ end
 		while orders?
 			if self.square == @orders[0].square
 				# Done with this order, reached the target
-				$logger.info "#{ to_s } reached target"
 
-				@orders = @orders[1..-1]
+				if @orders[0].order == :RAZE
+					$logger.info "Hit anthill at #{ self.square.to_s }"
+
+					# TODO: clear_raze will move all raze targets, including
+					#       possibly target of current ant. Check if following
+					#		works.
+					@orders = @orders[1..-1]
+					@ai.clear_raze self.square	
+				else
+					$logger.info "#{ to_s } reached target"
+					@orders = @orders[1..-1]
+				end
+
 				next
 			end
 

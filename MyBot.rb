@@ -183,11 +183,27 @@ class Strategy < BaseStrategy
 
 	def turn ai
 		check_attacked ai	
-		complete_collectives ai
-		create_collectives ai unless ( ai.my_ants.length >= AntConfig::KAMIKAZE_LIMIT )
+
+		# Collectives disabled for the time being, for ant hills
+		#complete_collectives ai
+		#create_collectives ai unless ( ai.my_ants.length >= AntConfig::KAMIKAZE_LIMIT )
 		ant_conflict ai
 		ant_orders ai
-		move_collectives ai
+
+		# preliminary test - let all ant attack an anthill
+		ai.hills.each_pair do |owner, l|
+			next if owner == 0
+
+			ai.my_ants.each do |ant|
+				# Insert some randomness, so that not all ants hit the
+				# first hill in the list
+				next if rand(2) == 0
+
+				ant.set_order ai.map[ l[0] ][ l[1] ], :RAZE
+			end
+		end
+
+		#move_collectives ai
 
 		super ai, false, ( ai.my_ants.length < AntConfig::KAMIKAZE_LIMIT )
 	end

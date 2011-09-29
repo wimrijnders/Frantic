@@ -43,6 +43,8 @@ class AI
 	attr_accessor :score
 	attr_accessor :stdout
 
+	attr_accessor :hills
+
 	# Initialize a new AI object.
 	# Arguments are streams this AI will read from and write to.
 	def initialize stdin=$stdin, stdout=$stdout
@@ -56,6 +58,7 @@ class AI
 		@food = []
 		
 		@did_setup=false
+		@hills = {}
 	end
 	
 	# Returns a read-only hash of all settings.
@@ -178,7 +181,7 @@ class AI
 		@food = []
 		
 		until((rd=@stdin.gets.strip)=='go')
-			_, type, row, col, owner = *rd.match(/(w|f|a|d) (\d+) (\d+)(?: (\d+)|)/)
+			_, type, row, col, owner = *rd.match(/(w|f|a|d|h) (\d+) (\d+)(?: (\d+)|)/)
 			row, col = row.to_i, col.to_i
 			owner = owner.to_i if owner
 			
@@ -191,6 +194,14 @@ class AI
 				sq.food=true
 
 				@food << [ row, col ]
+			when 'h'
+				if owner == 0 and @hills[0].nil?
+					$logger.info "My hill at #{ row },#{col}"
+					@hills[ owner ] = [ row, col ]
+				elsif @hills[ owner ].nil?
+					$logger.info "Hill player #{ owner } at #{ row },#{col}"
+					@hills[ owner ] = [ row, col ]
+				end
 			when 'a'
 
 				if owner==0
@@ -208,6 +219,7 @@ class AI
 					sq.ant = a
 					sq.visited += 1
 				else
+					$logger.info "New enemy ant at #{ sq }, owner #{ owner }."
 					a= EnemyAnt.new owner, sq, self
 
 					sq.ant = a
@@ -216,17 +228,20 @@ class AI
 			when 'd'
 				if owner==0
 					if sq.moved_here?
-						$logger.info "My ant died!."
+						$logger.info "My ant at #{ sq } died!"
 						
 						sq.moved_here.die
 						my_ants.delete sq.moved_here
 					else
 						$logger.info "Dead ant at #{ sq } unexpected!"
 					end
+				else
+					$logger.info "Enemy ant died at #{ sq }, owner #{ owner }."
 				end
 
-				d=Ant.new false, owner, sq, self
-				sq.ant = d
+				# No need to remember dead ants; they don't obstruct
+				#d=Ant.new false, owner, sq, self
+				#sq.ant = d
 			when 'r'
 				# pass
 			else
@@ -362,6 +377,24 @@ class AI
 
 	def cols
 		@cols
+	end
+
+	def clear_raze square
+		count = 0
+		my_ants.each do |ant|
+			ret = ant.remove_target_from_order square
+			count += 1 if ret
+		end
+
+		$logger.info "Cleared #{ count } raze targets."	
+
+		# also remove from hills list
+		@hills.each_pair do |k,l|
+			if l[0] == square.row and l[1] == square.col
+				$logger.info "Removing hill on #{ square.to_s } from list"
+				@hills.delete k
+			end
+		end
 	end
 end
 
