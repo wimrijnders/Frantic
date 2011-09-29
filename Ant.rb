@@ -82,12 +82,14 @@ end
 
 
 class MyAnt < Ant
+	@@default_index = 0
+
 
 	# Square this ant sits on.
 	attr_accessor :moved_to, 
 		:abspos # absolute position relative to leader, if part of collective
 	
-	attr_accessor :collective, :friends, :enemies
+	attr_accessor :collective, :friends, :enemies, :default
 
 	include Evasion
 	
@@ -99,6 +101,9 @@ class MyAnt < Ant
 		@attack_distance = nil
 		@orders = []
 		@enemies = [] 
+
+		@default = [ :N, :E, :S, :W ][ @@default_index ]
+		@@default_index = ( @@default_index + 1 ) % 4
 
 		evade_init
 	end
@@ -302,6 +307,21 @@ end
 		prev_order = (orders?) ? @orders[0].square: nil
 
 		while orders?
+			order_sq = @orders[0].square
+
+			if @orders[0].order == :ATTACK
+				d = Distance.new self.square, order_sq 
+				if d.in_view?
+					unless !ai.map[ order_sq.row][ order_sq.col].ant.nil? and
+					       ai.map[ order_sq.row][ order_sq.col].ant.enemy?
+
+						$logger.info "Clearing attack target #{ order_sq.to_s}."
+						@orders = @orders[1..-1]
+						next
+					end
+				end 
+			end
+
 			if self.square == @orders[0].square
 				# Done with this order, reached the target
 
@@ -313,6 +333,7 @@ end
 					#		works.
 					@orders = @orders[1..-1]
 					@ai.clear_raze self.square	
+					
 				else
 					$logger.info "#{ to_s } reached target"
 					@orders = @orders[1..-1]
@@ -659,7 +680,7 @@ end
 		return if check_orders
 
 
-		if ( ai.my_ants.length >= AntConfig::KAMIKAZE_LIMIT )
+		if ai.kamikaze?
 			# Pick the nearest enemy and go for it
 			$logger.info "Banzai!"
 			d = closest_enemy_dist
@@ -672,21 +693,19 @@ end
 		if attacked?
 			#retreat and return if ai.defensive?
 
-			if ( ai.my_ants.length >= AntConfig::AGGRESIVE_LIMIT and enemies.length == 1 )
+			if ai.aggresive? and enemies.length == 1
 				move attack_distance.attack_dir
 				return 
 			end
 	
 			$logger.info "Conflict!"
-			#d = attack_distance
 
-			# TODO: how can there not be a distance. We are being attacked, right?
-			d = closest_enemy_dist
-			retreat if !d.nil? and  d.in_peril?
+			#d = closest_enemy_dist
+			#retreat if !d.nil? and  d.in_peril?
 
-			#neighbor_attack
+			neighbor_attack
 		else
-			#neighbor_help
+			neighbor_help
 		end
 	end
 end

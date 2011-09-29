@@ -12,6 +12,7 @@ module AntConfig
 
 	KAMIKAZE_LIMIT  = 120	# There's too many ants, getting close to
 							# timeout. Take extreme measures to bring down the population 
+							# -1 for no limit
 
 	# Stuff for collectives
 

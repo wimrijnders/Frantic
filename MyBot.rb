@@ -75,13 +75,18 @@ class Strategy < BaseStrategy
 		# go to the least visited square
 		best_visited = nil
 		best_dir = nil
-		
+	
+if false	
 		# Select preferred direction as longest direction on map.
 		# This fills the map up faster with following approach
 		index = 0
 		if ant.ai.rows < ant.ai.cols
 			index = 1
 		end
+end
+		# Every ant has a default preferred direction, use that as
+		# starting point
+		index = directions.index ant.default
 	
 		( directions[ index, 4] ).each do |dir|
 			sq = ant.square.neighbor( dir )
@@ -186,15 +191,18 @@ class Strategy < BaseStrategy
 
 		# Collectives disabled for the time being, for ant hills
 		#complete_collectives ai
-		#create_collectives ai unless ( ai.my_ants.length >= AntConfig::KAMIKAZE_LIMIT )
+		#create_collectives ai unless ai.kamikaze? 
 		ant_conflict ai
 		ant_orders ai
+		find_food ai
 
 		# preliminary test - let all ant attack an anthill
 		ai.hills.each_pair do |owner, l|
 			next if owner == 0
 
 			ai.my_ants.each do |ant|
+				next if not ant.orders?
+
 				# Insert some randomness, so that not all ants hit the
 				# first hill in the list
 				next if rand(2) == 0
@@ -203,9 +211,21 @@ class Strategy < BaseStrategy
 			end
 		end
 
+		if ai.kamikaze?
+			ai.my_ants.each do |ant|
+				next if not ant.orders?
+				next if not ant.moved?
+
+				# if not doing anything else, move towards a random enemy
+				enemy = ai.enemy_ants[ rand (ai.enemy_ants.length ) ]
+
+				ant.set_order enemy.square, :ATTACK
+			end
+		end
+
 		#move_collectives ai
 
-		super ai, false, ( ai.my_ants.length < AntConfig::KAMIKAZE_LIMIT )
+		super ai, false, false #, ( !ai.kamikaze? ) 
 	end
 end
 

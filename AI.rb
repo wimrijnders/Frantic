@@ -379,6 +379,15 @@ class AI
 		@cols
 	end
 
+	
+	def kamikaze?
+		AntConfig::KAMIKAZE_LIMIT != -1 and my_ants.length >= AntConfig::KAMIKAZE_LIMIT
+	end
+
+	def aggresive?
+		my_ants.length >= AntConfig::AGGRESIVE_LIMIT
+	end
+
 	def clear_raze square
 		count = 0
 		my_ants.each do |ant|
