@@ -55,6 +55,7 @@ class BaseStrategy
 		ai.my_ants.each do |ant|
 			next if ant.moved?
 			next if ant.collective?
+			next if ant.harvesting?
 	
 			default_move ant
 		end

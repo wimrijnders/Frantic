@@ -5,32 +5,18 @@ def is_number? a
 end
 
 bot_num = nil 
-turns = 1500 
+turns = 300 
 flags = "--turntime=1000" # "--nolaunch"
 
 map = ARGV[0]
 map = map.to_i if is_number? map
 puts "Map: #{ map}"
 
-# Nice symmetric maps to test 
-# These are now not part of the code, btw.
-
-maps = [ 
-	'blank', # 4pl, no water at all
-	21, 	 # 4pl,  big, open map! Coll2+4 should have won
-			 # Good one for using the test bots
-	36, 	 # 4pl, to beat
-	35		 # 5pl to beat
-]
-
-
-# End maps
-
 bots = [
 	"ruby ../MyBot.rb",		# Frantic
+	"ruby ../Inertia.rb",
 	"python sample_bots/python/GreedyBot.py",
 	"ruby ../GoSouth.rb",
-	"ruby ../Inertia.rb",
 	"ruby ../Twitcher.rb",
 	"python2.7 sample_bots/python/HunterBot.py",
 	"python submission_test/TestBot.py",

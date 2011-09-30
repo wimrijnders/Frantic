@@ -5,10 +5,12 @@ require 'Config.rb'
 require 'support.rb'
 require 'Square.rb'
 require 'Evasion.rb'
+require 'Orders.rb'
 require 'Distance.rb'
 require 'AttackDistance.rb'
 require 'MoveHistory.rb'
 require 'Collective.rb'
+require 'Harvesters.rb'
 require 'Ant.rb'
 
 
@@ -43,7 +45,7 @@ class AI
 	attr_accessor :score
 	attr_accessor :stdout
 
-	attr_accessor :hills
+	attr_accessor :hills, :harvesters
 
 	# Initialize a new AI object.
 	# Arguments are streams this AI will read from and write to.

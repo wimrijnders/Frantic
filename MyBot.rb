@@ -213,8 +213,8 @@ end
 
 		if ai.kamikaze?
 			ai.my_ants.each do |ant|
-				next if not ant.orders?
-				next if not ant.moved?
+				next if ant.orders?
+				next if ant.moved?
 
 				# if not doing anything else, move towards a random enemy
 				enemy = ai.enemy_ants[ rand (ai.enemy_ants.length ) ]
@@ -222,6 +222,16 @@ end
 				ant.set_order enemy.square, :ATTACK
 			end
 		end
+
+
+		# If nothing else to do, turn into a harvester
+		ai.my_ants.each do |ant|
+			next if ant.orders?
+			next if ant.moved?
+
+			ai.harvesters.enlist ant
+		end
+		
 
 		#move_collectives ai
 
@@ -236,9 +246,15 @@ end
 
 strategy = Strategy.new
 
-$ai.setup
+$ai.setup do |ai|
+	ai.harvesters = Harvesters.new ai.rows, ai.cols, ai.viewradius2
+end
+
+first = false
 
 $ai.run do |ai|
+	$logger.info ai.harvesters.to_s and first = true unless first
+
 	# your turn code here
 	$logger.info "Start turn."
 
