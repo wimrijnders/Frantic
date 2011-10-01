@@ -278,9 +278,7 @@ class Collective
 			# retreat if too close for comfort
 			dir = dist.invert.dir
 
-			# TODO: how can there not be an enemy if we are being attacked??
-			if enemy and enemy.straight_line? and not enemy.advancing? leader.pos
-			#if @prev_dist.straight_line? and @prev_dist.advancing
+			if enemy.straight_line? and not enemy.advancing? leader.pos
 				# possibly ignoring you; change direction
 				$logger.info "Evading ignorer"
 				dir = left dir
@@ -300,10 +298,23 @@ class Collective
 		#
 		$logger.info "#{ leader.to_s } dist: #{ dist.to_s }"
 		if dist and dist.in_view?
+			# It is possible to approach an anthill completely and 
+			# be right next to the emerging enemy ants. Following ensures
+			# that the collective will not try to evade.
+			if dist.dist == 1 
+				stay
+				throw :done
+			end
+
 			# Conflict; enemy is in view range
 			enemy = leader.enemies[0]
 
-			#@prev_dist.add dist
+			unless enemy
+				# Safefuard; Following problem has occured more than once
+				$logger.info "WARNING: attack_distance defined but no nearest enemy present."
+				return
+			end
+
 			dir = nil
 			if !assembled?
 				$logger.info "#{ leader.to_s } not assembled"
@@ -330,22 +341,20 @@ class Collective
 						hold_ground dist if dist.in_peril?
 					end
 				else
-					#if @prev_dist.straight_line? and not @prev_dist.advancing
-					if enemy and enemy.straight_line? and not enemy.advancing? leader.pos
+					if enemy.straight_line? and not enemy.advancing? leader.pos
 						# This is an ant ignoring you and moving in a fixed direction
 						# Don't bother chasing if it's not moving toward you
-						$logger.info "Not chasing straight liner."
+						$logger.info "Not chasing straight liner. #{ enemy.to_s } going #{ enemy.dir }"
 
-						# for good measure, move in the opposite direction.
-						# there may be more coming
-						move_intern dist.invert.dir
+						# for good measure, move in the opposite direction of
+						# the enemy ant; there may be more coming.
+						move_intern reverse( enemy.dir )
 						throw :done
 
 						# TODO: Perhaps concentrate on the next closest ant
 					end
 
-					#if @prev_dist.twitch?
-					if enemy and enemy.twitch?
+					if enemy.twitch?
 						# break the twitch, otherwise we'll be twitching in unison forever
 						$logger.info "Breaking the twitch."
 						# Just plain attack

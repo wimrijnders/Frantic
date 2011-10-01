@@ -1,30 +1,22 @@
 #!/usr/local/bin/ruby
 
+#
+# Configuration options
+#
+
+live    = true
+bot_num = nil 
+turns   = 500 
+flags   = "" #--turntime=5000" # "--nolaunch"
+
+
+#
+# Local methods
+#
+
 def is_number? a
     true if Integer(a) rescue false
 end
-
-bot_num = nil 
-turns = 1500 
-flags = "" #--turntime=5000" # "--nolaunch"
-
-map = ARGV[0]
-map = map.to_i if is_number? map
-puts "Map: #{ map}"
-
-bots = [
-	"ruby ../MyBot.rb",		# Frantic
-	"ruby ../Inertia.rb",
-	"ruby ../Inertia.rb",
-	"ruby ../Inertia.rb",
-	"python sample_bots/python/GreedyBot.py",
-	"ruby ../GoSouth.rb",
-	"ruby ../Twitcher.rb",
-	"python2.7 sample_bots/python/HunterBot.py",
-	"python submission_test/TestBot.py",
-	"python sample_bots/python/LeftyBot.py"
-]
-
 
 def get_num_players mapfile
 	file = File.new( mapfile, "r")
@@ -39,6 +31,33 @@ def get_num_players mapfile
 
 	num.to_i
 end
+
+#
+# Main routine
+#
+
+if live
+	live_opts = " -So | java -jar visualizer.jar"
+else
+	live_opts = ""
+end
+
+map = ARGV[0]
+map = map.to_i if is_number? map
+puts "Map: #{ map}"
+
+bots = [
+	"ruby ../MyBot.rb",		# Frantic
+	"python sample_bots/python/GreedyBot.py",
+	"ruby ../Inertia.rb",
+	"ruby ../GoSouth.rb",
+	"ruby ../Twitcher.rb",
+	"python2.7 sample_bots/python/HunterBot.py",
+	"python submission_test/TestBot.py",
+	"python sample_bots/python/LeftyBot.py"
+]
+
+
 
 if map == 'test'
 	mapfile = "submission_test/test.map"
@@ -62,4 +81,5 @@ bot_num = get_num_players "maps/" + mapfile
 
 fail "Can't handle this map" if bot_num.nil?
 
-system( "python2.7 ./playgame.py -So --engine_seed 42 --player_seed 42 --end_wait=0.25 --verbose --log_dir game_logs --turns #{ turns } #{ flags } --map_file \"maps/#{ mapfile }\" \"#{ bots[0, bot_num].join( "\" \""  ) }\" -E -I -O --capture_errors | java -jar visualizer.jar")
+system( "python2.7 ./playgame.py --engine_seed 42 --player_seed 42 --end_wait=0.25 --verbose --log_dir game_logs --turns #{ turns } #{ flags } --map_file \"maps/#{ mapfile }\" \"#{ bots[0, bot_num].join( "\" \""  ) }\" -E -I -O#{ live_opts }") 
+#system( "python2.7 ./playgame.py --engine_seed 42 --player_seed 42 --end_wait=0.25 --verbose --log_dir game_logs --turns #{ turns } #{ flags } --map_file \"maps/#{ mapfile }\" \"#{ bots[0, bot_num].join( "\" \""  ) }\" -E -I -O --capture_errors#{ live_opts}") 

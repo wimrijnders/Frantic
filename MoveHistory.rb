@@ -11,7 +11,7 @@ class Move
 		@dir = nil
 
 		if prev
-			dist = Distance.new pos, prev
+			dist = Distance.new prev, pos
 			calc_dir dist
 		end
 	end
@@ -94,12 +94,24 @@ class MoveHistory
 
 
 	def advancing? pos
+		# special case for straigh-liners; sometimes one can be seen
+		# as advincing when directly in front of leader
+		if straight_line?
+			if first and @list[-2]
+				dist1 = Distance.new pos, first.pos
+				dist2 = Distance.new pos, @list[-2].pos
+			end
+
+			return dist1.longest_dist.abs < dist2.longest_dist.abs
+		end
+
 		if first and @list[-2]
 			dist1 = Distance.new pos, first.pos
 			dist2 = Distance.new pos, @list[-2].pos
 
 			return dist1.dist.abs < dist2.dist.abs
 		end
+
 
 		false
 	end
@@ -164,6 +176,10 @@ class MoveHistory
 		str << "Straight line" if straight_line?
 
 		str
+	end
+
+	def dir 
+		@list[-1].dir
 	end
 end
 

@@ -43,6 +43,17 @@ def left dir
 	newdir
 end
 
+def reverse dir
+	newdir = case dir
+		when :N; :S 
+		when :W; :E 
+		when :S; :N 
+		when :E; :W 
+	end
+
+	newdir
+end
+
 
 class Coord
 	@@ai = nil;

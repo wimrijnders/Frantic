@@ -10,7 +10,7 @@ module AntConfig
 	AGGRESIVE_LIMIT = 40	# At this number, the ant will
 							# choose fights sooner 
 
-	KAMIKAZE_LIMIT  = 120	# There's too many ants, getting close to
+	KAMIKAZE_LIMIT  = -1	# There's too many ants, getting close to
 							# timeout. Take extreme measures to bring down the population 
 							# -1 for no limit
 

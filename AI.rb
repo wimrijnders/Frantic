@@ -210,7 +210,7 @@ class AI
 					a = MyAnt.new sq, self
 
 					unless sq.moved_here?
-						$logger.info "New ant."
+						$logger.info "New ant at #{ sq }."
 						my_ants.push a
 					else
 						a = sq.moved_here 
@@ -260,7 +260,6 @@ class AI
 					square.moved_here.moved=false
 					square.moved_here.moved_to=nil
 					square.moved_here.friends=nil
-		#			square.moved_here.enemies=nil
 					square.moved_here.abspos=nil
 					square.moved_here = nil
 				end

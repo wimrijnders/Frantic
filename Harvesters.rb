@@ -141,80 +141,76 @@ class Harvesters
 		end
 	end
 
+	def rows
+		@arr.length
+	end
+
+	def cols
+		@arr[0].length
+	end
+
 	def norm_r r
-		(r + @arr.length ) % @arr.length
+		(r + rows ) % rows 
 	end
 
 	def norm_c c
-		(c  + @arr[0].length ) % @arr[0].length
+		(c  + cols ) % cols 
 	end
+
+
+	def check_spot r,c, roffs, coffs
+		rrel = norm_r( r + roffs )
+		crel = norm_c( c + coffs )
+
+		if @arr[ rrel ][ crel ].nil?
+			# Found a spot
+			# return relative position
+			throw:done, [ roffs, coffs ]
+		end
+	end
+
 
 	#
 	# Find the closest empty position for a new recruit
+	#
 	def find_location r,c
+		offset = nil
 		radius = 1
 
-		# TODO: fix this loop to end when entire array has been searched
-		diameter = 2*radius + 1
-		while diameter <= @arr.length and diameter <= @arr[0].length
-			# Start from 12 o'clock and move clockwise
-		
-			0.upto(radius) do |n|
-				rrel = norm_r( r - radius )
-				crel = norm_c( c + n )
-	
-				if @arr[ rrel ][ crel ].nil?
-					# Found a spot
-					# return relative position
-					return [ -radius, n ]
-				end
-			end
-			(-radius+1).upto(radius).each do |n|
-				rrel = norm_r( r +n )
-				crel = norm_c( c + radius )
-	
-				if @arr[ rrel ][ crel ].nil?
-					# Found a spot
-					# return relative position
-					return [ n, radius ]
-				end
-			end
-			( radius -1).downto( -radius ) do |n|
-				rrel = norm_r( r + radius )
-				crel = norm_c( c + n )
+		offset = catch :done do	
 
-				if @arr[ rrel ][ crel ].nil?
-					# Found a spot
-					# return relative position
-					return [ radius, n ]
-				end
-			end
-			( radius - 1).downto( -radius ) do |n|
-				rrel = norm_r( r + n )
-				crel = norm_c( c -radius )
-
-				if @arr[ rrel ][ crel ].nil?
-					# Found a spot
-					# return relative position
-					return [ n, -radius ]
-				end
-			end
-			( -radius + 1).upto( -1 ) do |n|
-				rrel = norm_r( r - radius )
-				crel = norm_c( c + n )
-	
-				if @arr[ rrel ][ crel ].nil?
-					# Found a spot
-					# return relative position
-					return [ -radius, n ]
-				end
-			end
-
-			# End loop
-			radius += 1
+			# TODO: fix this loop to end when entire array has been searched
 			diameter = 2*radius + 1
+			while diameter <= rows or diameter <= cols 
+	
+				# Start from 12 o'clock and move clockwise
+
+				0.upto(radius) do |n|
+					check_spot r, c, -radius, n
+				end if diameter <= cols
+
+				(-radius+1).upto(radius).each do |n|
+					check_spot r, c, n, radius
+				end if diameter <= rows
+
+				( radius -1).downto( -radius ) do |n|
+					check_spot r, c, radius, n
+				end if diameter <= cols
+
+				( radius - 1).downto( -radius ) do |n|
+					check_spot r, c, n, -radius
+				end if diameter <= rows
+
+				( -radius + 1).upto( -1 ) do |n|
+					check_spot r, c, -radius, n
+				end if diameter <= cols
+
+				# End loop
+				radius += 1
+				diameter = 2*radius + 1
+			end
 		end
 
-		nil
+		offset
 	end
 end

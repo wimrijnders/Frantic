@@ -50,7 +50,7 @@ module Orders
 	def clear_orders
 		p = find_order :HARVEST
 		if p
-			ai.harvesters.remove selfif ai.harvesters
+			ai.harvesters.remove self if ai.harvesters
 		end
 
 		@orders = []
@@ -117,7 +117,7 @@ module Orders
 			$logger.info "Change order #{ order } to square #{ sq.to_s } for #{ self.to_s }"
 			p.square = sq
 		else
-			@logger.info "#{ to_s } has no order #{ order}!"
+			$logger.info "#{ to_s } has no order #{ order}!"
 		end
 		
 	end

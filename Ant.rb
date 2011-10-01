@@ -78,6 +78,11 @@ class EnemyAnt < Ant
 		@state.twitch?
 	end
 
+
+	def dir
+		@state.dir
+	end 
+	
 end
 
 
@@ -214,18 +219,20 @@ end
 
 
 	def check_attacked
+		@attack_distance = nil
+		return false unless @enemies[0]
+
 		d = Distance.new self, @enemies[0]
 
 		unless d.nil?
 			if d.in_view? and d.clear_view @square
-				$logger.info "ant #{ @square.to_s } attacked!"
+				$logger.info "ant #{ @square.to_s } attacked by #{ @enemies[0] }!"
 
 				@attack_distance = d
 				return true
 			end
 		end
 
-		@attack_distance = nil
 		false
 	end
 

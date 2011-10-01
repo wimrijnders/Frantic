@@ -158,14 +158,14 @@ class Strategy < BaseStrategy
 		check_attacked ai	
 
 		# Collectives disabled for the time being, for ant hills
-		#complete_collectives ai
-		#create_collectives ai unless ai.kamikaze? 
+		complete_collectives ai
+		create_collectives ai unless ai.kamikaze? 
 		ant_conflict ai
 		ant_orders ai
 		find_food ai
 
-		# preliminary test - let all ant attack an anthill
 if false
+		# preliminary test - let all ants attack an anthill
 		ai.hills.each_pair do |owner, l|
 			next if owner == 0
 
@@ -203,7 +203,7 @@ end
 		end
 		
 
-		#move_collectives ai
+		move_collectives ai
 
 		super ai, false, false #, ( !ai.kamikaze? ) 
 	end
