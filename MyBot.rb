@@ -70,39 +70,7 @@ class Strategy < BaseStrategy
 	def default_move ant
 		return if ant.moved?
 	
-		directions = [:N, :E, :S, :W, :N, :E, :S, :W ]
-	
-		# go to the least visited square
-		best_visited = nil
-		best_dir = nil
-	
-if false	
-		# Select preferred direction as longest direction on map.
-		# This fills the map up faster with following approach
-		index = 0
-		if ant.ai.rows < ant.ai.cols
-			index = 1
-		end
-end
-		# Every ant has a default preferred direction, use that as
-		# starting point
-		index = directions.index ant.default
-	
-		( directions[ index, 4] ).each do |dir|
-			sq = ant.square.neighbor( dir )
-		
-			next unless sq.passable?
-		
-			val = sq.visited
-			if !best_visited || val < best_visited
-				best_visited = val
-				best_dir = dir
-			end
-		end
-		
-		best_dir = directions[ index ] if best_dir.nil?
-		
-		ant.move best_dir 
+		ant.move ant.default 
 	end
 
 
@@ -197,6 +165,7 @@ end
 		find_food ai
 
 		# preliminary test - let all ant attack an anthill
+if false
 		ai.hills.each_pair do |owner, l|
 			next if owner == 0
 
@@ -211,7 +180,7 @@ end
 			end
 		end
 
-		if ai.kamikaze?
+		if ai.kamikaze? and ai.enemy_ants.length > 0
 			ai.my_ants.each do |ant|
 				next if ant.orders?
 				next if ant.moved?
@@ -222,6 +191,7 @@ end
 				ant.set_order enemy.square, :ATTACK
 			end
 		end
+end
 
 
 		# If nothing else to do, turn into a harvester

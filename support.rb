@@ -114,6 +114,11 @@ class Order
 		sq
 	end
 
+
+	def square= v
+		@square = v
+	end
+
 	def sq_int
 		@square
 	end

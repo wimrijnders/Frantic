@@ -12,7 +12,7 @@ module Orders
 			return if o == n
 		end
 
-		$logger.info "Setting order #{ what } on square #{ square.to_s }"
+		$logger.info "Setting order #{ what } on square #{ square.to_s } for #{ self.to_s }"
 
 		# ASSEMBLE overrides the rest of the orders
 		if what == :ASSEMBLE
@@ -31,9 +31,9 @@ module Orders
 			elsif a.order != :FORAGE and b.order != :FORAGE
 				# Raze before harvest
 				if a.order == :RAZE
-					1
+					-1
 				elsif b.order == :RAZE
-					-1	
+					1	
 				else
 					0
 				end
@@ -48,6 +48,11 @@ module Orders
 	end
 
 	def clear_orders
+		p = find_order :HARVEST
+		if p
+			ai.harvesters.remove selfif ai.harvesters
+		end
+
 		@orders = []
 
 		#evade_reset
@@ -79,7 +84,10 @@ module Orders
 				end
 			end
 
-			@orders.delete p unless p.nil?
+			unless p.nil?
+				@orders.delete p
+				ai.harvesters.remove self if ai.harvesters and p.order == :HARVEST
+			end
 		end
 
 		# return true if target was present
@@ -104,7 +112,13 @@ module Orders
 
 	def change_order sq, order
 		p = find_order order
-		p.square = sq
+
+		if p
+			$logger.info "Change order #{ order } to square #{ sq.to_s } for #{ self.to_s }"
+			p.square = sq
+		else
+			@logger.info "#{ to_s } has no order #{ order}!"
+		end
 		
 	end
 

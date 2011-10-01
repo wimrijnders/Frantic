@@ -114,7 +114,7 @@ class MyAnt < Ant
 	#
 	def die
 		@collective.remove self	if collective?
-		@ai.harvesters.remove self
+		@ai.harvesters.remove self	if @ai.harvesters
 	end
 	
 	# Order this ant to go in given direction.

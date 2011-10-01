@@ -5,8 +5,8 @@ def is_number? a
 end
 
 bot_num = nil 
-turns = 300 
-flags = "--turntime=1000" # "--nolaunch"
+turns = 1500 
+flags = "" #--turntime=5000" # "--nolaunch"
 
 map = ARGV[0]
 map = map.to_i if is_number? map
@@ -14,6 +14,8 @@ puts "Map: #{ map}"
 
 bots = [
 	"ruby ../MyBot.rb",		# Frantic
+	"ruby ../Inertia.rb",
+	"ruby ../Inertia.rb",
 	"ruby ../Inertia.rb",
 	"python sample_bots/python/GreedyBot.py",
 	"ruby ../GoSouth.rb",

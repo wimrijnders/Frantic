@@ -11,20 +11,87 @@ class Harvesters
 
 		@dist = 2*radius + 1
 
-		@arr = Array.new( rows/@dist ) do |row|
-			row = Array.new cols/@dist
+		rowdim = rows/@dist
+		rowdim += 1 unless rows % @dist == 0
+		coldim = cols/@dist
+		coldim += 1 unless cols % @dist == 0
+
+		@arr = Array.new( rowdim ) do |row|
+			row = Array.new coldim 
 		end
 	end
 
 
 	def to_s
-		"Harvesters (rows, cols, dist) = ( #{ @arr.length },#{ @arr[0].length }, #{ @dist } )"
+		"Harvesters (rows, cols, dist) = ( #{ @arr.length }, #{ @arr[0].length }, #{ @dist } )"
 	end
+
+
+	def move_line_right r,c, rel
+		return if rel[1] == 0
+
+		rrel = rel[0]
+		rnorm = norm_r( r + rrel ) 
+		( rel[1] -1).downto( 0 ) do |crel|
+			cnorm = norm_c( c + crel)
+	
+			thisant = @arr[ rnorm][ cnorm ]
+			thisant.change_order thisant.ai.map[ rnorm*@dist][ norm_c(cnorm + 1) *@dist], :HARVEST
+			@arr[ rnorm][ norm_c(cnorm + 1) ] = @arr[ rnorm][ cnorm ]
+			@arr[ rnorm][ cnorm ] = nil
+		end
+	end
+
+	def move_line_left r,c, rel
+		return if rel[1] == 0
+
+		rrel = rel[0]
+		rnorm = norm_r( r + rrel ) 
+		( rel[1] +1).upto( 0 ) do |crel|
+			cnorm = norm_c( c + crel)
+	
+			thisant = @arr[ rnorm][ cnorm ]
+			thisant.change_order thisant.ai.map[ rnorm*@dist][ norm_c(cnorm - 1) *@dist], :HARVEST
+			@arr[ rnorm][ norm_c(cnorm - 1) ] = @arr[ rnorm][ cnorm ]
+			@arr[ rnorm][ cnorm ] = nil
+		end
+	end
+
+	def move_line_up r,c, rel
+		return if rel[0] == 0
+
+		crel = rel[1]
+		cnorm = norm_c( c + crel ) 
+		( rel[0] + 1 ).upto(0) do |rrel|
+			rnorm = norm_r( r + rrel)
+
+			thisant = @arr[ rnorm][ cnorm ]
+			thisant.change_order thisant.ai.map[ norm_r(rnorm -1)*@dist][ cnorm*@dist], :HARVEST
+			@arr[ norm_r( rnorm -1) ][ cnorm ] = @arr[ rnorm][ cnorm ]
+			@arr[ rnorm][ cnorm ] = nil
+		end
+	end
+
+	def move_line_down r,c, rel
+		return if rel[0] == 0
+
+		crel = rel[1]
+		cnorm = norm_c( c + crel ) 
+		( rel[0] -1 ).downto(0) do |rrel|
+			rnorm = norm_r( r + rrel)
+
+			thisant = @arr[ rnorm][ cnorm ]
+			thisant.change_order thisant.ai.map[ norm_r(rnorm +1)*@dist][ cnorm*@dist], :HARVEST
+			@arr[ norm_r( rnorm +1) ][ cnorm ] = @arr[ rnorm][ cnorm ]
+			@arr[ rnorm][ cnorm ] = nil
+		end
+	end
+
 
 	def enlist ant
 		# Find nearest location in harvesters grid for given ant
-		r = (ant.row*1.0/@dist).round
-		c = (ant.col*1.0/@dist).round
+		r = norm_r (ant.row*1.0/@dist).round
+		c = norm_c (ant.col*1.0/@dist).round
 
 		$logger.info "Setting #{ ant.to_s } to a spot at ( #{ r}, #{c} )"
 		if @arr[r][c].nil?
@@ -39,108 +106,27 @@ class Harvesters
 				$logger.info "Relative location( #{ rel[0] }, #{ rel[1] } ) is unoccupied."
 				# Determine quadrant
 				if rel[0] < 0 and rel[1] >= 0
-					# quadrant topright
-					rrel = rel[0]
-					rnorm = norm_r( r + rrel ) 
-					( rel[1] -1).downto( 0 ) do |crel|
-						cnorm = norm_c( c + crel)
-			
-						ant.set_order ant.ai.map[ rnorm*@dist][ norm_c(cnorm + 1) *@dist], :HARVEST
-						@arr[ rnorm][ norm_c(cnorm + 1) ] = @arr[ rnorm][ cnorm ]
-						@arr[ rnorm][ cnorm ] = nil
-					end
-
-					crel = rel[1]
-					cnorm = norm_c( c + crel ) 
-					( rel[0] + 1 ).upto(0) do |rrel|
-						rnorm = norm_r( r + rrel)
-
-						ant.set_order ant.ai.map[ norm_r(rnorm -1)*@dist][ cnorm*@dist], :HARVEST
-						@arr[ norm_r( rnorm -1) ][ cnorm ] = @arr[ rnorm][ cnorm ]
-						@arr[ rnorm][ cnorm ] = nil
-					end
-
-					# Finally, move the new recruit to the nearest place
-					ant.set_order ant.ai.map[ r*@dist][ c*@dist], :HARVEST
-					@arr[r][c] = ant
+					$logger.info "quadrant topright"
+					move_line_right r,c, rel
+					move_line_up r,c, [ rel[0], 0 ]
 				elsif rel[0] >= 0 and rel[1] > 0
-					# quadrant bottomright
+					$logger.info "quadrant bottomright"
 
-					crel = rel[1]
-					cnorm = norm_c( c + crel ) 
-					( rel[0] -1 ).upto(0) do |rrel|
-						rnorm = norm_r( r + rrel)
-
-						ant.set_order ant.ai.map[ norm_r(rnorm +1)*@dist][ cnorm*@dist], :HARVEST
-						@arr[ norm_r( rnorm +1) ][ cnorm ] = @arr[ rnorm][ cnorm ]
-						@arr[ rnorm][ cnorm ] = nil
-					end
-
-					rrel = rel[0]
-					rnorm = norm_r( r + rrel ) 
-					( rel[1] -1).downto( 0 ) do |crel|
-						cnorm = norm_c( c + crel)
-			
-						ant.set_order ant.ai.map[ rnorm*@dist][ norm_c(cnorm + 1) *@dist], :HARVEST
-						@arr[ rnorm][ norm_c(cnorm + 1) ] = @arr[ rnorm][ cnorm ]
-						@arr[ rnorm][ cnorm ] = nil
-					end
-
-					# Finally, move the new recruit to the nearest place
-					ant.set_order ant.ai.map[ r*@dist][ c*@dist], :HARVEST
-					@arr[r][c] = ant
+					move_line_down r,c, rel
+					move_line_right r,c, [0, rel[1] ]
 				elsif rel[0] > 0 and rel[1] <= 0
-					# quadrant bottomleft
-
-					crel = rel[1]
-					cnorm = norm_c( c + crel ) 
-					( rel[0] -1 ).upto(0) do |rrel|
-						rnorm = norm_r( r + rrel)
-
-						ant.set_order ant.ai.map[ norm_r(rnorm +1)*@dist][ cnorm*@dist], :HARVEST
-						@arr[ norm_r( rnorm +1) ][ cnorm ] = @arr[ rnorm][ cnorm ]
-						@arr[ rnorm][ cnorm ] = nil
-					end
-
-					rrel = rel[0]
-					rnorm = norm_r( r + rrel ) 
-					( rel[1] +1).upto( 0 ) do |crel|
-						cnorm = norm_c( c + crel)
-			
-						ant.set_order ant.ai.map[ rnorm*@dist][ norm_c(cnorm - 1) *@dist], :HARVEST
-						@arr[ rnorm][ norm_c(cnorm - 1) ] = @arr[ rnorm][ cnorm ]
-						@arr[ rnorm][ cnorm ] = nil
-					end
-
-					# Finally, move the new recruit to the nearest place
-					ant.set_order ant.ai.map[ r*@dist][ c*@dist], :HARVEST
-					@arr[r][c] = ant
+					$logger.info "quadrant bottomleft"
+					move_line_left r,c, rel
+					move_line_down r,c, [ rel[0], 0 ]
 				elsif rel[0] <= 0 and rel[1] < 0
-					# quadrant topleft
-					rrel = rel[0]
-					rnorm = norm_r( r + rrel ) 
-					( rel[1] +1).upto( 0 ) do |crel|
-						cnorm = norm_c( c + crel)
-			
-						ant.set_order ant.ai.map[ rnorm*@dist][ norm_c(cnorm - 1) *@dist], :HARVEST
-						@arr[ rnorm][ norm_c(cnorm - 1) ] = @arr[ rnorm][ cnorm ]
-						@arr[ rnorm][ cnorm ] = nil
-					end
-
-					crel = rel[1]
-					cnorm = norm_c( c + crel ) 
-					( rel[0] + 1 ).upto(0) do |rrel|
-						rnorm = norm_r( r + rrel)
-
-						ant.set_order ant.ai.map[ norm_r(rnorm -1)*@dist][ cnorm*@dist], :HARVEST
-						@arr[ norm_r( rnorm -1) ][ cnorm ] = @arr[ rnorm][ cnorm ]
-						@arr[ rnorm][ cnorm ] = nil
-					end
-
-					# Finally, move the new recruit to the nearest place
-					ant.set_order ant.ai.map[ r*@dist][ c*@dist], :HARVEST
-					@arr[r][c] = ant
+					$logger.info "quadrant topleft"
+					move_line_up r,c, rel
+					move_line_left r,c, [0, rel[1] ]
 				end
+
+				# Finally, move the new recruit to the nearest place
+				ant.set_order ant.ai.map[ r*@dist][ c*@dist], :HARVEST
+				@arr[r][c] = ant
 			end
 		end
 	end
@@ -169,8 +155,10 @@ class Harvesters
 		radius = 1
 
 		# TODO: fix this loop to end when entire array has been searched
-		while true
+		diameter = 2*radius + 1
+		while diameter <= @arr.length and diameter <= @arr[0].length
 			# Start from 12 o'clock and move clockwise
+		
 			0.upto(radius) do |n|
 				rrel = norm_r( r - radius )
 				crel = norm_c( c + n )
@@ -224,6 +212,7 @@ class Harvesters
 
 			# End loop
 			radius += 1
+			diameter = 2*radius + 1
 		end
 
 		nil
