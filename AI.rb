@@ -11,6 +11,7 @@ require 'AttackDistance.rb'
 require 'MoveHistory.rb'
 require 'Collective.rb'
 require 'Harvesters.rb'
+require 'Region.rb'
 require 'Ant.rb'
 
 
@@ -418,3 +419,4 @@ $ai=AI.new
 $logger = Logger.new $ai
 Distance.set_ai $ai
 Coord.set_ai $ai
+region = Region.new $ai.viewradius2
