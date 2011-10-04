@@ -6,8 +6,8 @@
 
 live    = true
 bot_num = nil 
-turns   = 500 
-flags   = "" #--turntime=5000" # "--nolaunch"
+turns   = 1000 
+flags   = "--turntime=5000" # "--nolaunch"
 
 
 #
@@ -48,6 +48,9 @@ puts "Map: #{ map}"
 
 bots = [
 	"ruby ../MyBot.rb",		# Frantic
+	"ruby ../Inertia.rb",
+	"ruby ../Inertia.rb",
+	"ruby ../Inertia.rb",
 	"python sample_bots/python/GreedyBot.py",
 	"ruby ../Inertia.rb",
 	"ruby ../GoSouth.rb",

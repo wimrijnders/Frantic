@@ -16,7 +16,7 @@ module Orders
 
 		# ASSEMBLE overrides the rest of the orders
 		if what == :ASSEMBLE
-			@orders = []
+			clear_orders
 		end
 
 		@orders << n
@@ -56,6 +56,17 @@ module Orders
 		@orders = []
 
 		#evade_reset
+	end
+
+	def clear_order order
+		p = find_order  order
+		if p 
+			if order == :HARVEST
+				ai.harvesters.remove self if ai.harvesters
+			end
+			$logger.info "Clearing order #{ order } for #{ self.to_s }."
+			@orders.delete p
+		end
 	end
 
 	def orders?
@@ -116,6 +127,7 @@ module Orders
 		if p
 			$logger.info "Change order #{ order } to square #{ sq.to_s } for #{ self.to_s }"
 			p.square = sq
+			p.offset = nil	if order == :HARVEST
 		else
 			$logger.info "#{ to_s } has no order #{ order}!"
 		end
@@ -147,6 +159,8 @@ module Orders
 			if self.square == order_sq
 				# Done with this order, reached the target
 
+				self.trail.set_trail order_sq  unless order_order == :ASSEMBLE
+
 				if order_order == :RAZE
 					$logger.info "Hit anthill at #{ self.square.to_s }"
 
@@ -158,14 +172,15 @@ module Orders
 					
 				else
 					$logger.info "#{ to_s } reached target for order #{ order_order }"
+
 					if order_order == :HARVEST
-						# Leave it to move, in order to get food,
-						# But keep the order intact
+						# Keep the order in the list, don't remove
 						return true
 					else
 						@orders = @orders[1..-1] 
 					end
 				end
+
 
 				next
 			end
@@ -196,8 +211,14 @@ module Orders
 			if order_order == :HARVEST and evading?
 				sq = order_sq
 				d = Distance.new self, sq
-				if d.in_view? and @ai.map[ sq.row ][sq.col].water?
+
+				# Use of in_danger here is not because of attack, but because
+				# we want to get closer to the target square than in_view
+				if d.in_danger? and @ai.map[ sq.row ][sq.col].water?
 					$logger.info "#{ self.to_s } harvest target #{ sq } is water. Can't get any closer"
+					@orders[0].offset = [ -( sq.row - self.row ), - (sq.col - self.col ) ]
+					$logger.info "Set order offset to #{ @orders[0].offset }."
+					stay
 					evade_reset
 					return
 				end

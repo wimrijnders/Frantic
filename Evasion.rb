@@ -42,7 +42,7 @@ module Evasion
 	def evade dir
 		# The direction we want to go is blocked;
 		# go round the obstacle
-		$logger.info "Starting evasion" if @want_dir.nil?
+		$logger.info "#{ self.to_s} starting evasion" if @want_dir.nil?
 	
 		done = false
 		newdir = dir

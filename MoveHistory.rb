@@ -1,5 +1,4 @@
 
-
 class Move
 
 	attr_accessor :pos, :dir
@@ -9,13 +8,13 @@ class Move
 		@pos = pos.clone
 
 		@dir = nil
-
 		if prev
 			dist = Distance.new prev, pos
 			calc_dir dist
 		end
 	end
-	
+
+
 	#
 	# Determine in which direction the ant went.
 	#
@@ -183,3 +182,101 @@ class MoveHistory
 	end
 end
 
+
+class Trail
+
+	def initialize
+		@dirs = {}
+	end
+
+	def add dir
+		if @dirs[ dir ]
+			@dirs[ dir] += 1
+		else
+			@dirs[ dir] = 1
+		end
+	end
+
+	#
+	# Select a direction to move in, based on trail frequency
+	#
+	def get_dir
+		$logger.info "Called get_dir."
+		total = 0
+		@dirs.each_pair do |dir, count |
+			total += count
+		end
+
+		select = rand( total ) + 1
+		$logger.info "Total #{ total }, select #{ select}."
+
+		total = 0
+		@dirs.each_pair do |dir, count |
+			total += count
+			return dir if total >= select
+		end
+
+		nil
+	end
+end
+
+
+class MoveFriendly
+	attr_accessor :dir, :square
+
+	def initialize  dir, square
+		@dir, @square = dir, square
+	end
+end
+
+class MoveHistoryFriendly
+	def initialize
+		@list = []
+	end
+
+	def add dir, square
+
+		# close off loops
+		@list.reverse.each do |l|
+			if square == l.square
+				$logger.info "Found loop in trail at square #{ square }; closing off."
+				index = @list.index l
+				@list = @list[0..index]
+				return
+			end
+		end
+
+		item =  MoveFriendly.new dir, square 
+		@list << item 
+	end
+
+	def set_trail firstsq 
+		return if @list.length == 0
+
+		sq = firstsq
+		if sq.class == Coord
+			sq = $ai.map[ sq.row][ sq.col ]
+		end
+
+		my_hill = $ai.hills[0]
+
+		@list.reverse.each do |l|
+			dir = l.dir
+			d = reverse dir
+			sq = sq.neighbor d
+
+			# No trails on top of our hill!
+			break if my_hill[0] == sq.row and my_hill[1] == sq.col
+
+			unless sq.trail
+				sq.trail = Trail.new
+			end
+			sq.trail.add dir
+		end
+
+		$logger.info "Done laying trail from #{ sq.to_s } to #{ firstsq.to_s}; length #{ @list.length }"
+
+		@list = []
+	end
+end
+	

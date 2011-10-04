@@ -194,14 +194,24 @@ if false
 end
 
 
-		# If nothing else to do, turn into a harvester
 		ai.my_ants.each do |ant|
-			next if ant.orders?
 			next if ant.moved?
 
-			ai.harvesters.enlist ant
+			# If present, follow trail
+			if ant.square.trail
+				dir = ant.square.trail.get_dir
+				if dir
+					$logger.info "#{ ant.to_s } following trail to #{ dir }."
+					ant.clear_order :HARVEST
+					#ant.evade_reset
+					ant.move dir
+				end
+			else
+				# If nothing else to do, turn into a harvester
+				next if ant.orders?
+				ai.harvesters.enlist ant
+			end
 		end
-		
 
 		move_collectives ai
 

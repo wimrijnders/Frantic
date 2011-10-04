@@ -94,7 +94,7 @@ class MyAnt < Ant
 	attr_accessor :moved_to, 
 		:abspos # absolute position relative to leader, if part of collective
 	
-	attr_accessor :collective, :friends, :enemies, :default
+	attr_accessor :collective, :friends, :enemies, :default, :trail
 
 	include Evasion
 	include Orders
@@ -112,6 +112,8 @@ class MyAnt < Ant
 
 		evade_init
 		orders_init
+
+		@trail = MoveHistoryFriendly.new 
 	end
 
 	#
@@ -138,6 +140,8 @@ class MyAnt < Ant
 		@square.neighbor( direction ).moved_here = self
 		@moved= true
 		@moved_to= direction
+
+		@trail.add direction, @square
 
 		@ai.order self, direction
 	end
@@ -170,28 +174,6 @@ class MyAnt < Ant
 			order dir
 		else
 			evade dir
-if false
-			str += "Not passable"
-			if square.neighbor( dir ).water?
-				evade dir
-			else
-				unless attacked?
-					# Just pick any direction we can move to
-					directions = [:N, :E, :S, :W ]
-					directions.each do |d|
-						sq = square.neighbor( d )
-						if sq.passable?
-							order d
-							$logger.info str + "; picked #{ d }"
-							return
-						end
-					end
-				end
-
-				# no directions left or under attack
-				stay
-			end
-end
 		end
 		$logger.info str
 	end

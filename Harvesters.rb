@@ -87,6 +87,31 @@ class Harvesters
 		end
 	end
 
+	def move_lines ant, r, c, rel
+		# Determine quadrant
+		if rel[0] < 0 and rel[1] >= 0
+			$logger.info "quadrant topright"
+			move_line_right r,c, rel
+			move_line_up r,c, [ rel[0], 0 ]
+		elsif rel[0] >= 0 and rel[1] > 0
+			$logger.info "quadrant bottomright"
+
+			move_line_down r,c, rel
+			move_line_right r,c, [0, rel[1] ]
+		elsif rel[0] > 0 and rel[1] <= 0
+			$logger.info "quadrant bottomleft"
+			move_line_left r,c, rel
+			move_line_down r,c, [ rel[0], 0 ]
+		elsif rel[0] <= 0 and rel[1] < 0
+			$logger.info "quadrant topleft"
+			move_line_up r,c, rel
+			move_line_left r,c, [0, rel[1] ]
+		end
+
+		# Finally, move the new recruit to the nearest place
+		ant.set_order ant.ai.map[ r*@dist][ c*@dist], :HARVEST
+		@arr[r][c] = ant
+	end
 
 	def enlist ant
 		# Find nearest location in harvesters grid for given ant
@@ -104,29 +129,12 @@ class Harvesters
 
 			unless rel.nil?
 				$logger.info "Relative location( #{ rel[0] }, #{ rel[1] } ) is unoccupied."
-				# Determine quadrant
-				if rel[0] < 0 and rel[1] >= 0
-					$logger.info "quadrant topright"
-					move_line_right r,c, rel
-					move_line_up r,c, [ rel[0], 0 ]
-				elsif rel[0] >= 0 and rel[1] > 0
-					$logger.info "quadrant bottomright"
+				move_lines ant, r, c, rel
 
-					move_line_down r,c, rel
-					move_line_right r,c, [0, rel[1] ]
-				elsif rel[0] > 0 and rel[1] <= 0
-					$logger.info "quadrant bottomleft"
-					move_line_left r,c, rel
-					move_line_down r,c, [ rel[0], 0 ]
-				elsif rel[0] <= 0 and rel[1] < 0
-					$logger.info "quadrant topleft"
-					move_line_up r,c, rel
-					move_line_left r,c, [0, rel[1] ]
-				end
-
-				# Finally, move the new recruit to the nearest place
-				ant.set_order ant.ai.map[ r*@dist][ c*@dist], :HARVEST
-				@arr[r][c] = ant
+				#rcoord = norm_r( r + rel[0])
+				#ccoord = norm_c( c + rel[1])
+				#ant.set_order ant.ai.map[ rcoord*@dist ][ ccoord*@dist ], :HARVEST
+				#@arr[rcoord][ccoord] = ant
 			end
 		end
 	end
