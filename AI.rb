@@ -201,6 +201,9 @@ class AI
 				if owner == 0 and @hills[0].nil?
 					$logger.info "My hill at #{ row },#{col}"
 					@hills[ owner ] = [ row, col ]
+
+					# Regions initialization
+					sq.rel( @hills[0] ).region = 0
 				elsif @hills[ owner ].nil?
 					$logger.info "Hill player #{ owner } at #{ row },#{col}"
 					@hills[ owner ] = [ row, col ]
@@ -419,4 +422,3 @@ $ai=AI.new
 $logger = Logger.new $ai
 Distance.set_ai $ai
 Coord.set_ai $ai
-region = Region.new $ai.viewradius2

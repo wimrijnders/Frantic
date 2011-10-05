@@ -197,6 +197,8 @@ end
 		ai.my_ants.each do |ant|
 			next if ant.moved?
 
+			$region.find_regions ant.square
+
 			# If present, follow trail
 			if ant.square.trail
 				dir = ant.square.trail.get_dir
@@ -228,12 +230,17 @@ strategy = Strategy.new
 
 $ai.setup do |ai|
 	ai.harvesters = Harvesters.new ai.rows, ai.cols, ai.viewradius2
+	$region = Region.new ai.viewradius2
 end
 
 first = false
 
 $ai.run do |ai|
-	$logger.info ai.harvesters.to_s and first = true unless first
+	unless first
+		$logger.info "template:\n" + $region.to_s 
+		$logger.info ai.harvesters.to_s 
+		first = true
+	end
 
 	# your turn code here
 	$logger.info "Start turn."
