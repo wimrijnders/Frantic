@@ -4,22 +4,10 @@ module Orders
 		@orders = []
 	end
 
-	def set_order square, what, offset = nil
-		n = Order.new(square, what, offset)
+	private
 
-		@orders.each do |o|
-			# order already present
-			return if o == n
-		end
-
-		$logger.info "Setting order #{ what } on square #{ square.to_s } for #{ self.to_s }"
-
-		# ASSEMBLE overrides the rest of the orders
-		if what == :ASSEMBLE
-			clear_orders
-		end
-
-		@orders << n
+	def sort_orders
+		$logger.info "Sorting orders"
 
 		# Nearest orders first
 		@orders.sort! do |a,b|
@@ -46,6 +34,27 @@ module Orders
 			end
 		end
 	end
+
+	public
+
+	def set_order square, what, offset = nil
+		n = Order.new(square, what, offset)
+
+		@orders.each do |o|
+			# order already present
+			return if o == n
+		end
+
+		$logger.info "Setting order #{ what } on square #{ square.to_s } for #{ self.to_s }"
+
+		# ASSEMBLE overrides the rest of the orders
+		clear_orders if what == :ASSEMBLE
+
+		@orders << n
+
+		sort_orders
+	end
+
 
 	def clear_orders
 		p = find_order :HARVEST
@@ -159,7 +168,7 @@ module Orders
 			if self.square == order_sq
 				# Done with this order, reached the target
 
-				self.trail.set_trail order_sq  unless order_order == :ASSEMBLE
+				#self.trail.set_trail order_sq  unless order_order == :ASSEMBLE
 
 				if order_order == :RAZE
 					$logger.info "Hit anthill at #{ self.square.to_s }"

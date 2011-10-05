@@ -94,7 +94,9 @@ class MyAnt < Ant
 	attr_accessor :moved_to, 
 		:abspos # absolute position relative to leader, if part of collective
 	
-	attr_accessor :collective, :friends, :enemies, :default, :trail
+	attr_accessor :collective, :friends, :enemies, :default
+
+	#attr_accessor :trail
 
 	include Evasion
 	include Orders
@@ -113,7 +115,7 @@ class MyAnt < Ant
 		evade_init
 		orders_init
 
-		@trail = MoveHistoryFriendly.new 
+		#@trail = MoveHistoryFriendly.new 
 	end
 
 	#
@@ -141,7 +143,7 @@ class MyAnt < Ant
 		@moved= true
 		@moved_to= direction
 
-		@trail.add direction, @square
+		#@trail.add direction, @square
 
 		@ai.order self, direction
 	end

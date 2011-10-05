@@ -37,98 +37,10 @@ end
 
 class Strategy < BaseStrategy
 
-	def recruit ant
-	
-		# recruit near neighbours for a collective
-		if ant.ai.defensive?
-			friend_distance = 10
-		else
-			friend_distance = 20
-		end
-	
-		recruits = ant.neighbor_friends friend_distance 
-		recruits.delete_if { |a| a.collective? }
-	
-		# If there are enough, make the collective
-		if recruits.size > 0 
-			recruits.each do |l|
-				ant.add_collective l, recruits.length
-				break if ant.collective_assembled?
-			end
-			$logger.info "Created collective #{ ant.collective.to_s}"
-		else
-			# If not enough close by, disband the collective
-			# These may then be used for other incomplete collectives
-			catch :done do
-				ant.collective.disband if ant.collective?
-			end
-		end
-	end
-	
-	
-
 	def default_move ant
 		return if ant.moved?
 	
 		ant.move ant.default 
-	end
-
-
-
-	#
-	# Complete existing collectives first
-	#
-	def complete_collectives ai
-		ai.my_ants.each do |ant|
-			next unless ant.collective?
-			next if ant.collective.assembled? false
-	
-			recruit ant
-		end
-	
-	end
-
-
-	#
-	# Assemble new collectives
-	#
-	def create_collectives ai
-		ai.my_ants.each do |ant|
-			next if ant.collective?
-	
-			next unless ant.attacked? 
-	
-			# Don't even think about assembling if not enough ants around
-			next if ant.ai.my_ants.length < AntConfig::ASSEMBLE_LIMIT
-	
-			if ant.ai.defensive? 
-				# If collective nearby, don't bother creating a new one
-				collective_near = false
-				ant.neighbor_friends( 10 ).each do |a|
-					if a.collective?
-						$logger.info "#{ ant.square.to_s } has collective nearby"
-						collective_near = true
-						break
-					end
-				end
-	
-				next if collective_near
-			end
-	
-			# If too close too an assembling collective, 
-			# don't bother creating a new one
-			collective_near = false
-			ant.neighbor_friends( 3 ).each do |a|
-				if a.collective?
-					$logger.info "#{ ant.square.to_s } assembling collective too close "
-					collective_near = true
-					break
-				end
-			end
-			next if collective_near
-	
-			recruit ant
-		end
 	end
 
 
@@ -143,23 +55,12 @@ class Strategy < BaseStrategy
 	end
 
 
-
-	def move_collectives ai	
-		# Move collectives as a whole
-		ai.my_ants.each do |ant|
-			next unless ant.collective_leader?
-	
-			ant.move_collective
-		end
-	end
-
-
 	def turn ai
 		check_attacked ai	
 
 		# Collectives disabled for the time being, for ant hills
-		complete_collectives ai
-		create_collectives ai unless ai.kamikaze? 
+		Collective.complete_collectives ai
+		Collective.create_collectives ai unless ai.kamikaze? 
 		ant_conflict ai
 		ant_orders ai
 		find_food ai
@@ -199,23 +100,14 @@ end
 
 			$region.find_regions ant.square
 
-			# If present, follow trail
-			if ant.square.trail
-				dir = ant.square.trail.get_dir
-				if dir
-					$logger.info "#{ ant.to_s } following trail to #{ dir }."
-					ant.clear_order :HARVEST
-					#ant.evade_reset
-					ant.move dir
-				end
-			else
-				# If nothing else to do, turn into a harvester
-				next if ant.orders?
-				ai.harvesters.enlist ant
-			end
+			#next if Trail.follow_trail ant
+
+			# If nothing else to do, turn into a harvester
+			next if ant.orders?
+			ai.harvesters.enlist ant
 		end
 
-		move_collectives ai
+		Collective.move_collectives ai
 
 		super ai, false, false #, ( !ai.kamikaze? ) 
 	end

@@ -9,7 +9,10 @@ class Square
 	attr_accessor :col
 	
 	attr_accessor :water, :food, :ai
-	attr_accessor :trail, :region
+
+	#attr_accessor :trail
+
+	attr_accessor :region
 	
 	def initialize water, food, ant, row, col, ai
 		@water, @food, @ant, @row, @col, @ai = water, food, ant, row, col, ai
@@ -17,7 +20,7 @@ class Square
 		@moved_here = nil
 		@visited = 0
 
-		@trail = nil
+		#@trail = nil
 	end
 	
 	# Returns true if this square is not water.

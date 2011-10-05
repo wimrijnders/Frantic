@@ -218,6 +218,27 @@ class Trail
 
 		nil
 	end
+
+
+	#
+	# Top-level strategy.
+	#
+	# If present, follow trail.
+	#
+	def self.follow_trail ant
+		if ant.square.trail
+			dir = ant.square.trail.get_dir
+			if dir
+				$logger.info "#{ ant.to_s } following trail to #{ dir }."
+				ant.clear_order :HARVEST
+				#ant.evade_reset
+				ant.move dir
+			end
+			true
+		else
+			false
+		end
+	end
 end
 
 
