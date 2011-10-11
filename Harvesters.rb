@@ -26,6 +26,7 @@ class Harvesters
 		"Harvesters (rows, cols, dist) = ( #{ @arr.length }, #{ @arr[0].length }, #{ @dist } )"
 	end
 
+	private
 
 	def move_line_right r,c, rel
 		return if rel[1] == 0
@@ -87,6 +88,7 @@ class Harvesters
 		end
 	end
 
+
 	def move_lines ant, r, c, rel
 		# Determine quadrant
 		if rel[0] < 0 and rel[1] >= 0
@@ -113,28 +115,33 @@ class Harvesters
 		@arr[r][c] = ant
 	end
 
+	public
+
 	def enlist ant
 		# Find nearest location in harvesters grid for given ant
 		r = norm_r (ant.row*1.0/@dist).round
 		c = norm_c (ant.col*1.0/@dist).round
 
+
 		$logger.info "Setting #{ ant.to_s } to a spot at ( #{ r}, #{c} )"
 		if @arr[r][c].nil?
 			$logger.info "Found #{ ant.to_s } a spot at ( #{ r}, #{c} )"
-			ant.set_order ant.ai.map[ r*@dist][ c*@dist], :HARVEST
-			@arr[r][c] = ant
+			if ant.set_order ant.ai.map[ r*@dist][ c*@dist], :HARVEST
+				@arr[r][c] = ant
+			end
 		else
 			$logger.info "Harvester spot ( #{ r}, #{c} ) occupied."
+		
+			# NOTE: until paths are sorted out, we allow an ant to occupy
+			# the closest harvest location
+			return
+
+			# TODO: enable following again when paths work and are understood
 			rel = find_location r,c
 
 			unless rel.nil?
 				$logger.info "Relative location( #{ rel[0] }, #{ rel[1] } ) is unoccupied."
 				move_lines ant, r, c, rel
-
-				#rcoord = norm_r( r + rel[0])
-				#ccoord = norm_c( c + rel[1])
-				#ant.set_order ant.ai.map[ rcoord*@dist ][ ccoord*@dist ], :HARVEST
-				#@arr[rcoord][ccoord] = ant
 			end
 		end
 	end
@@ -156,6 +163,8 @@ class Harvesters
 	def cols
 		@arr[0].length
 	end
+
+	private
 
 	def norm_r r
 		(r + rows ) % rows 

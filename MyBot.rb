@@ -58,7 +58,10 @@ class Strategy < BaseStrategy
 	def turn ai
 		check_attacked ai	
 
-		# Collectives disabled for the time being, for ant hills
+		ai.my_ants.each do |ant|
+			$region.find_regions ant.square
+		end
+
 		Collective.complete_collectives ai
 		Collective.create_collectives ai unless ai.kamikaze? 
 		ant_conflict ai
@@ -98,8 +101,6 @@ end
 		ai.my_ants.each do |ant|
 			next if ant.moved?
 
-			$region.find_regions ant.square
-
 			#next if Trail.follow_trail ant
 
 			# If nothing else to do, turn into a harvester
@@ -122,7 +123,8 @@ strategy = Strategy.new
 
 $ai.setup do |ai|
 	ai.harvesters = Harvesters.new ai.rows, ai.cols, ai.viewradius2
-	$region = Region.new ai.viewradius2
+	$region = Region.new ai
+	Pathinfo.set_region $region
 end
 
 first = false

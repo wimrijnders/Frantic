@@ -160,10 +160,19 @@ def closest_ant l, ai
 
 	ants.each do |ant|
 
-		d = Distance.new ant, l
+		unless $region
+			# Use the old distance approach for bots which 
+			# don't have regions implemented
+			d = Distance.new ant, l
+			dist = d.dist
+		else
+			pathinfo = Pathinfo.new ant.square, ai.map[ l[0] ][ l[1] ]
+			next unless pathinfo.path?
+			dist = pathinfo.dist	
+		end
 
-		if !cur_dist || d.dist < cur_dist
-			cur_dist = d.dist
+		if !cur_dist || dist < cur_dist
+			cur_dist = dist
 			cur_best = ant
 		end
 	end

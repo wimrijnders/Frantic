@@ -35,7 +35,7 @@ class Collective
 	#
 	def rally ant, count = nil
 		count = size() -1 if count.nil?
-		ant.set_order( leader, :ASSEMBLE, relpos(count) ) 
+		ant.set_order( leader.square, :ASSEMBLE, relpos(count) ) 
 	end
 
 	def to_s

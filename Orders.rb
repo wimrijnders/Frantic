@@ -42,17 +42,46 @@ module Orders
 
 		@orders.each do |o|
 			# order already present
-			return if o == n
+			return false if o == n
 		end
 
 		$logger.info "Setting order #{ what } on square #{ square.to_s } for #{ self.to_s }"
 
+		if $region
+			path = $region.find_path self.square, square
+
+			if path.nil?
+				str = "No path to target #{ square } for #{ self.to_s }; "
+				if what == :ASSEMBLE #or what == :HARVEST
+					str << "doing our best"
+					$logger.info str
+				else
+					str << "ignoring order"
+					$logger.info str
+					return false
+				end
+			end
+		end
+
 		# ASSEMBLE overrides the rest of the orders
 		clear_orders if what == :ASSEMBLE
 
-		@orders << n
+		@orders.insert 0,n
 
-		sort_orders
+		if path and path.length > 0
+			# WRI TRY: see if distance calc works
+			Pathinfo.new self.square, square, path
+
+			# interject a liaison order
+			liaison = $region.get_liaison path[0], path[1]
+			$logger.info "Setting order LIAISON on square #{ liaison } for #{ self.to_s }"
+			@orders.insert 0, Order.new( liaison, :LIAISON )
+
+			# Don't sort for liaison
+		else
+			sort_orders
+		end
+		true
 	end
 
 

@@ -12,7 +12,7 @@ class Square
 
 	#attr_accessor :trail
 
-	attr_accessor :region
+	attr_accessor :region, :done_region
 	
 	def initialize water, food, ant, row, col, ai
 		@water, @food, @ant, @row, @col, @ai = water, food, ant, row, col, ai
