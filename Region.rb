@@ -100,13 +100,15 @@ class Region
 
 				if sq.region
 					if sq.region < 10
-						r = "0" + sq.region.to_s
+						r = "__" + sq.region.to_s
+					elsif sq.region < 100
+						r = "_" + sq.region.to_s
 					else
 						r = sq.region.to_s
 					end
 					str << r 
 				else
-					str << ".."	
+					str << "..."	
 				end
 			end
 			str << "\n"
@@ -119,12 +121,18 @@ class Region
 	def set_liaison from, to, square
 		# Don't overwrite existing liaison
 		unless get_liaison from, to
+
 			unless @liaison[ from ]
 				@liaison[from] = { to => square }
 			else
 				@liaison[from][ to ] = square
 			end
 			$logger.info "#{ square } liaison for #{ from }-#{ to }."
+
+			set_path from, to, [ from, to]
+
+			# New liaisons added; need to retest for new possible paths
+			clear_non_paths
 		end
 	end
 
@@ -203,7 +211,6 @@ class Region
 		sq = square.rel [ x, y ]
 		if !sq.region
 			return if sq.water?
-			return if sq.region
 
 			# If no region present, fill one in
 			# Check neighbor regions, and select that if present	
@@ -220,14 +227,6 @@ class Region
 	
 						set_liaison from, to, sq
 						set_liaison to, from , sq
-
-						# New liaisons added; need to retest for new possible paths
-						clear_non_paths
-
-
-						path = [ from, to]
-						set_path from, to, path 
-						set_path to, from, path.reverse 
 					end
 				end
 			else 
