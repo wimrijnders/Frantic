@@ -40,17 +40,30 @@ module Orders
 	def set_order square, what, offset = nil
 		n = Order.new(square, what, offset)
 
+		square = ai.map[n.square.row][ n.square.col ]
+		if square.water?
+			$logger.info { "Target #{ square.to_s } is water; determine nearest land" }
+			offset = nearest_non_water square
+			unless offset.nil?
+				$logger.info { "Found land at offset #{ offset }" }
+				n.add_offset offset
+				square = ai.map[n.square.row][ n.square.col ]
+			end
+		end
+		if square.water?
+			$logger.info { "ERROR: Target #{ square.to_s } is still water" }
+		end
+
 		@orders.each do |o|
 			# order already present
 			return false if o == n
 		end
 
-		$logger.info "Setting order #{ what } on square #{ square.to_s } for #{ self.to_s }"
+		$logger.info { "Setting order #{ what } on square #{ square.to_s } for #{ self.to_s }" }
 
 		if $region
-			path = $region.find_path self.square, square
-
-			if path.nil?
+			liaison  = $region.path_direction self.square, square
+			if liaison.nil?
 				str = "No path to target #{ square } for #{ self.to_s }; "
 				if what == :ASSEMBLE #or what == :HARVEST
 					str << "doing our best"
@@ -68,13 +81,8 @@ module Orders
 
 		@orders.insert 0,n
 
-		if path and path.length > 0
-			# WRI TRY: see if distance calc works
-			Pathinfo.new self.square, square, path
-
-			# interject a liaison order
-			liaison = $region.get_liaison path[0], path[1]
-			$logger.info "Setting order LIAISON on square #{ liaison } for #{ self.to_s }"
+		if $region and not false === liaison 
+			$logger.info { "Setting order LIAISON on square #{ liaison } for #{ self.to_s }" }
 			@orders.insert 0, Order.new( liaison, :LIAISON )
 
 			# Don't sort for liaison
@@ -102,7 +110,7 @@ module Orders
 			if order == :HARVEST
 				ai.harvesters.remove self if ai.harvesters
 			end
-			$logger.info "Clearing order #{ order } for #{ self.to_s }."
+			$logger.info { "Clearing order #{ order } for #{ self.to_s }." }
 			@orders.delete p
 		end
 	end
@@ -128,7 +136,6 @@ module Orders
 			@orders.each do |o|
 				if o.target? t
 					p = o 
-					#$logger.info("Found p")
 					break
 				end
 			end
@@ -149,7 +156,6 @@ module Orders
 			@orders.each do |o|
 				if o.order == order 
 					p = o 
-					#$logger.info("Found p")
 					break
 				end
 			end
@@ -163,11 +169,11 @@ module Orders
 		p = find_order order
 
 		if p
-			$logger.info "Change order #{ order } to square #{ sq.to_s } for #{ self.to_s }"
+			$logger.info { "Change order #{ order } to square #{ sq.to_s } for #{ self.to_s }" }
 			p.square = sq
 			p.offset = nil	if order == :HARVEST
 		else
-			$logger.info "#{ to_s } has no order #{ order}!"
+			$logger.info { "#{ to_s } has no order #{ order}!" }
 		end
 		
 	end
@@ -187,7 +193,7 @@ module Orders
 					unless !ai.map[ order_sq.row][ order_sq.col].ant.nil? and
 					       ai.map[ order_sq.row][ order_sq.col].ant.enemy?
 
-						$logger.info "Clearing attack target #{ order_sq.to_s}."
+						$logger.info { "Clearing attack target #{ order_sq.to_s}." }
 						@orders = @orders[1..-1]
 						next
 					end
@@ -200,7 +206,7 @@ module Orders
 				#self.trail.set_trail order_sq  unless order_order == :ASSEMBLE
 
 				if order_order == :RAZE
-					$logger.info "Hit anthill at #{ self.square.to_s }"
+					$logger.info { "Hit anthill at #{ self.square.to_s }" }
 
 					# TODO: clear_raze will move all raze targets, including
 					#       possibly target of current ant. Check if following
@@ -209,7 +215,7 @@ module Orders
 					@ai.clear_raze self.square	
 					
 				else
-					$logger.info "#{ to_s } reached target for order #{ order_order }"
+					$logger.info { "#{ to_s } reached target for order #{ order_order }" }
 
 					if order_order == :HARVEST
 						# Keep the order in the list, don't remove
@@ -253,9 +259,9 @@ module Orders
 				# Use of in_danger here is not because of attack, but because
 				# we want to get closer to the target square than in_view
 				if d.in_danger? and @ai.map[ sq.row ][sq.col].water?
-					$logger.info "#{ self.to_s } harvest target #{ sq } is water. Can't get any closer"
+					$logger.info { "#{ self.to_s } harvest target #{ sq } is water. Can't get any closer" }
 					@orders[0].offset = [ -( sq.row - self.row ), - (sq.col - self.col ) ]
-					$logger.info "Set order offset to #{ @orders[0].offset }."
+					$logger.info { "Set order offset to #{ @orders[0].offset }." }
 					stay
 					evade_reset
 					return
@@ -278,9 +284,63 @@ module Orders
 		end
 
 		if @orders[0].order == :ASSEMBLE
-			$logger.info "#{ to_s } moving to #{ @orders[0].square.to_s }"
+			$logger.info { "#{ to_s } moving to #{ @orders[0].square.to_s }" }
 		end
-		move_to @orders[0].square
+
+		if $region
+			what = @orders[0].order 
+			sq = ai.map[ @orders[0].square.row ][ @orders[0].square.col ]
+
+			if what == :LIAISON
+				move_to sq 
+			else
+				$logger.info { "Determining new path for order #{ what }" }
+				liaison  = $region.path_direction self.square, sq
+				if liaison.nil?
+					# Apparently, this never happens...logical, otherwise
+					# there would be no order to move.
+					str = "No path to target #{ sq } for #{ self.to_s }; "
+					if what == :ASSEMBLE 
+						str << "doing our best"
+						$logger.info str
+						move_to sq
+					else
+						str << "ignoring order"
+						$logger.info str
+						return false
+					end
+				else
+					if false === liaison 
+						$logger.info "no liaison needed - move directly"
+
+						# NOTE: the liaison order is abused here somewhat.
+						# The target square is in view of the current order,
+						# but there is a possibility that the ant will move
+						# through the same region as the liaison; this means
+						# that in the next move, the path would be redetermined
+						# and the ant would move to the liaison, eg. back to this
+						# square. It results in twitch-behaviour.
+						#
+						# Setting liaison like this works fine, because of the
+						# loop over orders in handle_orders(). Consecutive orders
+						# with same target are reached in the same loop.
+						#
+						$logger.info { "Abusing order LIAISON on square #{ sq } for #{ self.to_s }" }
+						@orders.insert 0, Order.new( sq, :LIAISON )
+					else
+						$logger.info { "Setting order LIAISON on square #{ liaison } for #{ self.to_s }" }
+						@orders.insert 0, Order.new( liaison, :LIAISON )
+					end
+				end
+
+				what = @orders[0].order 
+				sq =  @orders[0].square
+				$logger.info { "Moving to #{ sq.to_s } for order #{ what}" }
+				move_to sq
+			end
+		else
+			move_to sq
+		end
 
 		true
 	end
@@ -303,11 +363,11 @@ module Orders
 	
 					if da.dist > de.dist
 						# we lucked out - skip this order
-						$logger.info "check_orders #{ to_s } skipping."
+						$logger.info { "check_orders #{ to_s } skipping." }
 						@orders = @orders[1..-1]
 					else
 						# We can still make it first! Even if we die...
-						$logger.info "check_orders #{ to_s } we can make it!"
+						$logger.info { "check_orders #{ to_s } we can make it!" }
 						throw :done
 					end
 				end

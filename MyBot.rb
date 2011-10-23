@@ -62,8 +62,9 @@ class Strategy < BaseStrategy
 			$region.find_regions ant.square
 		end
 
-		Collective.complete_collectives ai
-		Collective.create_collectives ai unless ai.kamikaze? 
+# Collectives disabled
+#		Collective.complete_collectives ai
+#		Collective.create_collectives ai unless ai.kamikaze? 
 		ant_conflict ai
 		ant_orders ai
 		find_food ai
@@ -108,7 +109,7 @@ end
 			ai.harvesters.enlist ant
 		end
 
-		Collective.move_collectives ai
+		#Collective.move_collectives ai
 
 		super ai, false, false #, ( !ai.kamikaze? ) 
 	end
@@ -131,17 +132,17 @@ first = false
 
 $ai.run do |ai|
 	unless first
-		$logger.info "template:\n" + $region.to_s 
-		$logger.info ai.harvesters.to_s 
+		$logger.info { "template:\n" + $region.to_s }
+		$logger.info { ai.harvesters.to_s }
 		first = true
 	end
 
 	# your turn code here
-	$logger.info "Start turn."
+	$logger.info { "Start turn." }
 
 	strategy.turn ai
 	
-	$logger.info "End turn."
+	$logger.info { "End turn." }
 
 	if ENABLE_PROFILING
 		# Need to put this within the loop, otherwise 
@@ -161,7 +162,7 @@ $ai.run do |ai|
 			#printer.print(STDOUT)
 			printer.print( File.new("profile4.txt","w"))
 		
-			$logger.info "Profiling done."
+			$logger.info { "Profiling done." }
 		end
 	end
 end

@@ -36,14 +36,14 @@ class Square
 	
 
 	# Square is passable if it's not water,
-	# it doesn't contain alive ants and it doesn't contain food.
+	# and it doesn't contain alive ants
 	#
 	# In addition, no other friendly ant should have moved here.
+	#
 	def passable?
 
-		return false if water? or food?  or moved_here? 
+		return false if water? or food? or moved_here? 
 
-		#$logger.info "passable #{ self.to_s }: #{ ant? }, #{ @ant.pos.to_s if ant? }"
 		if ant?
 			return false if @ant.enemy?
 

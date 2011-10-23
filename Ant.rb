@@ -94,7 +94,7 @@ class MyAnt < Ant
 	attr_accessor :moved_to, 
 		:abspos # absolute position relative to leader, if part of collective
 	
-	attr_accessor :collective, :friends, :enemies, :default
+	attr_accessor :collective, :friends, :enemies
 
 	#attr_accessor :trail
 
@@ -116,6 +116,28 @@ class MyAnt < Ant
 		orders_init
 
 		#@trail = MoveHistoryFriendly.new 
+	end
+
+	def default
+		best = nil;
+		best_dir = nil;
+		# Select least visited direction
+		# Randomize a bit, otherwise it will persevere in a given direction
+		[ :N, :E, :S, :W, :N,:E, :S, :W ][ rand(4).to_i, 4].each do |dir|
+			visited = @square.neighbor( dir ).visited
+
+			if best.nil? or best > visited
+				best = visited
+				best_dir = dir
+			end
+		end
+	
+		if best.nil?
+			# Prob never called; never mind
+			@default
+		else
+			best_dir
+		end	
 	end
 
 	#
@@ -149,7 +171,7 @@ class MyAnt < Ant
 	end
 
 	def stay
-		$logger.info "Ant stays at #{ @square.to_s }."
+		$logger.info { "Ant stays at #{ @square.to_s }." }
 		@square.moved_here = self
 		@moved = true
 		@moved_to = nil
@@ -177,7 +199,7 @@ class MyAnt < Ant
 		else
 			evade dir
 		end
-		$logger.info str
+		$logger.info { str }
 	end
 
 	#
@@ -210,7 +232,7 @@ class MyAnt < Ant
 
 		unless d.nil?
 			if d.in_view? and d.clear_view @square
-				$logger.info "ant #{ @square.to_s } attacked by #{ @enemies[0] }!"
+				$logger.info { "ant #{ @square.to_s } attacked by #{ @enemies[0] }!" }
 
 				@attack_distance = d
 				return true
@@ -263,12 +285,9 @@ class MyAnt < Ant
 
 	def make_friends
 		if @friends.nil?
-			#$logger.info "Filling friends"
 			@friends = closest_list(ai.my_ants)	
 
-			#$logger.info "Remove self pre: #{ @friends.length }"
 			@friends.delete self
-			#$logger.info "Remove self post: #{ @friends.length }"
 		end
 	end
 
@@ -436,7 +455,7 @@ class MyAnt < Ant
 	
 		# Find a close neighbour and move to him
 		d = closest_friend_dist
-		$logger.info "closest friend: #{ d.to_s }"
+		$logger.info { "closest friend: #{ d.to_s }" }
 		unless d.nil?
 			dist = d.dist
 			if dist == 1 
@@ -473,7 +492,7 @@ class MyAnt < Ant
 			end
 	
 			if d.dist == 1 
-				$logger.info "Moving in - next to friend."
+				$logger.info "Moving in - next to friend." 
 				stay
 			elsif d.in_view?
 				$logger.info "Moving in to help attacked buddy."

@@ -6,8 +6,8 @@
 
 live    = true
 bot_num = nil 
-turns   = 1000 
-flags   = "--turntime=5000" # "--nolaunch"
+turns   = 500 
+flags   = "--turntime=1000" # "--nolaunch"
 
 
 #
@@ -89,4 +89,3 @@ bot_num = get_num_players mapfile
 fail "Can't handle this map" if bot_num.nil?
 
 system( "python2.7 ./playgame.py --engine_seed 42 --player_seed 42 --end_wait=0.25 --verbose --log_dir game_logs --turns #{ turns } #{ flags } --map_file \"#{ mapfile }\" \"#{ bots[0, bot_num].join( "\" \""  ) }\" -E -I -O#{ live_opts }") 
-#system( "python2.7 ./playgame.py --engine_seed 42 --player_seed 42 --end_wait=0.25 --verbose --log_dir game_logs --turns #{ turns } #{ flags } --map_file \"#{ mapfile }\" \"#{ bots[0, bot_num].join( "\" \""  ) }\" -E -I -O --capture_errors#{ live_opts}") 

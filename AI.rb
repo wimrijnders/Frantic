@@ -102,8 +102,11 @@ class AI
 		
 			over=false
 			until over
+				$logger.info { "Start read turn" }
 				over = read_turn
+				$logger.info { "End read turn, start yield" }
 				yield self
+				$logger.info { "End yield" }
 			
 				@stdout.puts 'go'
 				@stdout.flush
@@ -182,7 +185,8 @@ class AI
 		new_enemy_ants=[]
 
 		@food = []
-		
+	
+		$logger.info { "start loop"}	
 		until((rd=@stdin.gets.strip)=='go')
 			_, type, row, col, owner = *rd.match(/(w|f|a|d|h) (\d+) (\d+)(?: (\d+)|)/)
 			row, col = row.to_i, col.to_i
@@ -198,14 +202,17 @@ class AI
 
 				@food << [ row, col ]
 			when 'h'
+				# TODO: there can be multiple hills per owner.
+				#       Fix the hash
+				# Also, be careful with the region setting!
 				if owner == 0 and @hills[0].nil?
-					$logger.info "My hill at #{ row },#{col}"
+					$logger.info { "My hill at #{ row },#{col}" }
 					@hills[ owner ] = [ row, col ]
 
 					# Regions initialization
-					sq.rel( @hills[0] ).region = 0
+					sq.region = 0
 				elsif @hills[ owner ].nil?
-					$logger.info "Hill player #{ owner } at #{ row },#{col}"
+					$logger.info { "Hill player #{ owner } at #{ row },#{col}" }
 					@hills[ owner ] = [ row, col ]
 				end
 			when 'a'
@@ -214,18 +221,18 @@ class AI
 					a = MyAnt.new sq, self
 
 					unless sq.moved_here?
-						$logger.info "New ant at #{ sq }."
+						$logger.info { "New ant at #{ sq }." }
 						my_ants.push a
 					else
 						a = sq.moved_here 
-						$logger.info "Moved ant from #{ a.square } to #{ sq }."
+						$logger.info { "Moved ant from #{ a.square } to #{ sq }." }
 						a.square =  sq
 					end
 
 					sq.ant = a
 					sq.visited += 1
 				else
-					$logger.info "New enemy ant at #{ sq }, owner #{ owner }."
+					$logger.info { "New enemy ant at #{ sq }, owner #{ owner }." }
 					a= EnemyAnt.new owner, sq, self
 
 					sq.ant = a
@@ -234,15 +241,15 @@ class AI
 			when 'd'
 				if owner==0
 					if sq.moved_here?
-						$logger.info "My ant at #{ sq } died!"
+						$logger.info { "My ant at #{ sq } died!" }
 						
 						sq.moved_here.die
 						my_ants.delete sq.moved_here
 					else
-						$logger.info "Dead ant at #{ sq } unexpected!"
+						$logger.info { "Dead ant at #{ sq } unexpected!" }
 					end
 				else
-					$logger.info "Enemy ant died at #{ sq }, owner #{ owner }."
+					$logger.info { "Enemy ant died at #{ sq }, owner #{ owner }." }
 				end
 
 				# No need to remember dead ants; they don't obstruct
@@ -254,6 +261,7 @@ class AI
 				warn "unexpected: #{rd}"
 			end
 		end
+		$logger.info { "end loop" }
 
 		# reset the moved ants 
 		@map.each do |row|
@@ -271,7 +279,7 @@ class AI
 		end
 
 		# Match the previous enemy ants with the new ones
-		$logger.info "Match pre: #{ @enemy_ants.length} ants."
+		$logger.info { "Match pre: #{ @enemy_ants.length} ants." }
 		count = 0
 		found_some = true
 		while found_some  and @enemy_ants.length > 0
@@ -291,7 +299,6 @@ class AI
 				list << b if b and b.enemy? and b.alive? and not b.state?
 
 				if list.length == 1
-					#$logger.info "Found the ant."
 					list[0].transfer_state a
 					@enemy_ants.delete a
 					found_some = true
@@ -310,7 +317,7 @@ class AI
 				list << b if b and b.enemy? and b.alive? and not b.state?
 
 				if list.length == 1
-					$logger.info "Found the ant."
+					$logger.info { "Found the ant." }
 					list[0].transfer_state a
 					@enemy_ants.delete a
 					found_some = true
@@ -319,23 +326,23 @@ class AI
 		end
 
 
-		$logger.info "Match post: #{ @enemy_ants.length} ants; iterations: #{ count }"
+		$logger.info { "Match post: #{ @enemy_ants.length} ants; iterations: #{ count }" }
 		
 		new_enemy_ants.each do |a|
 			a.init_state unless a.state?
-			$logger.info a.to_s
+			$logger.info { a.to_s }
 		end
 
 		@enemy_ants = new_enemy_ants
 
-		$logger.info "Sorting pre"
+		$logger.info { "Sorting pre" }
 		@my_ants.each do |b|
 			@enemy_ants.each do |a|
 				b.add_enemy a 
 			end
 			b.sort_enemies
 		end
-		$logger.info "Sorting post"
+		$logger.info { "Sorting post" }
 
 		return ret
 	end
@@ -400,12 +407,12 @@ class AI
 			count += 1 if ret
 		end
 
-		$logger.info "Cleared #{ count } raze targets."	
+		$logger.info { "Cleared #{ count } raze targets."	}
 
 		# also remove from hills list
 		@hills.each_pair do |k,l|
 			if l[0] == square.row and l[1] == square.col
-				$logger.info "Removing hill on #{ square.to_s } from list"
+				$logger.info { "Removing hill on #{ square.to_s } from list" }
 				@hills.delete k
 			end
 		end

@@ -6,6 +6,7 @@ class BaseStrategy
 	end
 
 	def find_food ai
+		$logger.info { "getting the food" }
 		ai.food.each do |l|
 	
 			ant = closest_ant l, ai
@@ -16,6 +17,7 @@ class BaseStrategy
 				ant.set_order ai.map[ l[0] ][ l[1] ], :FORAGE
 			end
 		end 
+		$logger.info { "done getting the food" }
 	end
 
 	def evade ai

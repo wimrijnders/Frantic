@@ -6,10 +6,15 @@ class Logger
 		@start = Time.now
 	end
 
-	def info str
-		time = (Time.now - @start)*1000
+	def info str = nil
 		if @log
-			@@ai.stdout.puts "- #{ time.to_i }: #{ str }"
+			time = (Time.now - @start)*1000
+			if str
+				@@ai.stdout.puts "- #{ time.to_i }: #{ str }"
+			end
+			if block_given?
+				@@ai.stdout.puts "- #{ time.to_i } BLOCK: #{ yield }"
+			end
 			@@ai.stdout.flush
 		end
 	end
@@ -147,11 +152,22 @@ class Order
 		  (	offset[0] == a.offset[0] and offset[1] == a.offset[1] )
 		)
 	end
+
+	def add_offset offs
+		if @offset.nil?
+			@offset = offs
+		else
+			@offset[0] += offs[0]
+			@offset[1] += offs[1]
+		end
+	end
 end
 
 
 
 def closest_ant l, ai 
+	
+	$logger.info { "closest_ant start" }
 
 	ants = ai.my_ants 
 
@@ -177,6 +193,67 @@ def closest_ant l, ai
 		end
 	end
 
+	$logger.info { "closest_ant end" }
 	cur_best
 end
 
+#
+# Following derived from Harvesters
+#
+
+	def check_spot ai, r,c, roffs, coffs
+		coord = Coord.new( r + roffs, c + coffs)
+
+		if ai.map[ coord.row ][ coord.col ].land?
+			# Found a spot
+			# return relative position
+			throw:done, [ roffs, coffs ]
+		end
+	end
+
+def nearest_non_water sq
+	return sq if sq.land?
+
+	r = sq.row
+	c = sq.col
+	rows = sq.ai.rows 
+	cols = sq.ai.cols 
+
+		offset = nil
+		radius = 1
+
+		offset = catch :done do	
+
+			diameter = 2*radius + 1
+			while diameter <= rows or diameter <= cols 
+	
+				# Start from 12 o'clock and move clockwise
+
+				0.upto(radius) do |n|
+					check_spot sq.ai, r, c, -radius, n
+				end if diameter <= cols
+
+				(-radius+1).upto(radius).each do |n|
+					check_spot sq.ai, r, c, n, radius
+				end if diameter <= rows
+
+				( radius -1).downto( -radius ) do |n|
+					check_spot sq.ai, r, c, radius, n
+				end if diameter <= cols
+
+				( radius - 1).downto( -radius ) do |n|
+					check_spot sq.ai, r, c, n, -radius
+				end if diameter <= rows
+
+				( -radius + 1).upto( -1 ) do |n|
+					check_spot sq.ai, r, c, -radius, n
+				end if diameter <= cols
+
+				# End loop
+				radius += 1
+				diameter = 2*radius + 1
+			end
+		end
+
+		offset
+end

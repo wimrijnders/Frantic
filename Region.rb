@@ -1,5 +1,4 @@
 
-## WRI TRY
 class Pathinfo
 	@@region = nil
 
@@ -13,30 +12,70 @@ class Pathinfo
 		if path
 			@path = path
 		else
+			# NOTE: from and to are squares here
 			path = $region.find_path from, to
+			if path
+				item = $region.get_path_basic path[0], path[-1]
+				$logger.info { "get_path_basic returned nil: #{ item.nil? }" }
+				unless item.nil?
+					@path = item[:path]
+					@path_dist = item[:dist]
+				else
+					@path = path
+					@path_dist = Pathinfo.path_distance path
+				end
+			end
 
-			@path = path if path
+			unless item.nil?
+			end
 		end
 
 		@distance = calc_distance if @path
 	end
 
-	def calc_distance
-		prev = @from
+	def self.path_distance path
+		return 0 if path.length <= 2
+
+		prev = nil
 		total = 0
-		0.upto(@path.length-2) do |n|
-			cur = @@region.get_liaison @path[n], @path[n+1]
-			dist = Distance.new prev, cur
-			total += dist.dist
+		0.upto(path.length-2) do |n|
+			cur = @@region.get_liaison path[n], path[n+1]
+
+			unless prev.nil?
+				dist = Distance.new prev, cur
+				total += dist.dist
+			end
 
 			prev = cur
 		end
 
-		# add the final distance to the target point
-		dist = Distance.new prev, @to
-		total += dist.dist
+		path_length = path.length() - 1
+		$logger.info { "Distance path #{ path } through #{ path_length } liasions: #{ total }." }
+		total
+	end
 
-		$logger.info "Distance #{ @from.to_s }-#{ @to.to_s } through #{ @path.length() -1 } liasions: #{ total }."
+
+	def calc_distance
+		total = 0
+		if @path.nil? or @path.length < 2
+			# There is no path; calculate distance between from and to
+			dist = Distance.new @from, @to
+			total += dist.dist
+		else
+			cur = @@region.get_liaison @path[0], @path[1]
+			dist = Distance.new @from, cur
+			total += dist.dist
+
+			cur = @@region.get_liaison @path[-2], @path[-1]
+			dist = Distance.new cur, @to
+			total += dist.dist
+
+			total += @path_dist
+		end
+
+		path_length = @path.length() - 1
+		path_length = 0 if path_length < 0
+		$logger.info { "Distance #{ @from.to_s }-#{ @to.to_s } through #{ path_length } liasions: #{ total }." }
 
 		total
 	end
@@ -127,7 +166,7 @@ class Region
 			else
 				@liaison[from][ to ] = square
 			end
-			$logger.info "#{ square } liaison for #{ from }-#{ to }."
+			$logger.info { "#{ square } liaison for #{ from }-#{ to }." }
 
 			set_path from, to, [ from, to]
 
@@ -169,25 +208,74 @@ class Region
 	end
 
 
-	def set_path from, to, value
-		# Don't overwrite existing paths
-		unless get_path from, to
-			unless @paths[ from ]
-				@paths[from] = { to => value }
-			else
-				@paths[from][ to ] = value
-			end
+	def set_path_basic from, to, path, dist = nil
+		if dist.nil?
+			dist = Pathinfo.path_distance path
+		end
 
-			$logger.info "Added new path #{ from }-#{ to }: #{ value }"
+		item = {
+			:path => path,
+			:dist => dist
+		}
+
+		unless @paths[ from ]
+			@paths[from] = { to => item }
+		else
+			@paths[from][ to ] = item
 		end
 	end
 
 
-	def get_path from, to
+	def set_path from_old, to_old, path
+		# We assume here that these are new paths
+		# Try to add the sub paths as well
+
+		0.upto( path.length-2) do |i|
+			(i+1).upto( path.length-1) do |j|
+				from = path[i]
+				to   = path[j]
+				new_path = path[i..j]
+				prev_item = get_path_basic from, to 
+
+				if prev_item.nil?
+					set_path_basic from, to, new_path 
+					$logger.info { "Added new path #{ from }-#{ to }: #{ new_path }" }
+				else
+					prev_path = prev_item[ :path ]
+					prev_dist = prev_item[ :dist ]
+
+					# Skip if these are the same solutions
+					next if new_path == prev_path
+
+					new_dist  = Pathinfo.path_distance new_path 
+
+					if new_dist < prev_dist
+						$logger.info { "Found shorter path for #{ from }-#{ to }: #{ new_path }; prev_dist: #{ prev_dist }, new_dist: #{ new_dist }" }
+						set_path_basic from, to, new_path, new_dist 
+					end
+				end
+			end
+		end
+	end
+
+public
+
+	def get_path_basic from, to
 		if @paths[ from ]
 			@paths[from][to]
 		else
 			nil
+		end
+	end
+
+private
+
+	def get_path from, to
+		path = get_path_basic from, to
+		if path.nil?
+			nil
+		else
+			path[:path]
 		end
 	end
 
@@ -260,7 +348,7 @@ class Region
 	end
 
 	def search_liaison from, to, current_path
-		$logger.info "search_liaison searching #{ from }-#{ to }: #{ current_path }"
+		$logger.info { "search_liaison searching #{ from }-#{ to }: #{ current_path }" }
 		cur = @liaison[from]
 
 		if cur
@@ -294,7 +382,7 @@ class Region
 	def find_regions square
 		return if square.done_region
 
-		$logger.info "find_regions for #{ square }"
+		$logger.info { "find_regions for #{ square }" }
 
 		dim = @template.length
 		quadrant {|x,y| set_region square, -x,  y }
@@ -303,7 +391,25 @@ class Region
 		quadrant {|x,y| set_region square, -y, -x }
 
 		square.done_region = true
-		$logger.info show_regions square
+		$logger.info { show_regions square }
+	end
+
+	#
+	# Given the from and to squares, determine
+	# to which liaison square we need to move in order
+	# to go in the right direction.
+	#
+	# return: square if liaison square found
+	#		  false  if no liason needed
+	#         nil    if path can not be determined
+	#
+	def path_direction from, to
+		path = $region.find_path from, to
+
+		return nil if path.nil?
+		return false if path.length == 0
+
+		get_liaison path[0], path[1]
 	end
 
 
@@ -318,15 +424,27 @@ class Region
 		# Test same region
 		return [] if from_r == to_r
 
-		$logger.info "finding path from #{ from.to_s } to #{ to.to_s}; regions #{ from_r}-#{to_r }"
+		$logger.info { "finding path from #{ from.to_s } to #{ to.to_s}; regions #{ from_r}-#{to_r }" }
 
 		result = get_path from_r, to_r
 		if result
-			$logger.info "found cached result #{ result }."
+			$logger.info { "found cached result #{ result }." }
+
+			# Check if we are not already on liaison. If so, remove from list
+			liaison = get_liaison result[0], result[1]
+			if from == liaison
+				$logger.info { "Already at liaison, skipping it." }
+				if result.length > 2 
+					result = result[1..-1]
+				else
+					result = []
+				end
+			end		
+
 			return result
 		end
 		if get_non_path from_r, to_r
-			$logger.info "found cached non-result for #{ from_r }-#{to_r}."
+			$logger.info { "found cached non-result for #{ from_r }-#{to_r}." }
 			return nil
 		end
 			
@@ -336,12 +454,12 @@ class Region
 		end
 
 		if result
-			$logger.info "search_liaison path found for #{ from_r } to #{ to_r }: #{ result }"
+			$logger.info { "search_liaison path found for #{ from_r } to #{ to_r }: #{ result }" }
 			# Cache the result
 			set_path from_r, to_r, result
 			set_path to_r, from_r, result.reverse
 		else
-			$logger.info "search_liaison no path found for #{ from_r } to #{ to_r }"
+			$logger.info { "search_liaison no path found for #{ from_r } to #{ to_r }" }
 			set_non_path from_r, to_r
 			set_non_path to_r, from_r
 		end

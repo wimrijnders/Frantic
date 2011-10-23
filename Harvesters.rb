@@ -7,7 +7,7 @@ class Harvesters
 		while 2*(radius + 1)*(radius + 1) <= viewradius2
 			radius +=1
 		end
-		$logger.info "Found square with radius #{ radius }"
+		$logger.info { "Found square with radius #{ radius }" }
 
 		@dist = 2*radius + 1
 
@@ -92,20 +92,20 @@ class Harvesters
 	def move_lines ant, r, c, rel
 		# Determine quadrant
 		if rel[0] < 0 and rel[1] >= 0
-			$logger.info "quadrant topright"
+			$logger.info { "quadrant topright" }
 			move_line_right r,c, rel
 			move_line_up r,c, [ rel[0], 0 ]
 		elsif rel[0] >= 0 and rel[1] > 0
-			$logger.info "quadrant bottomright"
+			$logger.info { "quadrant bottomright" }
 
 			move_line_down r,c, rel
 			move_line_right r,c, [0, rel[1] ]
 		elsif rel[0] > 0 and rel[1] <= 0
-			$logger.info "quadrant bottomleft"
+			$logger.info { "quadrant bottomleft" }
 			move_line_left r,c, rel
 			move_line_down r,c, [ rel[0], 0 ]
 		elsif rel[0] <= 0 and rel[1] < 0
-			$logger.info "quadrant topleft"
+			$logger.info { "quadrant topleft" }
 			move_line_up r,c, rel
 			move_line_left r,c, [0, rel[1] ]
 		end
@@ -123,14 +123,14 @@ class Harvesters
 		c = norm_c (ant.col*1.0/@dist).round
 
 
-		$logger.info "Setting #{ ant.to_s } to a spot at ( #{ r}, #{c} )"
+		$logger.info { "Setting #{ ant.to_s } to a spot at ( #{ r}, #{c} )" }
 		if @arr[r][c].nil?
-			$logger.info "Found #{ ant.to_s } a spot at ( #{ r}, #{c} )"
+			$logger.info { "Found #{ ant.to_s } a spot at ( #{ r}, #{c} )" }
 			if ant.set_order ant.ai.map[ r*@dist][ c*@dist], :HARVEST
 				@arr[r][c] = ant
 			end
 		else
-			$logger.info "Harvester spot ( #{ r}, #{c} ) occupied."
+			$logger.info { "Harvester spot ( #{ r}, #{c} ) occupied." }
 		
 			# NOTE: until paths are sorted out, we allow an ant to occupy
 			# the closest harvest location
@@ -140,7 +140,7 @@ class Harvesters
 			rel = find_location r,c
 
 			unless rel.nil?
-				$logger.info "Relative location( #{ rel[0] }, #{ rel[1] } ) is unoccupied."
+				$logger.info { "Relative location( #{ rel[0] }, #{ rel[1] } ) is unoccupied." }
 				move_lines ant, r, c, rel
 			end
 		end
@@ -149,10 +149,10 @@ class Harvesters
 	def remove ant
 		o = ant.find_order :HARVEST
 		if o 
-			$logger.info "Removing ant #{ ant.to_s } from harvesters."
+			$logger.info { "Removing ant #{ ant.to_s } from harvesters." }
 			@arr[ o.square.row/@dist ][ o.square.col/@dist ] = nil 
 		else
-			$logger.info "Ant #{ ant.to_s } was not harvester."
+			$logger.info { "Ant #{ ant.to_s } was not harvester." }
 		end
 	end
 
