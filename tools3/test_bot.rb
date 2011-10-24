@@ -6,8 +6,8 @@
 
 live    = true
 bot_num = nil 
-turns   = 500 
-flags   = "--turntime=1000" # "--nolaunch"
+turns   = 1000 
+flags   = "--turntime=2000" # "--nolaunch"
 
 
 #
@@ -78,7 +78,7 @@ elsif map[0] == 'm'
 elsif map[0] == 'h'
 	map = "0" + map if map.length ==1
 	mapfile  = "maps/multi_hill_maze/maze_#{ nump }p_#{ num }.map"
-elsif map[0] == 's'
+elsif map[0] == 'r'
 	map = "0" + map if map.length ==1
 	mapfile  = "maps/random_walk/random_walk_#{ nump }p_#{ num }.map"
 end

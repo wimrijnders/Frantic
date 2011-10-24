@@ -376,4 +376,21 @@ module Orders
 
 		orders?
 	end
+
+	def find_orders what
+		list = {}
+
+		count = 0
+		@orders.each do |n|
+			next if n.order == :LIAISON
+
+			if n.order == what
+				list[ n.square ] = count
+			end
+
+			count += 1
+		end
+
+		list
+	end
 end

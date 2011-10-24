@@ -279,7 +279,6 @@ class MoveHistoryFriendly
 			sq = $ai.map[ sq.row][ sq.col ]
 		end
 
-		my_hill = $ai.hills[0]
 
 		@list.reverse.each do |l|
 			dir = l.dir
@@ -287,7 +286,7 @@ class MoveHistoryFriendly
 			sq = sq.neighbor d
 
 			# No trails on top of our hill!
-			break if my_hill[0] == sq.row and my_hill[1] == sq.col
+			break if $ai.hills.my_hill?  [ sq.row, sq.col ]
 
 			unless sq.trail
 				sq.trail = Trail.new

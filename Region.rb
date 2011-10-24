@@ -319,8 +319,7 @@ private
 				end
 			else 
 				# No neighbors, fill in a new region
-				sq.region = @@counter
-				@@counter += 1
+				assign_region sq
 			end
 		end
 	end
@@ -367,6 +366,11 @@ private
 	end
 
 	public
+
+	def assign_region sq
+		sq.region = @@counter
+		@@counter += 1
+	end
 
 	def show_paths	paths
 		str = ""

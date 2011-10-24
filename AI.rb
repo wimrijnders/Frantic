@@ -14,6 +14,71 @@ require 'Harvesters.rb'
 require 'Region.rb'
 require 'Ant.rb'
 
+class Hills
+
+	def initialize
+		@list = {}
+	end
+
+	#
+	# Add new hill coord
+	#
+	# Return: true if added, false if already present
+	#
+	def add owner, coord
+		key = coord[0].to_s + "_" + coord[1].to_s
+
+		if @list[key].nil?
+			@list[key] = owner
+			true
+		else
+			$logger.info { "hill at #{ key } already present." }
+			false
+		end
+	end
+
+	#
+	# Declare a hill as dead.
+	#
+	# It is not removed, because it could possible reappear in the input.
+	# instead the owner is set to -1.
+	#
+	def remove coord
+		key = coord[0].to_s + "_" + coord[1].to_s
+
+		if @list[key].nil?
+			$logger.info { "Hill at #{ key } not present, can't remove." }
+		else
+			$logger.info { "Removing hill on #{ key } from list" }
+			@list[key] = -1
+		end
+	end
+
+	def my_hill? coord
+		key = coord[0].to_s + "_" + coord[1].to_s
+
+		if @list[key].nil?
+			false
+		else
+			@list[key] == 0
+		end
+	end
+
+	def each_enemy
+		@list.each_pair do |key, owner|
+			# Skip self and dead hills
+			next if owner == 0
+			next if owner == -1 
+
+			coord = key.split "_"
+			coord[0] = coord[0].to_i
+			coord[1] = coord[1].to_i
+
+			yield owner, coord
+		end
+	end
+end
+
 
 class AI
 	def defensive?
@@ -61,7 +126,7 @@ class AI
 		@food = []
 		
 		@did_setup=false
-		@hills = {}
+		@hills = Hills.new 
 	end
 	
 	# Returns a read-only hash of all settings.
@@ -202,18 +267,18 @@ class AI
 
 				@food << [ row, col ]
 			when 'h'
-				# TODO: there can be multiple hills per owner.
-				#       Fix the hash
-				# Also, be careful with the region setting!
-				if owner == 0 and @hills[0].nil?
-					$logger.info { "My hill at #{ row },#{col}" }
-					@hills[ owner ] = [ row, col ]
+				if @hills.add owner, [row,col]
+					if owner == 0 
+						$logger.info { "My hill at #{ row },#{col}" }
 
-					# Regions initialization
-					sq.region = 0
-				elsif @hills[ owner ].nil?
-					$logger.info { "Hill player #{ owner } at #{ row },#{col}" }
-					@hills[ owner ] = [ row, col ]
+						# Regions initialization
+						if $region
+							$region.assign_region sq
+							$logger.info { "set region my hill to #{ sq.region }" }
+						end
+					else
+						$logger.info { "Hill player #{ owner } at #{ row },#{col}" }
+					end
 				end
 			when 'a'
 
@@ -410,12 +475,7 @@ class AI
 		$logger.info { "Cleared #{ count } raze targets."	}
 
 		# also remove from hills list
-		@hills.each_pair do |k,l|
-			if l[0] == square.row and l[1] == square.col
-				$logger.info { "Removing hill on #{ square.to_s } from list" }
-				@hills.delete k
-			end
-		end
+		@hills.remove [square.row, square.col]
 	end
 end
 
