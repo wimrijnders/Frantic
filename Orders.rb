@@ -37,6 +37,9 @@ module Orders
 
 	public
 
+	#
+	# Returns true if order added, false otherwise
+	# 
 	def set_order square, what, offset = nil
 		n = Order.new(square, what, offset)
 
@@ -89,6 +92,7 @@ module Orders
 		else
 			sort_orders
 		end
+
 		true
 	end
 
@@ -97,6 +101,12 @@ module Orders
 		p = find_order :HARVEST
 		if p
 			ai.harvesters.remove self if ai.harvesters
+		end
+
+		@orders.each do |o|
+			next unless o.order == :FORAGE
+
+			ai.food.remove_ant self, [ o.sq_int.row, o.sq_int.col ]
 		end
 
 		@orders = []
@@ -109,6 +119,9 @@ module Orders
 		if p 
 			if order == :HARVEST
 				ai.harvesters.remove self if ai.harvesters
+			end
+			if order == :FORAGE
+				ai.food.remove_ant self, [ p.sq_int.row, p.sq_int.col ]
 			end
 			$logger.info { "Clearing order #{ order } for #{ self.to_s }." }
 			@orders.delete p
@@ -141,8 +154,11 @@ module Orders
 			end
 
 			unless p.nil?
-				@orders.delete p
 				ai.harvesters.remove self if ai.harvesters and p.order == :HARVEST
+				if p.order == :FORAGE
+					ai.food.remove_ant self, [ p.sq_int.row, p.sq_int.col ]
+				end
+				@orders.delete p
 			end
 		end
 
@@ -162,6 +178,20 @@ module Orders
 		end
 
 		p	
+	end
+
+
+	def clear_first_order del_food = false
+		p = @orders[0]
+		if p.order == :FORAGE
+			# Note that we do not use the coord with offset here
+			if del_food
+				ai.food.remove [ p.sq_int.row, p.sq_int.col ]
+			else
+				ai.food.remove_ant self, [ p.sq_int.row, p.sq_int.col ]
+			end
+		end
+		@orders = @orders[1..-1]
 	end
 
 
@@ -194,7 +224,7 @@ module Orders
 					       ai.map[ order_sq.row][ order_sq.col].ant.enemy?
 
 						$logger.info { "Clearing attack target #{ order_sq.to_s}." }
-						@orders = @orders[1..-1]
+						clear_first_order
 						next
 					end
 				end 
@@ -211,7 +241,7 @@ module Orders
 					# TODO: clear_raze will move all raze targets, including
 					#       possibly target of current ant. Check if following
 					#		works.
-					@orders = @orders[1..-1]
+					clear_first_order
 					@ai.clear_raze self.square	
 					
 				else
@@ -221,7 +251,7 @@ module Orders
 						# Keep the order in the list, don't remove
 						return true
 					else
-						@orders = @orders[1..-1] 
+						clear_first_order
 					end
 				end
 
@@ -231,7 +261,7 @@ module Orders
 
 			if order_order == :ASSEMBLE
 				if !collective
-					@orders = @orders[1..-1]
+					clear_first_order
 					next
 				end
 			end
@@ -239,13 +269,17 @@ module Orders
 			# Check if in-range when visible for food
 			if order_order == :FORAGE
 				sq = order_sq
-				closest = closest_ant [ sq.row, sq.col], @ai
+				if $region
+					closest = BaseStrategy.closest_ant_region @ai.map[ sq.row][ sq.col], @ai
+				else
+					closest = closest_ant [ sq.row, sq.col], @ai
+				end
 				unless closest.nil?
 					d = Distance.new closest, sq
 
 					if d.in_view? and !@ai.map[ sq.row ][sq.col].food?
 						# food is already gone. Skip order
-						@orders = @orders[1..-1]
+						clear_first_order true
 						next
 					end
 				end
@@ -364,7 +398,7 @@ module Orders
 					if da.dist > de.dist
 						# we lucked out - skip this order
 						$logger.info { "check_orders #{ to_s } skipping." }
-						@orders = @orders[1..-1]
+						clear_first_order
 					else
 						# We can still make it first! Even if we die...
 						$logger.info { "check_orders #{ to_s } we can make it!" }

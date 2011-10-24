@@ -4,23 +4,65 @@ class Logger
 		@log = AntConfig::LOG_OUTPUT
 		@@ai = ai
 		@start = Time.now
+
+		@f = nil
+		#@f = File.new( "log.txt", "w") if @log
 	end
 
 	def info str = nil
 		if @log
 			time = (Time.now - @start)*1000
 			if str
-				@@ai.stdout.puts "- #{ time.to_i }: #{ str }"
+				out "- #{ time.to_i }: #{ str }"
 			end
 			if block_given?
-				@@ai.stdout.puts "- #{ time.to_i } BLOCK: #{ yield }"
+				out "- #{ time.to_i } BLOCK: #{ yield }"
 			end
-			@@ai.stdout.flush
 		end
+	end
+
+	def out str
+		if @f 
+			@f.write str + "\n"
+			@f.flush
+		end
+
+		@@ai.stdout.puts str 
+		@@ai.stdout.flush
 	end
 
 	def log= val
 		@log = val
+	end
+end
+
+class Timer
+	def initialize
+		@list = {}
+	end
+
+	def start str
+		@list[ str ] = [ Time.now, nil ]
+	end
+
+	def end str
+		if @list[str]
+			@list[str][1] = Time.now
+		else
+			$logger.info { "No start time for #{ str } " }
+		end
+	end
+
+	def display
+		$logger.info {
+			str = "Timer results:\n";
+			@list.each_pair do |k,v|
+				str << "...'#{ k }' took #{ ( (v[1] - v[0])*1000).to_i } msec\n"
+			end
+
+			str
+		}
+		@list = {}
 	end
 end
 

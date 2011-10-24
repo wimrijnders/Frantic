@@ -79,6 +79,131 @@ class Hills
 	end
 end
 
+class Food
+	attr_accessor :coord, :active
+
+	def initialize coord
+		@coord = coord
+		@active = true
+		@ants = []
+	end
+
+	def == coord
+		@coord[0] == @coord[0] and @coord[1] == coord[1]
+	end
+
+	def row
+		@coord[0]
+	end
+
+	def col
+		@coord[1]
+	end
+
+	def add_ant ant
+		unless @ants.include? ant
+			@ants << ant
+		else
+			$logger.info { "Ant #{ ant } already present in food." }
+		end
+	end
+
+	def remove_ant ant
+		index = @ants.index ant
+
+		if index
+			@ants.delete ant
+			$logger.info { "Removed ant #{ ant } from food." }
+		else
+			$logger.info { "Ant #{ ant } not present in food." }
+		end
+	end
+
+	#
+	#
+	def should_forage?
+		# Make a list of all the current orders for foraging.
+		# Keep track of the forage order sequence.
+		forages = {}
+		@ants.each do | ant |
+			list = ant.find_orders :FORAGE	
+
+			list.each_pair do |sq,v|
+				k = sq.row.to_s + "_" + sq.col.to_s
+				if forages[k].nil? or forages[k] > v
+					forages[k] = v
+				end
+			end
+		end
+
+		$logger.info {
+			str =""
+			forages.each_pair do |k,v|
+				str << "    #{ k }: #{v}\n"
+			end
+
+			"Food #{ @coord}, found following foraging actions:\n#{ str }"
+		}
+
+		# Check score of current food
+		k = @coord[0].to_s + "_" + @coord[1].to_s
+
+		forages[ k ].nil? or forages[ k ] >= 2
+	end
+end
+
+
+class FoodList
+	def initialize
+		@list = []
+	end
+
+	def start_turn
+		@list.each { |f| f.active = false }
+	end
+
+	def add coord
+		# Check if already present
+		index = @list.index coord
+		if index
+			$logger.info { "Food at #{ coord } already present" }
+			@list[index].active = true
+		else
+			@list << Food.new( coord )
+		end
+	end
+
+	def remove coord
+		index = @list.index coord
+		if index
+			if @list[index].active
+				$logger.info { "Food for deletion at #{ coord } still active!" }
+			end
+			@list.delete_at index
+		else
+			$logger.info { "Food for deletion at #{ coord } not present!" }
+		end
+	end
+
+	def each
+		@list.each {|l| yield l if l.active }
+	end
+
+	def remove_ant ant, coord = nil
+		if coord
+			index = @list.index coord
+			if index
+				@list[index].remove_ant ant
+			else
+				$logger.info { "Food at #{ coord } not present" }
+			end
+		else
+			# Remove ant from all coords
+			@list.each {|l| l.remove_ant ant }
+		end
+	end
+end
+
 
 class AI
 	def defensive?
@@ -123,7 +248,7 @@ class AI
 		
 		@my_ants=[]
 		@enemy_ants=[]
-		@food = []
+		@food = FoodList.new
 		
 		@did_setup=false
 		@hills = Hills.new 
@@ -167,14 +292,19 @@ class AI
 		
 			over=false
 			until over
-				$logger.info { "Start read turn" }
+				$timer.start "turn"
+				$timer.start "read"
 				over = read_turn
-				$logger.info { "End read turn, start yield" }
+				$timer.end "read"
+				$timer.start "yield"
 				yield self
-				$logger.info { "End yield" }
+				$timer.end "yield"
 			
 				@stdout.puts 'go'
 				@stdout.flush
+
+				$timer.end "turn"
+				$timer.display
 			end
 		rescue => e
 			puts "Exception - SystemStackError?"
@@ -245,13 +375,11 @@ class AI
 			a.enemies = []
 		end
 	
-		# @my_ants=[]
-		#@enemy_ants=[]
 		new_enemy_ants=[]
+		@food.start_turn
 
-		@food = []
-	
-		$logger.info { "start loop"}	
+		$timer.start "loop"
+
 		until((rd=@stdin.gets.strip)=='go')
 			_, type, row, col, owner = *rd.match(/(w|f|a|d|h) (\d+) (\d+)(?: (\d+)|)/)
 			row, col = row.to_i, col.to_i
@@ -265,7 +393,7 @@ class AI
 			when 'f'
 				sq.food=true
 
-				@food << [ row, col ]
+				@food.add [ row, col ]
 			when 'h'
 				if @hills.add owner, [row,col]
 					if owner == 0 
@@ -326,7 +454,7 @@ class AI
 				warn "unexpected: #{rd}"
 			end
 		end
-		$logger.info { "end loop" }
+		$timer.end "loop"
 
 		# reset the moved ants 
 		@map.each do |row|
@@ -487,5 +615,6 @@ end
 
 $ai=AI.new
 $logger = Logger.new $ai
+$timer = Timer.new
 Distance.set_ai $ai
 Coord.set_ai $ai

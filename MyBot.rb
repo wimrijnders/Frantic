@@ -69,7 +69,7 @@ class Strategy < BaseStrategy
 		ant_orders ai
 		find_food ai
 
-if true
+if false
 		# preliminary test - let all ants attack an anthill
 		ai.hills.each_enemy do |owner, l|
 
@@ -96,7 +96,6 @@ if true
 			end
 		end
 end
-
 
 		ai.my_ants.each do |ant|
 			next if ant.moved?

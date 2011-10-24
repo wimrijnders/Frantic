@@ -11,6 +11,7 @@ class Pathinfo
 
 		if path
 			@path = path
+			@path_dist = Pathinfo.path_distance path
 		else
 			# NOTE: from and to are squares here
 			path = $region.find_path from, to
@@ -86,6 +87,29 @@ class Pathinfo
 
 	def dist
 		@distance
+	end
+
+	def self.shortest_path from, to_list
+		results = $region.find_paths from, to_list
+
+		return nil if results.nil? or results.length == 0
+
+		# Determine shortest path from the list of results
+		# Note that this is not the actual path length, as it excludes
+		# the real from and to squares
+		best_path = nil
+		best_dist = -1
+		results.each do |path|
+			dist = path_distance path
+
+			if best_path.nil? or dist < best_dist
+				best_path = path
+				best_dist = dist
+			end	
+		end
+
+		$logger.info { "Shortest path: #{ best_path }, dist: #{ best_dist}" }
+		best_path
 	end
 end
 
@@ -365,6 +389,38 @@ private
 		nil
 	end
 
+	def search_liaisons from, to_list, current_path
+		return [] if to_list.length == 0
+	
+		# Safeguard to avoid too deep searches
+		return [] if current_path.length >=15 
+	
+
+		$logger.info { "search_liaisons searching #{ from }-#{ to_list }: #{ current_path }" }
+		cur = @liaison[from]
+		results = []
+		found_to = []
+
+		if cur
+			to_list.each do |to|
+				if cur[ to ]
+					results << ( current_path + [to] )
+					found_to << to
+				end
+			end
+
+			to_list -= found_to
+
+			cur.each_key do |key|
+				unless current_path.include? key
+					results.concat search_liaisons key, to_list, current_path + [key]
+				end
+			end
+		end
+
+		results
+	end
+
 	public
 
 	def assign_region sq
@@ -416,8 +472,69 @@ private
 		get_liaison path[0], path[1]
 	end
 
+	def find_paths from, to_list
+		$logger.info { "find_paths searching #{ from }-#{ to_list }" }
 
-	def find_path from, to
+		results = []
+
+		# First, try to find values in the cache
+		to_list.each do | to |
+			path = find_path from, to, false 
+
+			next if path.nil?
+
+			results << path
+		end
+
+		# if we found something, we're done
+		if results.length > 0
+			$logger.info {
+				str = "Found cached results:\n"
+				results.each do |result|
+					str << "#{ result }\n"
+				end
+
+				str
+			}
+			return results 
+		end
+
+		from_r = from.region
+		to_list_r = []
+		to_list.each { |to| to_list_r << to.region }
+		to_list_r.uniq!
+
+		# Otherwise, perform a search on all values at the same time
+		results = search_liaisons from_r, to_list_r, [from_r]
+
+		if results.nil? or results.length == 0 
+			$logger.info "No results for find_paths"
+			return nil 
+		end
+
+		# Store and display results
+		results.each do |result|
+			from_r = result[0]
+			to_r = result[-1]
+
+			# Note that non-paths are not stored; we don't pass empty result values
+			store_path from_r, to_r, result
+		end
+
+		$logger.info {
+			str = "Found results:\n"
+			results.each do |result|
+				str << "#{ result }\n"
+			end
+
+			str
+		}
+
+		results
+	end
+
+
+	def find_path from, to, do_search = true
 		# Assuming input are squares
 		from_r = from.region
 		to_r   = to.region
@@ -452,22 +569,29 @@ private
 			return nil
 		end
 			
+
+		# Only do search if specified
+		return nil unless do_search
 	
 		result = catch :done do
 			search_liaison from_r, to_r, [from_r]
 		end
 
+		store_path from_r, to_r, result
+
+		result
+	end
+
+	def store_path from_r, to_r, result
 		if result
-			$logger.info { "search_liaison path found for #{ from_r } to #{ to_r }: #{ result }" }
+			$logger.info { "store_path saving path #{ from_r } to #{ to_r }: #{ result }" }
 			# Cache the result
 			set_path from_r, to_r, result
 			set_path to_r, from_r, result.reverse
 		else
-			$logger.info { "search_liaison no path found for #{ from_r } to #{ to_r }" }
+			$logger.info { "store_path saving no-path #{ from_r } to #{ to_r }" }
 			set_non_path from_r, to_r
 			set_non_path to_r, from_r
 		end
-
-		result
 	end
 end

@@ -112,6 +112,8 @@ class MyAnt < Ant
 		@default = [ :N, :E, :S, :W ][ @@default_index ]
 		@@default_index = ( @@default_index + 1 ) % 4
 
+		@next_default_dir = 0
+
 		evade_init
 		orders_init
 
@@ -119,11 +121,12 @@ class MyAnt < Ant
 	end
 
 	def default
-		best = nil;
-		best_dir = nil;
+		best = nil
+		best_dir = nil
 		# Select least visited direction
-		# Randomize a bit, otherwise it will persevere in a given direction
-		[ :N, :E, :S, :W, :N,:E, :S, :W ][ rand(4).to_i, 4].each do |dir|
+		[ :N, :E, :S, :W, :N,:E, :S, :W ][ @next_default_dir, 4].each do |dir|
+		#[ :N, :E, :S, :W, :N,:E, :S, :W ][ rand(4).to_i, 4].each do |dir|
+		
 			visited = @square.neighbor( dir ).visited
 
 			if best.nil? or best > visited
@@ -131,6 +134,7 @@ class MyAnt < Ant
 				best_dir = dir
 			end
 		end
+		@next_default_dir = ( @next_default_dir +1 ) % 4 
 	
 		if best.nil?
 			# Prob never called; never mind
@@ -146,6 +150,7 @@ class MyAnt < Ant
 	def die
 		@collective.remove self	if collective?
 		@ai.harvesters.remove self	if @ai.harvesters
+		@ai.food.remove_ant self
 	end
 	
 	# Order this ant to go in given direction.
