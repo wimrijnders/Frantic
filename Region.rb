@@ -100,7 +100,15 @@ class Pathinfo
 		best_path = nil
 		best_dist = -1
 		results.each do |path|
+			# Same region always wins
+			if path.length == 0
+				best_path = path
+				best_dist = 0
+				break
+			end
+
 			dist = path_distance path
+
 
 			if best_path.nil? or dist < best_dist
 				best_path = path
@@ -410,7 +418,7 @@ private
 		return [] if to_list.length == 0
 	
 		# Safeguard to avoid too deep searches
-		return [] if current_path.length >=15 
+		return [] if current_path.length >= 10 
 	
 
 		$logger.info { "search_liaisons searching #{ from }-#{ to_list }: #{ current_path }" }
@@ -488,12 +496,24 @@ private
 	#         nil    if path can not be determined
 	#
 	def path_direction from, to
-		path = $region.find_path from, to
+		path = $region.find_path from, to, false
 
 		return nil if path.nil?
-		return false if path.length == 0
+		return false if path.length < 2 
 
-		get_liaison path[0], path[1]
+		liaison = get_liaison path[0], path[1]
+		$logger.info { "path_direction liaison #{ liaison }, from #{ from }" }
+
+		if liaison and liaison.row == from.row and liaison.col == from.col
+			$logger.info { "path_direction #{ from } already at liaison. skipping."} 
+
+			path = path[1,-1]
+			return nil if path.nil?
+			return false if path.length < 2
+			liaison = get_liaison path[0], path[1]
+		end
+
+		liaison
 	end
 
 	def find_paths from, to_list

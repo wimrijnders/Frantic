@@ -82,8 +82,14 @@ module Orders
 		# ASSEMBLE overrides the rest of the orders
 		clear_orders if what == :ASSEMBLE
 
+		# Reset all liaisons of current orders, otherwise 
+		# the ant may possibly move in a wrong direction if
+		# new order is cleared
+		@orders.each { |o| o.clear_liaison }
+
 		@orders.insert 0,n
 
+if false
 		if $region and not false === liaison 
 			$logger.info { "Setting order LIAISON on square #{ liaison } for #{ self.to_s }" }
 			@orders.insert 0, Order.new( liaison, :LIAISON )
@@ -92,6 +98,9 @@ module Orders
 		else
 			sort_orders
 		end
+else
+		sort_orders
+end
 
 		true
 	end
@@ -323,6 +332,9 @@ module Orders
 		end
 
 		if $region
+			move_to @orders[0].handle_liaison( self.square, ai )
+
+if false
 			what = @orders[0].order 
 			sq = ai.map[ @orders[0].square.row ][ @orders[0].square.col ]
 
@@ -372,6 +384,7 @@ module Orders
 				sq =  @orders[0].square
 				$logger.info { "Moving to #{ sq.to_s } for order #{ what}" }
 				move_to sq
+end
 			end
 		else
 			move_to sq
@@ -417,7 +430,7 @@ module Orders
 
 		count = 0
 		@orders.each do |n|
-			next if n.order == :LIAISON
+#			next if n.order == :LIAISON
 
 			if n.order == what
 				list[ n.square ] = count

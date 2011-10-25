@@ -205,25 +205,39 @@ class Order
 		end
 	end
 
-	def handle_liaison cur_sq
+	def clear_liaison
+		@liaison = nil
+	end
+
+	def handle_liaison cur_sq, ai
+		sq = ai.map[ square.row][ square.col ]
+		return sq unless $region 
+
 		if @liaison
-			if @liasion == cur_sq
+			if @liaison == cur_sq
 				$logger.info { "Order #{ order } reached liaison #{ @liaison }" }
 				@liaison = nil
 			end
 		end
 
 		unless @liaison
-			sq = ai.map[ row ][ col ]
 			liaison  = $region.path_direction cur_sq, sq
 			if liaison.nil?
 				$logger.info { "ERROR: No liason for order #{ order } to target #{ sq }" }
-			end
 
-			if false == liason
+				# Ty to reach final target
+				@liaison = sq
+			elsif false === liaison
+				$logger.info "no liaison needed - move directly"
+				# Note that we use the liaison member for the target move
+				@liaison = sq
 			else
+				@liaison = liaison
 			end
 		end
+
+		$logger.info { "handle_liaison current #{ cur_sq } moving to #{ @liaison }" }
+		ai.map[ @liaison.row][ @liaison.col ]
 	end
 end
 

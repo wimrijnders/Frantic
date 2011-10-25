@@ -40,6 +40,7 @@ class Distance
 		end
 
 		normalize
+		#$logger.info { "Distance init #{ @row }, #{ @col }" }
 	end
 
 
@@ -115,7 +116,11 @@ class Distance
 		elsif cdif == 0
 			ret_dir = rowdir
 		end
-		return ret_dir unless ret_dir.nil?
+
+		unless ret_dir.nil?
+			#$logger.info "Going to #{ ret_dir }"
+			return ret_dir
+		end
 	
 
 		# If specified, take passability from square into account
@@ -142,6 +147,7 @@ class Distance
 			end
 		end
 	
+		#$logger.info "Final going to #{ ret_dir }"
 		ret_dir
 	end
 
