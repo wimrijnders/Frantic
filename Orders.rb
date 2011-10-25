@@ -183,6 +183,8 @@ module Orders
 
 	def clear_first_order del_food = false
 		p = @orders[0]
+		@orders = @orders[1..-1]
+
 		if p.order == :FORAGE
 			# Note that we do not use the coord with offset here
 			if del_food
@@ -191,7 +193,6 @@ module Orders
 				ai.food.remove_ant self, [ p.sq_int.row, p.sq_int.col ]
 			end
 		end
-		@orders = @orders[1..-1]
 	end
 
 

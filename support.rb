@@ -6,7 +6,7 @@ class Logger
 		@start = Time.now
 
 		@f = nil
-		#@f = File.new( "log.txt", "w") if @log
+		@f = File.new( "log.txt", "w") if @log
 	end
 
 	def info str = nil
@@ -16,7 +16,7 @@ class Logger
 				out "- #{ time.to_i }: #{ str }"
 			end
 			if block_given?
-				out "- #{ time.to_i } BLOCK: #{ yield }"
+				out "- #{ time.to_i }: #{ yield }"
 			end
 		end
 	end
@@ -27,8 +27,8 @@ class Logger
 			@f.flush
 		end
 
-		@@ai.stdout.puts str 
-		@@ai.stdout.flush
+		#@@ai.stdout.puts str 
+		#@@ai.stdout.flush
 	end
 
 	def log= val
@@ -155,6 +155,7 @@ class Order
 		@square = square
 		@order = order
 		@offset = offset
+		@liaison = nil
 	end
 
 	def square
@@ -201,6 +202,27 @@ class Order
 		else
 			@offset[0] += offs[0]
 			@offset[1] += offs[1]
+		end
+	end
+
+	def handle_liaison cur_sq
+		if @liaison
+			if @liasion == cur_sq
+				$logger.info { "Order #{ order } reached liaison #{ @liaison }" }
+				@liaison = nil
+			end
+		end
+
+		unless @liaison
+			sq = ai.map[ row ][ col ]
+			liaison  = $region.path_direction cur_sq, sq
+			if liaison.nil?
+				$logger.info { "ERROR: No liason for order #{ order } to target #{ sq }" }
+			end
+
+			if false == liason
+			else
+			end
 		end
 	end
 end

@@ -111,8 +111,9 @@ class Harvesters
 		end
 
 		# Finally, move the new recruit to the nearest place
-		ant.set_order ant.ai.map[ r*@dist][ c*@dist], :HARVEST
-		@arr[r][c] = ant
+		if ant.set_order ant.ai.map[ r*@dist][ c*@dist], :HARVEST
+			@arr[r][c] = ant
+		end
 	end
 
 	public

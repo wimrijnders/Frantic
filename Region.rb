@@ -255,7 +255,9 @@ class Region
 		# Try to add the sub paths as well
 
 		0.upto( path.length-2) do |i|
-			(i+1).upto( path.length-1) do |j|
+			# Doing longest path first
+			( path.length-1).downto(i+1) do |j|
+				changed = false
 				from = path[i]
 				to   = path[j]
 				new_path = path[i..j]
@@ -264,19 +266,29 @@ class Region
 				if prev_item.nil?
 					set_path_basic from, to, new_path 
 					$logger.info { "Added new path #{ from }-#{ to }: #{ new_path }" }
+					changed = true
 				else
 					prev_path = prev_item[ :path ]
 					prev_dist = prev_item[ :dist ]
 
 					# Skip if these are the same solutions
-					next if new_path == prev_path
+					if new_path != prev_path
 
-					new_dist  = Pathinfo.path_distance new_path 
+						new_dist  = Pathinfo.path_distance new_path 
 
-					if new_dist < prev_dist
-						$logger.info { "Found shorter path for #{ from }-#{ to }: #{ new_path }; prev_dist: #{ prev_dist }, new_dist: #{ new_dist }" }
-						set_path_basic from, to, new_path, new_dist 
+						if new_dist < prev_dist
+							$logger.info { "Found shorter path for #{ from }-#{ to }: #{ new_path }; prev_dist: #{ prev_dist }, new_dist: #{ new_dist }" }
+							set_path_basic from, to, new_path, new_dist 
+							changed = true
+						end
 					end
+				end
+
+				if not changed
+					# This path was known; so all sub-paths are also known.
+					# No need to check these
+					$logger.info "Known path #{ new_path }; skipping sub-paths"
+					break
 				end
 			end
 		end
@@ -372,6 +384,11 @@ private
 
 	def search_liaison from, to, current_path
 		$logger.info { "search_liaison searching #{ from }-#{ to }: #{ current_path }" }
+		if current_path.length >= 15
+			$logger.info "Path too long; skipping"
+			return nil
+		end
+
 		cur = @liaison[from]
 
 		if cur
@@ -408,6 +425,13 @@ private
 					found_to << to
 				end
 			end
+
+			# If results were found here, there is no point in looking further,
+			# Because any other results will be one region further away, and in all
+			# likelihood (!!! conceivably shorter!) they will be further away
+			#
+			# Then again, this is not the problem...still timeout
+			#return results if results.length > 0 
 
 			to_list -= found_to
 
@@ -507,17 +531,34 @@ private
 		# Otherwise, perform a search on all values at the same time
 		results = search_liaisons from_r, to_list_r, [from_r]
 
+		# Store non-paths
+		found_to = []
+		if results.nil? 
+			found_to = to_list_r
+		else
+			results.each do |result|
+				found_to << result[-1]
+			end
+		end
+
+		notfound_to = to_list_r - found_to
+
+		notfound_to.each do |to_r|	
+			set_non_path from_r, to_r
+			set_non_path to_r, from_r
+		end
+
+
 		if results.nil? or results.length == 0 
 			$logger.info "No results for find_paths"
 			return nil 
 		end
 
-		# Store and display results
+		# Store and display found paths
 		results.each do |result|
 			from_r = result[0]
 			to_r = result[-1]
 
-			# Note that non-paths are not stored; we don't pass empty result values
 			store_path from_r, to_r, result
 		end
 

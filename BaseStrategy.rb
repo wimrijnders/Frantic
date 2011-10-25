@@ -5,20 +5,32 @@ class BaseStrategy
 	def default_move ai
 	end
 
-	def self.closest_ant_region sq, ai
+	#
+	# Determine which ants are within a reasonable
+	# striking distance of given square
+	#
+	def self.nearby_ants_region sq, ai, all_ants = false
 		sq_ants = []
 		ai.my_ants.each do |ant|
-			next if ant.moved?
-			next if ant.collective?
+			unless all_ants
+				#next if ant.moved? 
+				next if ant.collective?
+			end
 
 			sq_ants << ant.square
 		end
 
 		# Note that the search is actually back to front, from food
 		# to ants. The distance of course is the same
-		path = Pathinfo.shortest_path sq, sq_ants
-
-		return nil unless path
+		paths = nil
+		if all_ants
+			paths = $region.find_paths sq, sq_ants
+		else
+			path = Pathinfo.shortest_path sq, sq_ants
+			return [nil,nil] unless path
+			paths = [path]
+		end
+		return [nil,nil] unless paths
 
 		from_r = sq.region
 
@@ -27,19 +39,36 @@ class BaseStrategy
 		ai.my_ants.each do |ant|
 			# This is the same as loop above
 			# TODO: consolidate this
-			next if ant.moved?
-			next if ant.collective?
+			unless all_ants
+				#next if ant.moved?
+				next if ant.collective?
+			end
 
-			if path.length == 0
-				antlist << ant if from_r == ant.square.region
-			else
-				antlist << ant if path[-1] == ant.square.region
+			paths.each do |path|
+				if path.length == 0
+					antlist << ant if from_r == ant.square.region
+				else
+					antlist << ant if path[-1] == ant.square.region
+				end
 			end
 		end
+		antlist.uniq!
+
+		$logger.info {
+			"nearby_ants_region found ants: " + antlist.join(", ")
+		}
+
+		[ antlist, paths ]
+	end
+
+
+	def self.closest_ant_region sq, ai
+		antlist, paths = nearby_ants_region sq, ai
+		path = paths[0] if paths
 
 		# Due to the tests on moved and collective, it is possible that
 		# the list is empty
-		return nil if antlist.length == 0
+		return nil if antlist.nil? or antlist.length == 0
 
 		# Of these ants, determine the closest
 		best_ant = nil

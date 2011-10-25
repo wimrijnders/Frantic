@@ -114,14 +114,23 @@ class Food
 		if index
 			@ants.delete ant
 			$logger.info { "Removed ant #{ ant } from food." }
-		else
-			$logger.info { "Ant #{ ant } not present in food." }
+		#else
+		#	$logger.info { "Ant #{ ant } not present in food." }
+		end
+	end
+
+	def clear_orders
+		@ants.each do |ant|
+			ant.remove_target_from_order ant.ai.map[ row ][ col]
 		end
 	end
 
 	#
 	#
 	def should_forage?
+		# Only forage active food
+		return false unless active
+
 		# Make a list of all the current orders for foraging.
 		# Keep track of the forage order sequence.
 		forages = {}
@@ -169,6 +178,7 @@ class FoodList
 			$logger.info { "Food at #{ coord } already present" }
 			@list[index].active = true
 		else
+			$logger.info { "New food at #{ coord }" }
 			@list << Food.new( coord )
 		end
 	end
@@ -179,6 +189,10 @@ class FoodList
 			if @list[index].active
 				$logger.info { "Food for deletion at #{ coord } still active!" }
 			end
+
+			# Tell all ants not to search for this food
+			@list[index].clear_orders
+
 			@list.delete_at index
 		else
 			$logger.info { "Food for deletion at #{ coord } not present!" }
@@ -289,9 +303,11 @@ class AI
 	def run &b # :yields: self
 		begin
 			setup &b if !@did_setup
-		
+	
+			turn_count = 1	
 			over=false
 			until over
+				$logger.info { "turn #{ turn_count }" }
 				$timer.start "turn"
 				$timer.start "read"
 				over = read_turn
@@ -305,6 +321,7 @@ class AI
 
 				$timer.end "turn"
 				$timer.display
+				turn_count += 1
 			end
 		rescue => e
 			puts "Exception - SystemStackError?"

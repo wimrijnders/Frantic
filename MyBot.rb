@@ -69,21 +69,24 @@ class Strategy < BaseStrategy
 		ant_orders ai
 		find_food ai
 
-if false
 		# preliminary test - let all ants attack an anthill
 		ai.hills.each_enemy do |owner, l|
+			sq = ai.map[ l[0] ][ l[1] ]
 
-			ai.my_ants.each do |ant|
-				next if not ant.orders?
+			nearby_ants, paths = BaseStrategy.nearby_ants_region sq, ai, true
+
+			nearby_ants.each do |ant|
+				next if ant.orders?
 
 				# Insert some randomness, so that not all ants hit the
 				# first hill in the list
 				next if rand(2) == 0
 
-				ant.set_order ai.map[ l[0] ][ l[1] ], :RAZE
-			end
-		end
+				ant.set_order sq, :RAZE
+			end unless nearby_ants.nil?
+		end if $region and not ai.defensive?
 
+if false
 		if ai.kamikaze? and ai.enemy_ants.length > 0
 			ai.my_ants.each do |ant|
 				next if ant.orders?
