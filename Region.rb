@@ -132,7 +132,12 @@ class LiaisonSearch
 	def search from_r, to_list_r
 		@cur_best_dist = nil;
 		$logger.info "searching shortest path" if @find_shortest
-		search_liaisons from_r, to_list_r, [from_r]
+
+		result = catch :done do 
+			search_liaisons from_r, to_list_r, [from_r]
+		end
+
+		result
 	end
 
 
@@ -200,6 +205,12 @@ class LiaisonSearch
 					$logger.info { "search_liaisons found path#{ from }-#{ to_list }: #{ result }" }
 
 					if @find_shortest
+						# Same region always wins
+						if result.length == 0
+							$logger.info { "search_liaisons found same region" }
+							throw :done, result
+						end
+
 						dist = Pathinfo.path_distance result
 
 						if @cur_best_dist.nil? or dist < @cur_best_dist
@@ -241,6 +252,63 @@ class Region
 	@@counter = 0
 	@@ai = nil
 
+	@@add_paths = []
+
+	private 
+
+	def do_thread
+		@add_path_thread = Thread.new do
+			$logger.info "Thread activated"
+
+			longest_diff = nil
+			longest_count = nil
+
+			doing = true
+			while doing
+				$logger.info "Thread waiting"
+				sleep 0.2 while @@add_paths.length == 0
+
+				count = 0
+				start = Time.now
+				while @@add_paths.length > 0
+					# Remove first item
+					path = @@add_paths.pop
+
+					from_r = path[0]
+					to_r   = path[-1]
+					$logger.info { "Thread saving path #{ from_r } to #{ to_r }: #{ path }" }
+					# Cache the result
+					set_path from_r, to_r, path
+					set_path to_r, from_r, path.reverse
+
+					count += 1
+				end
+				$logger.info {
+					diff = ( (Time.now - start)*1000 ).to_i
+
+					if longest_diff.nil? or diff > longest_diff
+						longest_diff = diff
+						longest_count = count
+
+					end
+					str = " Longest: #{ longest_count } in #{ longest_diff } msec"
+
+					"Thread added #{ count } results in #{ diff} msec. #{ str }" 
+				}
+
+			end
+
+			$logger.info "Thread closing down."
+		end
+	end
+
+	def self.add_paths result
+		$logger.info { "add_paths #{ result }" }
+		@@add_paths.concat result
+	end
+
+	public 
+
 	def initialize ai
 		@ai = ai
 		@liaison = {}
@@ -262,6 +330,7 @@ class Region
 			end
 		end
 
+		do_thread
 	end
 
 	def to_s
@@ -657,12 +726,7 @@ private
 		end
 
 		# Store found paths in cache
-		results.each do |result|
-			from_r = result[0]
-			to_r = result[-1]
-
-			store_path from_r, to_r, result
-		end
+		Region.add_paths results
 
 		$logger.info {
 			str = "Found results:\n"
@@ -728,7 +792,7 @@ private
 		if not result and do_search
 			result = LiaisonSearch.new( @liaison).find_first from_r, to_r
 
-			store_path from_r, to_r, result
+			store_path from_r, to_r, [ result ]
 		end
 
 		result
@@ -736,11 +800,9 @@ private
 
 
 	def store_path from_r, to_r, result
+
 		if result
-			$logger.info { "store_path saving path #{ from_r } to #{ to_r }: #{ result }" }
-			# Cache the result
-			set_path from_r, to_r, result
-			set_path to_r, from_r, result.reverse
+			Region.add_paths result
 		else
 			$logger.info { "store_path saving no-path #{ from_r } to #{ to_r }" }
 			set_non_path from_r, to_r
