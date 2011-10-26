@@ -31,7 +31,7 @@ class Square
 	def food?; @food; end
 
 	def to_s
-		"( #{ row }, #{col} )"
+		"(#{ row }, #{col})"
 	end
 	
 

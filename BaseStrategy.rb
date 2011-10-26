@@ -13,7 +13,6 @@ class BaseStrategy
 		sq_ants = []
 		ai.my_ants.each do |ant|
 			unless all_ants
-				#next if ant.moved? 
 				next if ant.collective?
 			end
 
@@ -37,10 +36,7 @@ class BaseStrategy
 		# Now, determine which ants are in the given region
 		antlist = []
 		ai.my_ants.each do |ant|
-			# This is the same as loop above
-			# TODO: consolidate this
 			unless all_ants
-				#next if ant.moved?
 				next if ant.collective?
 			end
 

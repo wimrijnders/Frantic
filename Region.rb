@@ -90,7 +90,7 @@ class Pathinfo
 	end
 
 	def self.shortest_path from, to_list
-		results = $region.find_paths from, to_list
+		results = $region.find_paths from, to_list, true
 
 		return nil if results.nil? or results.length == 0
 
@@ -118,6 +118,119 @@ class Pathinfo
 
 		$logger.info { "Shortest path: #{ best_path }, dist: #{ best_dist}" }
 		best_path
+	end
+end
+
+
+class LiaisonSearch
+	def initialize cache, find_shortest = false
+		@liaison = cache
+		@find_shortest = find_shortest
+	end
+
+
+	def search from_r, to_list_r
+		@cur_best_dist = nil;
+		search_liaisons from_r, to_list_r, [from_r]
+	end
+
+
+	#
+	# NOTE: Apparently not called any more;
+	#       Verify and remove if OK.
+	#
+	def find_first from_r, to_r
+		$logger.info { "find_first #{ from }-#{ to_list }" }
+		result = catch :done do
+			search_liaison from_r, to_r, [from_r]
+		end
+
+		result
+	end
+
+
+	private
+
+	#
+	# Search for first path between from and to.
+	#
+	def search_liaison from, to, current_path
+		$logger.info { "search_liaison searching #{ from }-#{ to }: #{ current_path }" }
+		if current_path.length >= 15
+			$logger.info "Path too long; skipping"
+			return nil
+		end
+
+		cur = @liaison[from]
+
+		if cur
+			if cur[ to ]
+				throw :done, current_path + [to]
+			end
+
+			cur.each_key do |key|
+				unless current_path.include? key
+					search_liaison key, to, current_path + [key]
+				end
+			end
+		end
+
+		nil
+	end
+
+
+
+	def search_liaisons from, to_list, current_path
+		return [] if to_list.length == 0
+	
+		# Safeguard to avoid too deep searches
+		return [] if current_path.length >= 10 
+	
+
+		$logger.info { "search_liaisons searching #{ from }-#{ to_list }: #{ current_path }" }
+		cur = @liaison[from]
+		results = []
+		found_to = []
+
+		if cur
+			to_list.each do |to|
+				if cur[ to ]
+					result = current_path + [to]
+					$logger.info { "search_liaisons found path#{ from }-#{ to_list }: #{ result }" }
+
+					if @find_shortest
+						dist = Pathinfo.path_distance result
+
+						if @cur_best_dist.nil? or dist < @cur_best_dist
+							$logger.info { "search_liaisons path is new shortest" }
+							@cur_best_dist = dist
+							results << result 
+						else
+							next
+						end
+					else
+						results << result 
+					end
+
+					found_to << to
+				end
+			end
+
+			if @find_shortest and results.length > 0 
+				# No point in looking further, any further paths will be longer
+				return results
+			end
+
+			to_list -= found_to
+
+			cur.each_key do |key|
+				unless current_path.include? key
+					results.concat search_liaisons key, to_list, current_path + [key]
+				end
+			end
+		end
+
+		results
 	end
 end
 
@@ -390,68 +503,7 @@ private
 		ret
 	end
 
-	def search_liaison from, to, current_path
-		$logger.info { "search_liaison searching #{ from }-#{ to }: #{ current_path }" }
-		if current_path.length >= 15
-			$logger.info "Path too long; skipping"
-			return nil
-		end
 
-		cur = @liaison[from]
-
-		if cur
-			if cur[ to ]
-				throw :done, current_path + [to]
-			end
-
-			cur.each_key do |key|
-				unless current_path.include? key
-					search_liaison key, to, current_path + [key]
-				end
-			end
-		end
-
-		nil
-	end
-
-	def search_liaisons from, to_list, current_path
-		return [] if to_list.length == 0
-	
-		# Safeguard to avoid too deep searches
-		return [] if current_path.length >= 10 
-	
-
-		$logger.info { "search_liaisons searching #{ from }-#{ to_list }: #{ current_path }" }
-		cur = @liaison[from]
-		results = []
-		found_to = []
-
-		if cur
-			to_list.each do |to|
-				if cur[ to ]
-					results << ( current_path + [to] )
-					found_to << to
-				end
-			end
-
-			# If results were found here, there is no point in looking further,
-			# Because any other results will be one region further away, and in all
-			# likelihood (!!! conceivably shorter!) they will be further away
-			#
-			# Then again, this is not the problem...still timeout
-			#return results if results.length > 0 
-
-			to_list -= found_to
-
-			cur.each_key do |key|
-				unless current_path.include? key
-					results.concat search_liaisons key, to_list, current_path + [key]
-				end
-			end
-		end
-
-		results
-	end
 
 	public
 
@@ -516,19 +568,45 @@ private
 		liaison
 	end
 
-	def find_paths from, to_list
+	#
+	# Make a list of regions for the given points
+	#
+	def get_regions to_list
+		list = []
+
+		to_list.each do |to|
+			list << to.region
+		end
+
+		list.uniq
+	end
+
+
+	#
+	# NOTE: 
+	#
+	# In the case of searching for shortest path, it is still
+	# possible that multiple paths are returned, ie. best interim results.
+	#	
+	def find_paths from, to_list, do_shortest = false
 		$logger.info { "find_paths searching #{ from }-#{ to_list }" }
 
+
+		from_r = from.region
+		to_list_r = get_regions to_list
+		$logger.info { "find_paths searching regions #{ to_list_r }" }
+
 		results = []
+		to_list_r.each do |to_r|
+			if get_non_path from_r, to_r
+				$logger.info { "found cached non-result for #{ from_r }-#{to_r}." }
+				next
+			end
 
-		# First, try to find values in the cache
-		to_list.each do | to |
-			path = find_path from, to, false 
-
-			next if path.nil?
-
-			results << path
+			path = find_path_regions from_r, to_r, false 
+			results << path unless path.nil?
 		end
+
 
 		# if we found something, we're done
 		if results.length > 0
@@ -543,29 +621,32 @@ private
 			return results 
 		end
 
-		from_r = from.region
-		to_list_r = []
-		to_list.each { |to| to_list_r << to.region }
-		to_list_r.uniq!
-
 		# Otherwise, perform a search on all values at the same time
-		results = search_liaisons from_r, to_list_r, [from_r]
+		results = LiaisonSearch.new( @liaison, do_shortest ).search from_r, to_list_r
 
+		#
 		# Store non-paths
-		found_to = []
-		if results.nil? 
-			found_to = to_list_r
-		else
-			results.each do |result|
-				found_to << result[-1]
+		#
+		# to-points without a found path are considered to be non-paths
+		#
+		# Don't do this for shortest path search with result, because 
+		# we didn't consider all paths in that case
+		#
+		unless do_shortest and results.length > 0
+			found_to = []
+			if results.nil? 
+				found_to = to_list_r
+			else
+				results.each do |result|
+					found_to << result[-1]
+				end
 			end
-		end
+			notfound_to = to_list_r - found_to
 
-		notfound_to = to_list_r - found_to
-
-		notfound_to.each do |to_r|	
-			set_non_path from_r, to_r
-			set_non_path to_r, from_r
+			notfound_to.each do |to_r|	
+				set_non_path from_r, to_r
+				set_non_path to_r, from_r
+			end
 		end
 
 
@@ -574,7 +655,7 @@ private
 			return nil 
 		end
 
-		# Store and display found paths
+		# Store found paths in cache
 		results.each do |result|
 			from_r = result[0]
 			to_r = result[-1]
@@ -595,26 +676,21 @@ private
 	end
 
 
+	#
+	# Find path between given squares
+	#
 	def find_path from, to, do_search = true
 		# Assuming input are squares
 		from_r = from.region
 		to_r   = to.region
-
-		# Test for unknown regions
-		return nil unless from_r and to_r
-
-		# Test same region
-		return [] if from_r == to_r
-
-		$logger.info { "finding path from #{ from.to_s } to #{ to.to_s}; regions #{ from_r}-#{to_r }" }
-
-		result = get_path from_r, to_r
+	
+		result = find_path_regions from_r, to_r, do_search
 		if result
 			$logger.info { "found cached result #{ result }." }
 
 			# Check if we are not already on liaison. If so, remove from list
 			liaison = get_liaison result[0], result[1]
-			if from == liaison
+			if liaison and from == liaison
 				$logger.info { "Already at liaison, skipping it." }
 				if result.length > 2 
 					result = result[1..-1]
@@ -622,26 +698,41 @@ private
 					result = []
 				end
 			end		
-
-			return result
 		end
+
+		result
+	end
+
+
+	#
+	# Find path between given regions
+	#
+	def find_path_regions from_r, to_r, do_search = true
+		$logger.info { "find_path_regions #{ from_r}-#{to_r }" }
+
+		# Test for unknown regions
+		return nil unless from_r and to_r
+
+		# Test same region
+		return [] if from_r == to_r
+
 		if get_non_path from_r, to_r
 			$logger.info { "found cached non-result for #{ from_r }-#{to_r}." }
 			return nil
 		end
+
+		result = get_path from_r, to_r
 			
-
 		# Only do search if specified
-		return nil unless do_search
-	
-		result = catch :done do
-			search_liaison from_r, to_r, [from_r]
-		end
+		if not result and do_search
+			result = LiaisonSearch.new( @liaison).find_first from_r, to_r
 
-		store_path from_r, to_r, result
+			store_path from_r, to_r, result
+		end
 
 		result
 	end
+
 
 	def store_path from_r, to_r, result
 		if result

@@ -45,22 +45,19 @@ end
 map = ARGV[0]
 nump = ARGV[1]
 num = ARGV[2]
-nump = "0" + nump if nump.length ==1
-num = "0" + num if num.length ==1
+nump = "0" + nump if nump and  nump.length ==1
+num = "0" + num if num and num.length ==1
 
 map = map.to_i if is_number? map
 
 
 bots = [
 	"ruby ../MyBot.rb",		# Frantic
-	"ruby ../Inertia.rb",
-	"ruby ../Inertia.rb",
-	"ruby ../Inertia.rb",
 	"python sample_bots/python/GreedyBot.py",
-	"ruby ../Inertia.rb",
+	"python2.7 sample_bots/python/HunterBot.py",
 	"ruby ../GoSouth.rb",
 	"ruby ../Twitcher.rb",
-	"python2.7 sample_bots/python/HunterBot.py",
+	"ruby ../Inertia.rb",
 	"python submission_test/TestBot.py",
 	"python sample_bots/python/LeftyBot.py"
 ]
