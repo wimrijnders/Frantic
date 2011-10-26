@@ -86,8 +86,7 @@ class BaseStrategy
 
 	def find_food ai
 		$timer.start "find_food"
-		$logger.info { "getting the food" }
-
+		$logger.info "=== Food Phase ==="
 
 		ai.food.each do |l|
 			sq = ai.map[ l.row ][ l.col ]
@@ -112,11 +111,12 @@ class BaseStrategy
 				end
 			end
 		end 
-		$logger.info { "done getting the food" }
+
 		$timer.end "find_food"
 	end
 
 	def evade ai
+		$logger.info "=== Evade Phase ==="
 		ai.my_ants.each do |ant|
 			next if ant.moved?
 			ant.evading
@@ -125,6 +125,7 @@ class BaseStrategy
 	
 
 	def ant_orders ai
+		$logger.info "=== Order Phase ==="
 		ai.my_ants.each do |ant|
 			#next if ant.collective_leader?
 			ant.handle_orders
@@ -150,6 +151,7 @@ class BaseStrategy
 		find_food ai  if do_food
 		evade ai
 
+		$logger.info "=== Default Move Phase ==="
 		ai.my_ants.each do |ant|
 			next if ant.moved?
 			next if ant.collective?
@@ -159,6 +161,7 @@ class BaseStrategy
 		end
 	
 		# Anything left here stays on the spot
+		$logger.info "=== Stay Phase ==="
 		ai.my_ants.each do |ant|
 			next if ant.moved?
 			ant.stay

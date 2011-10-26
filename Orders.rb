@@ -89,19 +89,6 @@ module Orders
 
 		@orders.insert 0,n
 
-if false
-		if $region and not false === liaison 
-			$logger.info { "Setting order LIAISON on square #{ liaison } for #{ self.to_s }" }
-			@orders.insert 0, Order.new( liaison, :LIAISON )
-
-			# Don't sort for liaison
-		else
-			sort_orders
-		end
-else
-		sort_orders
-end
-
 		true
 	end
 
@@ -278,6 +265,7 @@ end
 
 			# Check if in-range when visible for food
 			if order_order == :FORAGE
+				$logger.info "Check if food still there"
 				sq = order_sq
 				if $region
 					closest = BaseStrategy.closest_ant_region @ai.map[ sq.row][ sq.col], @ai
@@ -290,7 +278,10 @@ end
 					if d.in_view? and !@ai.map[ sq.row ][sq.col].food?
 						# food is already gone. Skip order
 						clear_first_order true
+						$logger.info "Food still there: no"
 						next
+					else
+						$logger.info "Food still there: yes"
 					end
 				end
 			end
@@ -333,59 +324,6 @@ end
 
 		if $region
 			move_to @orders[0].handle_liaison( self.square, ai )
-
-if false
-			what = @orders[0].order 
-			sq = ai.map[ @orders[0].square.row ][ @orders[0].square.col ]
-
-			if what == :LIAISON
-				move_to sq 
-			else
-				$logger.info { "Determining new path for order #{ what }" }
-				liaison  = $region.path_direction self.square, sq
-				if liaison.nil?
-					# Apparently, this never happens...logical, otherwise
-					# there would be no order to move.
-					str = "No path to target #{ sq } for #{ self.to_s }; "
-					if what == :ASSEMBLE 
-						str << "doing our best"
-						$logger.info str
-						move_to sq
-					else
-						str << "ignoring order"
-						$logger.info str
-						return false
-					end
-				else
-					if false === liaison 
-						$logger.info "no liaison needed - move directly"
-
-						# NOTE: the liaison order is abused here somewhat.
-						# The target square is in view of the current order,
-						# but there is a possibility that the ant will move
-						# through the same region as the liaison; this means
-						# that in the next move, the path would be redetermined
-						# and the ant would move to the liaison, eg. back to this
-						# square. It results in twitch-behaviour.
-						#
-						# Setting liaison like this works fine, because of the
-						# loop over orders in handle_orders(). Consecutive orders
-						# with same target are reached in the same loop.
-						#
-						$logger.info { "Abusing order LIAISON on square #{ sq } for #{ self.to_s }" }
-						@orders.insert 0, Order.new( sq, :LIAISON )
-					else
-						$logger.info { "Setting order LIAISON on square #{ liaison } for #{ self.to_s }" }
-						@orders.insert 0, Order.new( liaison, :LIAISON )
-					end
-				end
-
-				what = @orders[0].order 
-				sq =  @orders[0].square
-				$logger.info { "Moving to #{ sq.to_s } for order #{ what}" }
-				move_to sq
-end
-			end
 		else
 			move_to sq
 		end
@@ -430,8 +368,6 @@ end
 
 		count = 0
 		@orders.each do |n|
-#			next if n.order == :LIAISON
-
 			if n.order == what
 				list[ n.square ] = count
 			end

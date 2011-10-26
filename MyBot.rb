@@ -2,20 +2,8 @@ $:.unshift File.dirname($0)
 #######################################
 # TODO
 #
-# - Attacking collective: if only blocked by non-water, stay instead of evade.
-# - Staying put is a good strategy for small playing fields.
-# - 1-x ant combat; best approach is diagonal on corner ant. You die but you also kill one enemy.
-# - On evasion, select shortest route (fast-forward?)
-# - Break off evasion if under attack for collectives
-# - Creating collectives: don't do it in the direct neighbourhood of water (fixed obstacles) 
-#
-# - URGENT! collective attack: 
-#		- defensive: detect inert enemies, these render you immobile.
-#		- Especially important for defensive behaviour. You can get stuck.
-#
-# - If attacked with no way of escape, defend as well as possible
-#		- if ant is sure to die, let him take an enemy down
-# - Retreat: for multiple attackers, select good escape route
+# - Defend your hill; some players (include me!) are good at targetting
+#   these.
 #
 #
 #######################################
@@ -48,6 +36,7 @@ class Strategy < BaseStrategy
 	# Handle non-collective ants which are in a conflict situation
 	#
 	def ant_conflict ai
+		$logger.info "=== Conflict Phase ==="
 		ai.my_ants.each do |ant|
 			next if ant.collective?
 			ant.handle_conflict
@@ -70,6 +59,7 @@ class Strategy < BaseStrategy
 		find_food ai
 
 		# preliminary test - let all ants attack an anthill
+		$logger.info "=== Hill Phase ==="
 		ai.hills.each_enemy do |owner, l|
 			sq = ai.map[ l[0] ][ l[1] ]
 
@@ -88,6 +78,7 @@ class Strategy < BaseStrategy
 
 if false
 		if ai.kamikaze? and ai.enemy_ants.length > 0
+			$logger.info "=== Kamikaze Phase ==="
 			ai.my_ants.each do |ant|
 				next if ant.orders?
 				next if ant.moved?
@@ -100,6 +91,7 @@ if false
 		end
 end
 
+		$logger.info "=== Harvester Enlist Phase ==="
 		ai.my_ants.each do |ant|
 			next if ant.moved?
 

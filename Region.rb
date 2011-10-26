@@ -131,6 +131,7 @@ class LiaisonSearch
 
 	def search from_r, to_list_r
 		@cur_best_dist = nil;
+		$logger.info "searching shortest path" if @find_shortest
 		search_liaisons from_r, to_list_r, [from_r]
 	end
 
@@ -589,7 +590,7 @@ private
 	# possible that multiple paths are returned, ie. best interim results.
 	#	
 	def find_paths from, to_list, do_shortest = false
-		$logger.info { "find_paths searching #{ from }-#{ to_list }" }
+		$logger.info { "find_paths searching to #{ from } for #{ to_list.length } ants" }
 
 
 		from_r = from.region
@@ -708,7 +709,7 @@ private
 	# Find path between given regions
 	#
 	def find_path_regions from_r, to_r, do_search = true
-		$logger.info { "find_path_regions #{ from_r}-#{to_r }" }
+		#$logger.info { "find_path_regions #{ from_r}-#{to_r }" }
 
 		# Test for unknown regions
 		return nil unless from_r and to_r

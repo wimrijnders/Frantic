@@ -53,7 +53,7 @@ class AttackDistance
 			@dir = nil
 		end
 
-		$logger.info "calc_dir #{ @dir }"
+		#$logger.info "calc_dir #{ @dir }"
 	end
 
 
