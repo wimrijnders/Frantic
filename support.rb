@@ -12,11 +12,17 @@ class Logger
 	def info str = nil
 		if @log
 			time = (Time.now - @start)*1000
+
+			thread = ""
+			if Thread.current != Thread.main
+				thread = "#{ Thread.current[ :name ] } "
+			end
+
 			if str
-				out "- #{ time.to_i }: #{ str }"
+				out "#{ time.to_i } - #{ thread }#{ caller_method_name}: #{ str }"
 			end
 			if block_given?
-				out "- #{ time.to_i }: #{ yield }"
+				out "#{ time.to_i } - #{ thread }#{ caller_method_name }: #{ yield }"
 			end
 		end
 	end
@@ -34,7 +40,29 @@ class Logger
 	def log= val
 		@log = val
 	end
+
+	private
+
+	# Source: http://snippets.dzone.com/posts/show/2787
+	def caller_method_name
+    	parse_caller(caller(2).first).last
+	end
+
+	def parse_caller(at)
+	    if /^(.+?):(\d+)(?::in `(.*)')?/ =~ at
+	        file = Regexp.last_match[1]
+			line = Regexp.last_match[2].to_i
+			method = Regexp.last_match[3]
+
+		    if /^block.* in (.*)/ =~ method
+				method = Regexp.last_match[1]
+			end
+
+			[file, line, method]
+		end
+	end
 end
+
 
 class Timer
 	def initialize

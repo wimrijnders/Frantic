@@ -1,3 +1,5 @@
+require 'thread'
+$mutex = Mutex.new
 
 class Pathinfo
 	@@region = nil
@@ -123,12 +125,15 @@ end
 
 
 class LiaisonSearch
+
+	DEFAULT_MAX_LENGTH = 10
+
 	def initialize cache, find_shortest = false, max_length = nil
 		@liaison = cache
 		@find_shortest = find_shortest
 
 		if max_length.nil?
-			@max_length = 15
+			@max_length = DEFAULT_MAX_LENGTH
 		else
 			@max_length = max_length 
 		end
@@ -137,6 +142,12 @@ class LiaisonSearch
 
 	def search from_r, to_list_r
 		@cur_best_dist = nil;
+
+		if to_list_r.length == 1 and not @find_shortest
+			$logger.info "Only one item in to_list_r; forcing find_shortest"
+			@find_shortest = true
+		end
+
 		$logger.info "searching shortest path" if @find_shortest
 
 		if @find_shortest and to_list_r.include? from_r 
@@ -148,6 +159,12 @@ class LiaisonSearch
 
 		result = catch :done do 
 			search_liaisons from_r, to_list_r, [from_r]
+		end
+
+
+		if @find_shortest and not result.nil? and result.length > 0
+			# Shortest item is last in list.
+			result = [ result[-1] ]
 		end
 
 		result
@@ -214,6 +231,15 @@ class LiaisonSearch
 			$logger.info { "Path length >= #{ @max_length }; skipping" }
 			return []
 		end
+
+		if @find_shortest and not @cur_best_dist.nil?
+			dist = Pathinfo.path_distance current_path
+
+			if dist > @cur_best_dist
+				$logger.info { "search_liaisons cur dist #{ dist } > cur best #{ @cur_best_dist}; skipping" }
+				return
+			end
+		end
 	
 
 		$logger.info { "search_liaisons searching #{ from }-#{ to_list }: #{ current_path }" }
@@ -272,19 +298,21 @@ class Region
 	@@ai = nil
 
 	@@add_paths = []
+	@@add_searches = []
 
 	private 
 
 	def do_thread
-		@add_path_thread = Thread.new do
-			$logger.info "Thread activated"
+		Thread.new do
+			Thread.current[ :name ] = "Thread1"
+			$logger.info "activated"
 
 			longest_diff = nil
 			longest_count = nil
 
 			doing = true
 			while doing
-				$logger.info "Thread waiting"
+				$logger.info "waiting"
 				sleep 0.2 while @@add_paths.length == 0
 
 				count = 0
@@ -296,13 +324,14 @@ class Region
 
 					from_r = path[0]
 					to_r   = path[-1]
-					$logger.info { "Thread saving path #{ from_r } to #{ to_r }: #{ path }" }
+					$logger.info { "saving path #{ from_r } to #{ to_r }: #{ path }" }
 					# Cache the result
 					set_path from_r, to_r, path
 					set_path to_r, from_r, path.reverse
 
 					count += 1
 				end
+
 				$logger.info {
 					diff = ( (Time.now - start)*1000 ).to_i
 
@@ -313,12 +342,54 @@ class Region
 					end
 					str = " Longest: #{ longest_count } in #{ longest_diff } msec"
 
-					"Thread added #{ count } results in #{ diff} msec. #{ str }" 
+					"added #{ count } results in #{ diff} msec. #{ str }" 
 				}
 
 			end
 
-			$logger.info "Thread closing down."
+			$logger.info "Thread1 closing down."
+		end
+
+		Thread.new do
+			Thread.current[ :name ] = "Thread2"
+			$logger.info "activated"
+
+			longest_diff = nil
+			longest_count = nil
+
+			doing = true
+			while doing
+				$logger.info "waiting"
+				sleep 0.2 while @@add_searches.length == 0
+
+				count = 0
+				start = Time.now
+				while @@add_searches.length > 0
+					from, to_list = @@add_searches.pop
+
+					$logger.info { "searching #{ from }-#{ to_list }" }
+
+					# Results will be cached within this call
+					$region.find_paths from, to_list
+
+					count += 1
+				end
+
+				$logger.info {
+					diff = ( (Time.now - start)*1000 ).to_i
+
+					if longest_diff.nil? or diff > longest_diff
+						longest_diff = diff
+						longest_count = count
+					end
+					str = " Longest: #{ longest_count } searches in #{ longest_diff } msec"
+
+					"added #{ count } results in #{ diff} msec. #{ str }" 
+				}
+
+			end
+
+			$logger.info "closing down."
 		end
 	end
 
@@ -328,6 +399,12 @@ class Region
 	end
 
 	public 
+
+	def self.add_searches from, to_list
+		sq_ants   = Region.ants_to_squares to_list
+		@@add_searches << [ from, sq_ants]
+	end
+
 
 	def initialize ai
 		@ai = ai
@@ -396,10 +473,12 @@ class Region
 		# Don't overwrite existing liaison
 		unless get_liaison from, to
 
-			unless @liaison[ from ]
-				@liaison[from] = { to => square }
-			else
-				@liaison[from][ to ] = square
+			$mutex.synchronize do
+				unless @liaison[ from ]
+					@liaison[from] = { to => square }
+				else
+					@liaison[from][ to ] = square
+				end
 			end
 			$logger.info { "#{ square } liaison for #{ from }-#{ to }." }
 
@@ -677,14 +756,13 @@ private
 	# possible that multiple paths are returned, ie. best interim results.
 	#	
 	def find_paths from, to_list, do_shortest = false
-		$logger.info { "find_paths searching to #{ from } for #{ to_list.length } ants" }
+		$logger.info { "searching from #{ from } for #{ to_list.length } destinations" }
 		return nil if to_list.nil? or to_list.length == 0
 
 		from_r = from.region
 		to_list_r = Region.squares_to_regions to_list
 
 		results = find_paths_cache from_r, to_list_r
-
 
 		# if nothing found, perform a search on all values at the same time
 		if results.length == 0
@@ -754,7 +832,7 @@ private
 
 
 		if results.nil? or results.length == 0 
-			$logger.info "No results for find_paths"
+			$logger.info "No results for search_paths"
 			return nil 
 		end
 
@@ -889,20 +967,20 @@ private
 	#         any of destination regions.
 	#
 	def find_paths_cache from_r, to_list_r
-		$logger.info { "find_paths_cache searching regions #{ to_list_r }" }
+		$logger.info { "searching regions #{ to_list_r }" }
 
-		# Same region always wins
-		if to_list_r.include? from_r
-			$logger.info { "find_paths_cache same region #{ from_r }" }
-			return [ { :path => [], :dist => 0 } ]
-		end
 
 		to_list_r -= get_non_results from_r, to_list_r
 
 		results = []
 		to_list_r.each do |to_r|
-			path = get_path_basic from_r, to_r
-			results << path unless path.nil?
+			if from_r == to_r
+				$logger.info { "same region #{ from_r }" }
+				results << { :path => [], :dist => 0 } 
+			else
+				path = get_path_basic from_r, to_r
+				results << path unless path.nil?
+			end
 		end
 
 		# if we found something, we're done
@@ -926,21 +1004,31 @@ private
 
 	#
 	# Make a sorted list of neighbouring ants from given input.
-	# Only the cache is consulted.
+	# if do_search is false, only the cache is consulted.
 	#
-	def get_neighbors_sorted ant, ants, do_search = false
-		# Remove current ant from list.
-		tmp = ants.clone
-		tmp.delete ant
-		return [] if tmp.length == 0
+	def get_neighbors_sorted ant, in_ants, do_search = false
+		# First param may be an ant or a square
+		if ant.respond_to? :square
+			sq = ant.square
+		else
+			sq = ant
+		end
 
-		$logger.info "Entered get_neighbors_sorted"
+		ants = in_ants.clone
+
+		if ant.respond_to? :square
+			# Remove from-ant from list.
+			ants.delete ant
+		end
+		return [] if ants.length == 0
+
+		$logger.info { "entered, from: #{ ant }" }
 		$logger.info { "Ants : #{ ants }" }
 
-		sq_ants   = Region.ants_to_squares tmp
-		$logger.info { "Ant squares: #{ sq_ants }" }
+		sq_ants   = Region.ants_to_squares ants
+		#$logger.info { "Ant squares: #{ sq_ants }" }
 
-		from_r = ant.square.region
+		from_r = sq.region
 		to_list_r = Region.squares_to_regions sq_ants
 
 		paths = find_paths_cache from_r, to_list_r
@@ -961,21 +1049,13 @@ private
 		ants.each do |a|
 			region = a.square.region
 			paths.each do |l|
-				if l[:path][-1] == region
-					ants_with_distance << [ a, Pathinfo.new(ant.square, a.square, l[:path]).dist ]
+				# First part for same region
+				if ( l[:path].length == 0 and region == from_r ) or l[:path][-1] == region
+					ants_with_distance << [ a, Pathinfo.new( sq, a.square, l[:path]).dist ]
 					break
 				end
 			end
 		end
-
-		$logger.info {
-			str = "neighbor ants found:\n"
-			ants_with_distance.each do |result|
-				str << "#{ result }\n"
-			end
-
-			str
-		}
 
 		# Sort the list
 		ants_with_distance.sort! { |a,b| a[1] <=> b[1] }

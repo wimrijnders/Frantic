@@ -54,22 +54,30 @@ class Strategy < BaseStrategy
 		ant_orders ai
 		find_food ai
 
-		# preliminary test - let all available ants attack an anthill
 		$logger.info "=== Hill Phase ==="
+
+		# preliminary test - let all available ants attack an anthill
 		ai.hills.each_enemy do |owner, l|
 			sq = ai.map[ l[0] ][ l[1] ]
 
-			nearby_ants, paths = BaseStrategy.nearby_ants_region sq, ai, true
-
-			nearby_ants.each do |ant|
+			# Make list of ants which are available for attacking the hill
+			available_ants = []
+			ai.my_ants.each do |ant|
 				next if ant.orders?
 
 				# Insert some randomness, so that not all ants hit the
 				# first hill in the list
 				next if rand(2) == 0
 
+				available_ants << ant
+			end
+
+			nearby_ants = BaseStrategy.nearby_ants_region sq, available_ants, true
+
+			nearby_ants.each do |ant|
 				ant.set_order sq, :RAZE
 			end unless nearby_ants.nil?
+
 		end if $region and not ai.defensive?
 
 if false

@@ -6,10 +6,10 @@ class BaseStrategy
 	end
 
 
-	def self.target_ants ai, from_r, paths, all_ants
+	def self.target_ants ants, from_r, paths, all_ants
 		# Now, determine which ants are in the found regions
 		antlist = []
-		ai.my_ants.each do |ant|
+		ants.each do |ant|
 			unless all_ants
 				next if ant.collective?
 			end
@@ -24,7 +24,7 @@ class BaseStrategy
 		end
 
 		$logger.info {
-			"nearby_ants_region found ants: " + antlist.join(", ")
+			"target_ants found: " + antlist.join(", ")
 		}
 
 		antlist.uniq
@@ -34,47 +34,47 @@ class BaseStrategy
 	# Determine which ants are within a reasonable
 	# striking distance of given square
 	#
-	def self.nearby_ants_region sq, ai, all_ants = false
-		sq_ants = Region.ants_to_squares ai.my_ants
+	def self.nearby_ants_region sq, ants, all_ants = false
+		$logger.info "called"
+
+		sq_ants = Region.ants_to_squares ants
+
+		antlist = []
 
 		# Note that the search is actually back to front, from food
 		# to ants. The distance of course is the same
 		paths = nil
 		if all_ants
-			paths = $region.find_paths sq, sq_ants
+			# Do a cache search only - we rely on the backburner thread
+			# to find the paths for us. 
+			result = $region.get_neighbors_sorted sq, ants
+
+			if result.length > 0
+				# Remove distance info
+				result.each { |l| antlist << l[0] }
+			end
+			#paths = $region.find_paths sq, sq_ants
 		else
 			path = Pathinfo.shortest_path sq, sq_ants
-			return [nil,nil] unless path
-			paths = [path]
+			unless path.nil?
+				antlist = BaseStrategy.target_ants ants, sq.region, [path], all_ants
+			end
 		end
-		return [nil,nil] unless paths
 
-		antlist = BaseStrategy.target_ants ai, sq.region, paths, all_ants
-
-		[ antlist, paths ]
+		antlist
 	end
 
 
 	def self.closest_ant_region sq, ai
-		antlist, paths = nearby_ants_region sq, ai
-		path = paths[0] if paths
+		antlist = nearby_ants_region sq, ai.my_ants
+
 		# Due to the tests on moved and collective, it is possible that
 		# the list is empty
 		return nil if antlist.nil? or antlist.length == 0
 
-		# Of these ants, determine the closest
-		best_ant = nil
-		best_dist = -1
-		antlist.each do |ant|
-			# Path is passed as parameter, so find_path() is not called 
-			pathinfo = Pathinfo.new sq, ant.square, path
-
-			if best_ant.nil? or pathinfo.dist < best_dist
-				best_ant = ant
-				best_dist = pathinfo.dist
-			end	
-		end
-		$logger.info { "best ant: #{ best_ant}, dist: #{ best_dist}" }
+		# Closest ant is first in list (list is sorted ascending by distance)
+		best_ant = antlist[0]
+		$logger.info { "best ant: #{ best_ant}" }
 
 		best_ant
 	end

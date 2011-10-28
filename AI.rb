@@ -168,7 +168,10 @@ end
 
 
 class FoodList
-	def initialize
+	@ai = nil
+
+	def initialize ai
+		@ai = ai unless @ai
 		@list = []
 	end
 
@@ -185,6 +188,7 @@ class FoodList
 		else
 			$logger.info { "New food at #{ coord }" }
 			@list << Food.new( coord )
+			Region.add_searches @ai.map[ coord[0]][ coord[1] ], @ai.my_ants
 		end
 	end
 
@@ -267,7 +271,7 @@ class AI
 		
 		@my_ants=[]
 		@enemy_ants=[]
-		@food = FoodList.new
+		@food = FoodList.new self
 		
 		@did_setup=false
 		@hills = Hills.new 
@@ -428,6 +432,8 @@ class AI
 						end
 					else
 						$logger.info { "Hill player #{ owner } at #{ row },#{col}" }
+						# Active search in thread in anticipation
+						Region.add_searches sq, my_ants
 					end
 				end
 			when 'a'

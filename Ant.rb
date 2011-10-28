@@ -63,7 +63,7 @@ class EnemyAnt < Ant
 	end
 
 	def to_s
-		super + "; " +  @state.to_s
+		"enemy#{ square }; " +  @state.to_s
 	end
 
 	def advancing? pos
@@ -482,9 +482,11 @@ class MyAnt < Ant
 			if d.dist == 1 
 				$logger.info "Moving in - next to friend." 
 				stay
+				break
 			elsif d.in_view?
 				$logger.info "Moving in to help attacked buddy."
 				move_to l.pos
+				break
 			end
 		end
 	end
