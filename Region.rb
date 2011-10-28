@@ -123,15 +123,28 @@ end
 
 
 class LiaisonSearch
-	def initialize cache, find_shortest = false
+	def initialize cache, find_shortest = false, max_length = nil
 		@liaison = cache
 		@find_shortest = find_shortest
+
+		if max_length.nil?
+			@max_length = 15
+		else
+			@max_length = max_length 
+		end
 	end
 
 
 	def search from_r, to_list_r
 		@cur_best_dist = nil;
 		$logger.info "searching shortest path" if @find_shortest
+
+		if @find_shortest and to_list_r.include? from_r 
+			# Same region always wins
+			$logger.info { "search_liaisons found same region" }
+			return [ [] ]
+		end
+
 
 		result = catch :done do 
 			search_liaisons from_r, to_list_r, [from_r]
@@ -147,6 +160,13 @@ class LiaisonSearch
 	#
 	def find_first from_r, to_r
 		$logger.info { "find_first #{ from }-#{ to_list }" }
+
+		# Same region always wins
+		if from_r == to_r 
+			$logger.info { "search_liaison found same region" }
+			return []
+		end
+
 		result = catch :done do
 			search_liaison from_r, to_r, [from_r]
 		end
@@ -162,8 +182,8 @@ class LiaisonSearch
 	#
 	def search_liaison from, to, current_path
 		$logger.info { "search_liaison searching #{ from }-#{ to }: #{ current_path }" }
-		if current_path.length >= 15
-			$logger.info "Path too long; skipping"
+		if current_path.length >= @max_length 
+			$logger.info { "Path length >= #{ @max_length }; skipping" }
 			return nil
 		end
 
@@ -187,10 +207,13 @@ class LiaisonSearch
 
 
 	def search_liaisons from, to_list, current_path
-		return [] if to_list.length == 0
+		return nil if to_list.length == 0
 	
 		# Safeguard to avoid too deep searches
-		return [] if current_path.length >= 10 
+		if current_path.length >= @max_length 
+			$logger.info { "Path length >= #{ @max_length }; skipping" }
+			return []
+		end
 	
 
 		$logger.info { "search_liaisons searching #{ from }-#{ to_list }: #{ current_path }" }
@@ -200,17 +223,12 @@ class LiaisonSearch
 
 		if cur
 			to_list.each do |to|
+
 				if cur[ to ]
 					result = current_path + [to]
 					$logger.info { "search_liaisons found path#{ from }-#{ to_list }: #{ result }" }
 
 					if @find_shortest
-						# Same region always wins
-						if result.length == 0
-							$logger.info { "search_liaisons found same region" }
-							throw :done, result
-						end
-
 						dist = Pathinfo.path_distance result
 
 						if @cur_best_dist.nil? or dist < @cur_best_dist
@@ -237,7 +255,8 @@ class LiaisonSearch
 
 			cur.each_key do |key|
 				unless current_path.include? key
-					results.concat search_liaisons key, to_list, current_path + [key]
+					tmp = search_liaisons key, to_list, current_path + [key]
+					results.concat tmp unless tmp.nil? 
 				end
 			end
 		end
@@ -273,6 +292,7 @@ class Region
 				while @@add_paths.length > 0
 					# Remove first item
 					path = @@add_paths.pop
+					next if path.length == 0
 
 					from_r = path[0]
 					to_r   = path[-1]
@@ -487,6 +507,13 @@ class Region
 
 public
 
+
+	#
+	# Read given item from the cache.
+	#
+	# If found, returns array: [ path, path_length ]
+	# If not found, return nil
+	#
 	def get_path_basic from, to
 		if @paths[ from ]
 			@paths[from][to]
@@ -530,8 +557,12 @@ private
 			# If no region present, fill one in
 			# Check neighbor regions, and select that if present	
 			regions = neighbor_regions sq
+
+			# Shuffle up in order to avoid very elognated regions
+			regions = regions.sort_by { rand }
+
 			if regions.length > 0
-				regions.each_key do |region|
+				regions.each do |region|
 					unless sq.region
 						# First region we encounter, we use for current square
 						sq.region = region
@@ -564,13 +595,13 @@ private
 
 
 	def neighbor_regions sq
-		ret = {}
+		ret = [] 
 
 		[ :N, :E, :S, :W ].each do |dir|
-			ret[ sq.neighbor( dir ).region ] = true if sq.neighbor( dir).region
+			ret << sq.neighbor( dir ).region if sq.neighbor( dir).region
 		end
 
-		ret
+		ret.uniq
 	end
 
 
@@ -638,19 +669,6 @@ private
 		liaison
 	end
 
-	#
-	# Make a list of regions for the given points
-	#
-	def get_regions to_list
-		list = []
-
-		to_list.each do |to|
-			list << to.region
-		end
-
-		list.uniq
-	end
-
 
 	#
 	# NOTE: 
@@ -660,39 +678,54 @@ private
 	#	
 	def find_paths from, to_list, do_shortest = false
 		$logger.info { "find_paths searching to #{ from } for #{ to_list.length } ants" }
-
+		return nil if to_list.nil? or to_list.length == 0
 
 		from_r = from.region
-		to_list_r = get_regions to_list
-		$logger.info { "find_paths searching regions #{ to_list_r }" }
+		to_list_r = Region.squares_to_regions to_list
 
-		results = []
-		to_list_r.each do |to_r|
-			if get_non_path from_r, to_r
-				$logger.info { "found cached non-result for #{ from_r }-#{to_r}." }
-				next
+		results = find_paths_cache from_r, to_list_r
+
+
+		# if nothing found, perform a search on all values at the same time
+		if results.length == 0
+			results = search_paths from_r, to_list_r, do_shortest
+		else
+			# remove distance info from results
+			paths = []
+			results.each do | path |
+				paths << path[:path] 
 			end
-
-			path = find_path_regions from_r, to_r, false 
-			results << path unless path.nil?
+			results = paths
 		end
 
+		results
+	end
 
-		# if we found something, we're done
-		if results.length > 0
-			$logger.info {
-				str = "Found cached results:\n"
-				results.each do |result|
-					str << "#{ result }\n"
-				end
 
-				str
-			}
-			return results 
+	def get_non_results from_r, to_list_r
+		non_results = []
+		to_list_r.each do | to_r |
+			if get_non_path from_r, to_r
+				non_results << to_r
+			end
+		end
+		if non_results.length > 0
+			$logger.info { "get_non_results found: #{ from_r }-#{ non_results}." }
 		end
 
-		# Otherwise, perform a search on all values at the same time
-		results = LiaisonSearch.new( @liaison, do_shortest ).search from_r, to_list_r
+		non_results
+	end
+
+
+	#
+	#
+	#
+	def search_paths from_r, to_list_r, do_shortest, max_length = nil
+		$logger.info "Called search_paths"
+
+		to_list_r -= get_non_results from_r, to_list_r
+
+		results = LiaisonSearch.new( @liaison, do_shortest, max_length ).search from_r, to_list_r
 
 		#
 		# Store non-paths
@@ -702,7 +735,7 @@ private
 		# Don't do this for shortest path search with result, because 
 		# we didn't consider all paths in that case
 		#
-		unless do_shortest and results.length > 0
+		unless do_shortest and ( not results.nil? and results.length > 0 )
 			found_to = []
 			if results.nil? 
 				found_to = to_list_r
@@ -808,5 +841,154 @@ private
 			set_non_path from_r, to_r
 			set_non_path to_r, from_r
 		end
+	end
+
+	#
+	# Refactored stuff
+	#
+
+	public
+
+	#
+	# Create a list of squares with the locations
+	# of the given ants.
+	#
+	def self.ants_to_squares ants
+		sq_ants = []
+
+		ants.each do |ant|
+			sq_ants << ant.square
+		end
+
+		sq_ants
+	end
+
+
+	private
+
+	#
+	# Make a list of regions for the given squares
+	#
+	def self.squares_to_regions to_list
+		list = []
+
+		to_list.each do |to|
+			list << to.region
+		end
+
+		list.uniq
+	end
+
+	#
+	# Given a source region and a list of target regions,
+	# find all available paths in the cache.
+	#
+	# Values are returned a array with element: [ path, path_length ]
+	#	
+	# Return: list of paths which connect source region to
+	#         any of destination regions.
+	#
+	def find_paths_cache from_r, to_list_r
+		$logger.info { "find_paths_cache searching regions #{ to_list_r }" }
+
+		# Same region always wins
+		if to_list_r.include? from_r
+			$logger.info { "find_paths_cache same region #{ from_r }" }
+			return [ { :path => [], :dist => 0 } ]
+		end
+
+		to_list_r -= get_non_results from_r, to_list_r
+
+		results = []
+		to_list_r.each do |to_r|
+			path = get_path_basic from_r, to_r
+			results << path unless path.nil?
+		end
+
+		# if we found something, we're done
+		if results.length > 0
+			$logger.info {
+				str = "Found cached results:\n"
+				results.each do |result|
+					str << "#{ result }\n"
+				end
+
+				str
+			}
+		end
+
+		results
+	end
+
+
+	public
+
+
+	#
+	# Make a sorted list of neighbouring ants from given input.
+	# Only the cache is consulted.
+	#
+	def get_neighbors_sorted ant, ants, do_search = false
+		# Remove current ant from list.
+		tmp = ants.clone
+		tmp.delete ant
+		return [] if tmp.length == 0
+
+		$logger.info "Entered get_neighbors_sorted"
+		$logger.info { "Ants : #{ ants }" }
+
+		sq_ants   = Region.ants_to_squares tmp
+		$logger.info { "Ant squares: #{ sq_ants }" }
+
+		from_r = ant.square.region
+		to_list_r = Region.squares_to_regions sq_ants
+
+		paths = find_paths_cache from_r, to_list_r
+		if paths.length == 0 and do_search
+			found = search_paths from_r, to_list_r, false, 5
+	
+			if found and found.length > 0
+				# Add distance information to results
+				# NB: this distance is not used later on
+				found.each do | path |
+					paths << { :path => path, :dist => Pathinfo.path_distance( path ) }
+				end
+			end
+		end
+
+		# Connect ants to the found paths and determine total distance
+		ants_with_distance = []
+		ants.each do |a|
+			region = a.square.region
+			paths.each do |l|
+				if l[:path][-1] == region
+					ants_with_distance << [ a, Pathinfo.new(ant.square, a.square, l[:path]).dist ]
+					break
+				end
+			end
+		end
+
+		$logger.info {
+			str = "neighbor ants found:\n"
+			ants_with_distance.each do |result|
+				str << "#{ result }\n"
+			end
+
+			str
+		}
+
+		# Sort the list
+		ants_with_distance.sort! { |a,b| a[1] <=> b[1] }
+
+		$logger.info {
+			str = "neighbor ants after sort:\n"
+			ants_with_distance.each do |result|
+				str << "#{ result }\n"
+			end
+
+			str
+		}
+
+		ants_with_distance
 	end
 end

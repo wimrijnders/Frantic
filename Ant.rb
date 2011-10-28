@@ -229,23 +229,6 @@ class MyAnt < Ant
 	end
 
 
-	def check_attacked
-		@attack_distance = nil
-		return false unless @enemies[0]
-
-		d = Distance.new self, @enemies[0]
-
-		unless d.nil?
-			if d.in_view? and d.clear_view @square
-				$logger.info { "ant #{ @square.to_s } attacked by #{ @enemies[0] }!" }
-
-				@attack_distance = d
-				return true
-			end
-		end
-
-		false
-	end
 
 	def attacked?
 		!@attack_distance.nil?
@@ -273,24 +256,13 @@ class MyAnt < Ant
 
 
 	#
-	# create a sorted list from the given ant list.
-	#
-	# Sorted ascending by closest distance to current ant
-	#
-	def closest_list list
-		closest = list.sort do |a,b|
-			adist = Distance.new( pos, a.pos)
-			bdist = Distance.new( pos, b.pos)
-
-			adist.dist <=> bdist.dist
-		end
-		closest
-	end
-
+	# Friendly ants
+	# 
 
 	def make_friends
 		if @friends.nil?
-			@friends = closest_list(ai.my_ants)	
+			$logger.info "Sorting friends."
+			@friends = $region.get_neighbors_sorted self, ai.my_ants
 
 			@friends.delete self
 		end
@@ -305,38 +277,38 @@ class MyAnt < Ant
 
 		neighbors = []
 		@friends.each do |a|
-			adist = Distance.new( pos, a.pos)
-			break if adist.dist > dist
+			break if a[1] > dist
 
-			neighbors << a
+			neighbors << a[0]
 		end
 
 		neighbors
 	end
 
-	def closest_friend_dist
+	def closest_friend
 		make_friends
 
-		return nil if @friends[0].nil?
-
-		Distance.new self, @friends[0]
+		@friends[0]
 	end
 
-	def closest_enemy_dist
-		return nil if @enemies[0].nil?
 
-		Distance.new self, @enemies[0]
+	# 
+	# Enemy ants
+	#
+
+	def closest_enemy
+		return nil if  @enemies[0].nil?
+
+		@enemies[0][0]
 	end
-
 
 
 	def neighbor_enemies dist
 		neighbors = []
 		@enemies.each do |a|
-			adist = Distance.new( pos, a.pos)
-			break if adist.dist > dist
+			break if a[1] > dist
 
-			neighbors << a
+			neighbors << a[0]
 		end
 
 		neighbors
@@ -346,15 +318,41 @@ class MyAnt < Ant
 	def enemies_in_view
 		neighbors = []
 		@enemies.each do |a|
-			adist = Distance.new( pos, a.pos)
+			adist = Distance.new( pos, a[0].pos)
 			break unless adist.in_view?
 
-			neighbors << a
+			neighbors << a[0]
 		end
 
 		neighbors
 	end
 
+
+	def add_enemies enemies
+		@enemies = $region.get_neighbors_sorted self, enemies, true 
+	end
+
+
+	def check_attacked
+		@attack_distance = nil
+		return false unless @enemies[0]
+
+		#
+		# Note: we use direct distance here, even if there are paths.
+		#       This is because view distances work with direct distances 
+		d = Distance.new self, @enemies[0][0]
+
+		unless d.nil?
+			if d.in_view? and d.clear_view @square
+				$logger.info { "ant #{ @square.to_s } attacked by #{ @enemies[0][0] }!" }
+
+				@attack_distance = d
+				return true
+			end
+		end
+
+		false
+	end
 
 
 
@@ -412,21 +410,6 @@ class MyAnt < Ant
 	end
 
 
-	def add_enemy e
-		# Only add if within reasonable distance
-		dist = Distance.new self, e
-
-		if dist.dist < 20
-			@enemies << e
-		end
-	end
-
-
-	def sort_enemies
-		@enemies = closest_list @enemies
-	end
-
-
 	def neighbor_attack
 		# Check for direct friendly neighbours 
 		done = false
@@ -459,17 +442,17 @@ class MyAnt < Ant
 		end
 	
 		# Find a close neighbour and move to him
-		d = closest_friend_dist
-		$logger.info { "closest friend: #{ d.to_s }" }
-		unless d.nil?
-			dist = d.dist
+		friend = closest_friend
+		$logger.info { "Closest friend : #{ friend }" }
+		unless friend.nil?
+			dist = friend[1]
 			if dist == 1 
-				$logger.info "next to friend."
+				$logger.info "Next to friend."
 				# already next to other ant
 				stay
 			elsif dist < 20
 				$logger.info "Moving to friend."
-				move_dir d
+				move_to friend[0].square 
 			end
 			return 
 		end
@@ -518,9 +501,9 @@ class MyAnt < Ant
 		if ai.kamikaze?
 			# Pick the nearest enemy and go for it
 			$logger.info "Banzai!"
-			d = closest_enemy_dist
-			unless d.nil?
-				move d.attack_dir 
+			enemy = closest_enemy
+			unless enemy.nil?
+				move_to enemy.square
 				return
 			end
 		end
@@ -534,9 +517,6 @@ class MyAnt < Ant
 			end
 	
 			$logger.info "Conflict!"
-
-			#d = closest_enemy_dist
-			#retreat if !d.nil? and  d.in_peril?
 
 			neighbor_attack
 		else

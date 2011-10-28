@@ -413,7 +413,7 @@ class Collective
 			end
 
 			# Conflict; enemy is in view range
-			enemy = leader.enemies[0]
+			enemy = leader.closest_enemy
 
 			unless enemy
 				# Safefuard; Following problem has occured more than once
@@ -494,8 +494,9 @@ class Collective
 				# We're in place but not attacked.
 				# go pick a fight if possible
 				$logger.info "picking a fight"
-				d = leader.closest_enemy_dist
-				enemy = leader.enemies[0]
+				d = nil 
+				enemy = leader.closest_enemy
+				d = Distance.new( leader, enemy ) unless enemy.nil?
 
 				# If more or less close, go for it
 				if d and d.dist < AntConfig::FIGHT_DISTANCE 

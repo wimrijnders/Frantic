@@ -26,6 +26,8 @@ module Orders
 					0
 				end
 			else
+				# TODO: use regions here instead
+
 				# Nearest food first
 				adist = Distance.new( self.pos, a.square)
 				bdist = Distance.new( self.pos, b.square)
@@ -88,6 +90,8 @@ module Orders
 		@orders.each { |o| o.clear_liaison }
 
 		@orders.insert 0,n
+		evade_reset
+		sort_orders
 
 		true
 	end
@@ -107,7 +111,7 @@ module Orders
 
 		@orders = []
 
-		#evade_reset
+		evade_reset
 	end
 
 	def clear_order order
@@ -121,6 +125,7 @@ module Orders
 			end
 			$logger.info { "Clearing order #{ order } for #{ self.to_s }." }
 			@orders.delete p
+			evade_reset
 		end
 	end
 
@@ -137,7 +142,7 @@ module Orders
 
 
 	#
-	# Delete all orders aimed at specific square
+	# Delete order aimed at specific square
 	#
 	def remove_target_from_order t
 		if orders?
@@ -155,6 +160,7 @@ module Orders
 					ai.food.remove_ant self, [ p.sq_int.row, p.sq_int.col ]
 				end
 				@orders.delete p
+				evade_reset
 			end
 		end
 
@@ -180,6 +186,7 @@ module Orders
 	def clear_first_order del_food = false
 		p = @orders[0]
 		@orders = @orders[1..-1]
+		evade_reset
 
 		if p.order == :FORAGE
 			# Note that we do not use the coord with offset here
@@ -199,6 +206,7 @@ module Orders
 			$logger.info { "Change order #{ order } to square #{ sq.to_s } for #{ self.to_s }" }
 			p.square = sq
 			p.offset = nil	if order == :HARVEST
+			evade_reset
 		else
 			$logger.info { "#{ to_s } has no order #{ order}!" }
 		end
@@ -363,13 +371,21 @@ module Orders
 		orders?
 	end
 
-	def find_orders what
+	def find_orders what, sq = nil
 		list = {}
 
 		count = 0
 		@orders.each do |n|
 			if n.order == what
-				list[ n.square ] = count
+				if sq
+					# Search for specific target only 
+					if n.square == sq
+						list[ n.square ] = count
+						break
+					end
+				else
+					list[ n.square ] = count
+				end
 			end
 
 			count += 1

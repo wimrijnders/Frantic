@@ -119,6 +119,7 @@ class Food
 		end
 	end
 
+
 	def clear_orders
 		@ants.each do |ant|
 			ant.remove_target_from_order ant.ai.map[ row ][ col]
@@ -134,8 +135,12 @@ class Food
 		# Make a list of all the current orders for foraging.
 		# Keep track of the forage order sequence.
 		forages = {}
+		sq_search = nil
 		@ants.each do | ant |
-			list = ant.find_orders :FORAGE	
+			# Note that this is square of food
+			sq_search = ant.ai.map[ row ][ col] if sq_search.nil?
+
+			list = ant.find_orders :FORAGE, sq_search
 
 			list.each_pair do |sq,v|
 				k = sq.row.to_s + "_" + sq.col.to_s
@@ -488,71 +493,11 @@ class AI
 			end
 		end
 
-		# Match the previous enemy ants with the new ones
-		$logger.info { "Match pre: #{ @enemy_ants.length} ants." }
-		count = 0
-		found_some = true
-		while found_some  and @enemy_ants.length > 0
-			count += 1
-			found_some = false
-			@enemy_ants.each do |a|
-				list = []
-				b = a.square.ant
-				list << b if b and b.enemy? and b.alive? and not b.state?
-				b = a.square.neighbor( :N ).ant
-				list << b if b and b.enemy? and b.alive? and not b.state?
-				b = a.square.neighbor( :E ).ant
-				list << b if b and b.enemy? and b.alive? and not b.state?
-				b = a.square.neighbor( :S ).ant
-				list << b if b and b.enemy? and b.alive? and not b.state?
-				b = a.square.neighbor( :W ).ant
-				list << b if b and b.enemy? and b.alive? and not b.state?
-
-				if list.length == 1
-					list[0].transfer_state a
-					@enemy_ants.delete a
-					found_some = true
-				end
-			end
+		my_ants.each do |ant|
+			$region.find_regions ant.square
 		end
 
-		# Anything that's left, we match in their current position.
-		found_some = true
-		while found_some  and @enemy_ants.length > 0
-			count += 1
-			found_some = false
-			@enemy_ants.each do |a|
-				list = []
-				b = a.square.ant
-				list << b if b and b.enemy? and b.alive? and not b.state?
-
-				if list.length == 1
-					$logger.info { "Found the ant." }
-					list[0].transfer_state a
-					@enemy_ants.delete a
-					found_some = true
-				end
-			end
-		end
-
-
-		$logger.info { "Match post: #{ @enemy_ants.length} ants; iterations: #{ count }" }
-		
-		new_enemy_ants.each do |a|
-			a.init_state unless a.state?
-			$logger.info { a.to_s }
-		end
-
-		@enemy_ants = new_enemy_ants
-
-		$logger.info { "Sorting pre" }
-		@my_ants.each do |b|
-			@enemy_ants.each do |a|
-				b.add_enemy a 
-			end
-			b.sort_enemies
-		end
-		$logger.info { "Sorting post" }
+		detect_enemies new_enemy_ants
 
 		return ret
 	end
@@ -621,6 +566,73 @@ class AI
 
 		# also remove from hills list
 		@hills.remove [square.row, square.col]
+	end
+
+	def detect_enemies new_enemy_ants
+		return if @enemy_ants.length == 0 and new_enemy_ants.length == 0
+
+		$logger.info "Entered detect_enemies"
+
+		# Match the previous enemy ants with the new ones
+		$logger.info { "Match pre: #{ @enemy_ants.length} ants." }
+		count = 0
+		found_some = true
+		while found_some  and @enemy_ants.length > 0
+			count += 1
+			found_some = false
+			@enemy_ants.each do |a|
+				list = []
+				b = a.square.ant
+				list << b if b and b.enemy? and b.alive? and not b.state?
+				b = a.square.neighbor( :N ).ant
+				list << b if b and b.enemy? and b.alive? and not b.state?
+				b = a.square.neighbor( :E ).ant
+				list << b if b and b.enemy? and b.alive? and not b.state?
+				b = a.square.neighbor( :S ).ant
+				list << b if b and b.enemy? and b.alive? and not b.state?
+				b = a.square.neighbor( :W ).ant
+				list << b if b and b.enemy? and b.alive? and not b.state?
+
+				if list.length == 1
+					list[0].transfer_state a
+					@enemy_ants.delete a
+					found_some = true
+				end
+			end
+		end
+
+		# Anything that's left, we match in their current position.
+		found_some = true
+		while found_some  and @enemy_ants.length > 0
+			count += 1
+			found_some = false
+			@enemy_ants.each do |a|
+				list = []
+				b = a.square.ant
+				list << b if b and b.enemy? and b.alive? and not b.state?
+
+				if list.length == 1
+					$logger.info { "Found the ant." }
+					list[0].transfer_state a
+					@enemy_ants.delete a
+					found_some = true
+				end
+			end
+		end
+
+
+		$logger.info { "Match post: #{ @enemy_ants.length} ants; iterations: #{ count }" }
+		
+		new_enemy_ants.each do |a|
+			a.init_state unless a.state?
+			$logger.info { a.to_s }
+		end
+
+		@enemy_ants = new_enemy_ants
+
+		$logger.info { "Sorting pre" }
+		@my_ants.each { |b| b.add_enemies @enemy_ants }
+		$logger.info { "Sorting post" }
 	end
 end
 

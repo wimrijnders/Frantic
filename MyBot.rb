@@ -47,18 +47,14 @@ class Strategy < BaseStrategy
 	def turn ai
 		check_attacked ai	
 
-		ai.my_ants.each do |ant|
-			$region.find_regions ant.square
-		end
-
-# Collectives disabled
-#		Collective.complete_collectives ai
-#		Collective.create_collectives ai unless ai.kamikaze? 
+		$logger.info "=== Collective Phase ==="
+		Collective.complete_collectives ai
+		Collective.create_collectives ai unless ai.kamikaze? 
 		ant_conflict ai
 		ant_orders ai
 		find_food ai
 
-		# preliminary test - let all ants attack an anthill
+		# preliminary test - let all available ants attack an anthill
 		$logger.info "=== Hill Phase ==="
 		ai.hills.each_enemy do |owner, l|
 			sq = ai.map[ l[0] ][ l[1] ]
@@ -102,7 +98,7 @@ end
 			ai.harvesters.enlist ant
 		end
 
-		#Collective.move_collectives ai
+		Collective.move_collectives ai
 
 		super ai, false, false #, ( !ai.kamikaze? ) 
 	end
