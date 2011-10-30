@@ -2,8 +2,9 @@ $:.unshift File.dirname($0)
 #######################################
 # TODO
 #
-# - Defend your hill; some players (include me!) are good at targetting
+# - IMPORTANT: Defend your hill; some players (include me!) are good at targetting
 #   these.
+#		- Especially, throw up a defence if enemy close.
 #
 #
 #######################################
@@ -37,6 +38,47 @@ class Strategy < BaseStrategy
 	#
 	def ant_conflict ai
 		$logger.info "=== Conflict Phase ==="
+
+		$logger.info "check if own hills are safe"
+		ai.hills.each_friend do |square| 
+			# Find nearest enemies	
+			near_enemies = BaseStrategy.nearby_ants_region square, ai.enemy_ants, true 
+		
+			attackers = []
+			near_enemies.each do |enemy|
+				d = Distance.new square, enemy 
+
+				next if d.nil? or not d.in_view?
+
+				attackers << enemy
+			end
+
+			if attackers.length > 0
+				$logger.info { "#{ attackers } attacking my hill #{ square}!" }
+
+				# Order all nearby ants to defend
+				defenders = []
+				near_friends = BaseStrategy.nearby_ants_region square, ai.my_ants, true 
+				near_friends.each do |ant|
+					defenders << ant
+					unless ant.has_order  :DEFEND_HILL
+						ant.set_order square, :DEFEND_HILL
+					end
+				end
+
+				# Assign at least one blocker per attacker
+				att_i = 0
+				defenders.each do |d|
+					unless d.has_order :BLOCK
+						d.set_order defenders[ att_i ], :BLOCK
+						att_i = ( att_i + 1 ) % attackers.length()
+					end
+				end
+			end
+		end
+
+
+		$logger.info "Do individual conflict ants"
 		ai.my_ants.each do |ant|
 			next if ant.collective?
 			ant.handle_conflict
@@ -51,7 +93,6 @@ class Strategy < BaseStrategy
 		Collective.complete_collectives ai
 		Collective.create_collectives ai unless ai.kamikaze? 
 		ant_conflict ai
-		ant_orders ai
 		find_food ai
 
 		$logger.info "=== Hill Phase ==="
@@ -59,11 +100,12 @@ class Strategy < BaseStrategy
 		# preliminary test - let all available ants attack an anthill
 		ai.hills.each_enemy do |owner, l|
 			sq = ai.map[ l[0] ][ l[1] ]
+			$logger.info { "Targetting hill #{ sq }" }
 
 			# Make list of ants which are available for attacking the hill
 			available_ants = []
 			ai.my_ants.each do |ant|
-				next if ant.orders?
+				next unless ant.can_raze?
 
 				# Insert some randomness, so that not all ants hit the
 				# first hill in the list
@@ -78,9 +120,8 @@ class Strategy < BaseStrategy
 				ant.set_order sq, :RAZE
 			end unless nearby_ants.nil?
 
-		end if $region and not ai.defensive?
+		end if $region #and not ai.defensive?
 
-if false
 		if ai.kamikaze? and ai.enemy_ants.length > 0
 			$logger.info "=== Kamikaze Phase ==="
 			ai.my_ants.each do |ant|
@@ -93,11 +134,11 @@ if false
 				ant.set_order enemy.square, :ATTACK
 			end
 		end
-end
 
 		$logger.info "=== Harvester Enlist Phase ==="
 		ai.my_ants.each do |ant|
 			next if ant.moved?
+			next if ant.collective?
 
 			#next if Trail.follow_trail ant
 
@@ -106,7 +147,10 @@ end
 			ai.harvesters.enlist ant
 		end
 
+		$logger.info "=== Move Collective Phase ==="
 		Collective.move_collectives ai
+
+		ant_orders ai
 
 		super ai, false, false #, ( !ai.kamikaze? ) 
 	end

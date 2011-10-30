@@ -6,26 +6,28 @@ module Orders
 
 	private
 
+	Order_priority = [
+		:BLOCK,
+		:ASSEMBLE,
+		:DEFEND_HILL,
+		:FORAGE,
+		:RAZE,
+		:HARVEST
+	]
+
 	def sort_orders
-		$logger.info "Sorting orders"
+		$logger.info {
+			str = ""
+			@orders.each do |o|
+				str << "#{o }" + ", "
+			end
+			"Sorting orders pre: " + str
+		}
 
 		# Nearest orders first
 		@orders.sort! do |a,b|
 			# Food goes before rest
-			if a.order != :FORAGE and b.order == :FORAGE
-				1
-			elsif a.order == :FORAGE and b.order != :FORAGE
-				-1	
-			elsif a.order != :FORAGE and b.order != :FORAGE
-				# Raze before harvest
-				if a.order == :RAZE
-					-1
-				elsif b.order == :RAZE
-					1	
-				else
-					0
-				end
-			else
+			if a.order == :FORAGE and b.order == :FORAGE
 				# TODO: use regions here instead
 
 				# Nearest food first
@@ -33,8 +35,24 @@ module Orders
 				bdist = Distance.new( self.pos, b.square)
 
 				adist.dist <=> bdist.dist
+			else
+				index_a = Order_priority.index a.order
+				index_a = Order_priority.length if index_a.nil?
+
+				index_b = Order_priority.index b.order
+				index_b = Order_priority.length if index_b.nil?
+
+				index_a <=> index_b
 			end
 		end
+
+		$logger.info {
+			str = ""
+			@orders.each do |o|
+				str << "#{o.order }" + ", "
+			end
+			"Sorted orders: " + str
+		}
 	end
 
 	public
@@ -60,8 +78,15 @@ module Orders
 		end
 
 		@orders.each do |o|
-			# order already present
-			return false if o == n
+			if o.order == :HARVEST and what == :HARVEST
+				$logger.info "Already harvesting"
+				return false
+			end
+
+			if o == n
+				$logger.info "Order already present"
+				return false
+			end
 		end
 
 		$logger.info { "Setting order #{ what } on square #{ square.to_s } for #{ self.to_s }" }
@@ -130,7 +155,7 @@ module Orders
 	end
 
 	def orders?
-		@orders.size > 0
+		@orders.length > 0
 	end
 
 
@@ -221,6 +246,7 @@ module Orders
 		while orders?
 			order_sq    = @orders[0].square
 			order_order = @orders[0].order
+			#$logger.info "Checking order #{ order_order } on #{ order_sq}"
 
 			if order_order == :ATTACK
 				d = Distance.new self.square, order_sq 
@@ -231,6 +257,24 @@ module Orders
 						$logger.info { "Clearing attack target #{ order_sq.to_s}." }
 						clear_first_order
 						next
+					end
+				end 
+			end
+
+			if order_order == :DEFEND_HILL
+				d = Distance.new self.square, order_sq 
+
+				# Use of in_peril in order to get closer to hill than in_view
+				if d.in_peril?
+					# if on hill itself, move away
+					if self.square == order_sq
+						$logger.info { "Defender moving away from hill #{ order_sq.to_s}." }
+						move self.default
+						return
+					else
+						$logger.info { "Defending hill #{ order_sq.to_s}." }
+						stay
+						return
 					end
 				end 
 			end
@@ -275,21 +319,20 @@ module Orders
 			if order_order == :FORAGE
 				$logger.info "Check if food still there"
 				sq = order_sq
-				if $region
-					closest = BaseStrategy.closest_ant_region @ai.map[ sq.row][ sq.col], @ai
-				else
-					closest = closest_ant [ sq.row, sq.col], @ai
-				end
+
+				closest = closest_ant_view [ sq.row, sq.col], @ai
 				unless closest.nil?
 					d = Distance.new closest, sq
 
-					if d.in_view? and !@ai.map[ sq.row ][sq.col].food?
-						# food is already gone. Skip order
-						clear_first_order true
-						$logger.info "Food still there: no"
-						next
-					else
-						$logger.info "Food still there: yes"
+					if d.in_view? 
+						if !@ai.map[ sq.row ][sq.col].food?
+							# food is already gone. Skip order
+							clear_first_order true
+							$logger.info "Food still there: no"
+							next
+						else
+							$logger.info "Food still there: yes"
+						end
 					end
 				end
 			end
@@ -327,7 +370,11 @@ module Orders
 		end
 
 		if @orders[0].order == :ASSEMBLE
-			$logger.info { "#{ to_s } moving to #{ @orders[0].square.to_s }" }
+			if collective and collective.assemble
+				stay
+			else
+				$logger.info { "#{ to_s } moving to #{ @orders[0].square.to_s }" }
+			end
 		end
 
 		if $region
@@ -376,11 +423,15 @@ module Orders
 
 		count = 0
 		@orders.each do |n|
+			$logger.info { "Testing #{ what }, #{ sq } against #{ n.order },#{ n.square }" }
 			if n.order == what
+				$logger.info { "found #{ what }" }
+
 				if sq
 					# Search for specific target only 
-					if n.square == sq
-						list[ n.square ] = count
+					$logger.info { "Testing #{ sq } against #{ n.square }" }
+					if sq == n.square 
+						list[ sq ] = count
 						break
 					end
 				else
@@ -393,4 +444,23 @@ module Orders
 
 		list
 	end
+
+	def has_order what, sq = nil
+		list = find_orders what, sq
+
+		list.length > 0
+	end
+
+	def first_order what
+		if @orders[0]
+			@orders[0].order == what
+		else
+			false
+		end
+	end
+
+	def can_raze?
+		not orders? or first_order :HARVEST
+	end
+
 end

@@ -246,7 +246,6 @@ class Collective
 	def self.create_collectives ai
 		ai.my_ants.each do |ant|
 			next if ant.collective?
-	
 			next unless ant.attacked? 
 	
 			# Don't even think about assembling if not enough ants around
@@ -297,6 +296,12 @@ class Collective
 # End Top-level strategies
 ###########################
 
+	#
+	# Placeholder for assembly
+	#
+	def assemble
+		false
+	end
 
 	private
 
@@ -439,7 +444,7 @@ class Collective
 				enemies = leader.enemies_in_view
 				if enemies.length() > 1 and leader.ai.defensive? 
 
-					if enemies.length > size() -1	
+					if enemies.length > size() -1 and not leader.has_order :DEFEND_HILL
 						$logger.info "#{ leader.to_s} too many enemies"
 						dir = stay_away enemy, dist
 					else
@@ -663,7 +668,6 @@ class Collective
 	end
 
 
-
 	def random_move
 		$logger.info "Doing random move."
 		moves = [ :N, :E, :S, :W, :N, :E, :S, :W ]
@@ -680,6 +684,7 @@ class Collective
 		# Can not move at all - give up
 		disband
 	end
+
 end
 
 
@@ -813,6 +818,40 @@ class Collective2 < Collective
 		end
 
 		true		
+	end
+
+	
+	def assemble
+		if filled?
+			d = Distance.new @ants[0], @ants[1]
+
+			if d.dist == 1
+				if d.row == 0
+					@orient_dir = :N
+					if d.col == -1
+						@ants[0], @ants[1] = @ants[1], @ants[0]
+					end
+				elsif d.col == 0
+					@orient_dir = :E
+					if d.row == -1
+						@ants[0], @ants[1] = @ants[1], @ants[0]
+					end
+				end
+
+				$logger.info "Collective2 assembled as #{ @ants }, orient #{ @orient_dir}"
+
+				# Ensure that the ants don't drift away
+				if @ants[0].moved? and not @ants[1].moved?
+					@ants[1].stay
+				elsif not @ants[0].moved? and @ants[1].moved?
+					@ants[0].stay
+				end
+
+				true
+			end
+		end	
+
+		false
 	end
 end
 

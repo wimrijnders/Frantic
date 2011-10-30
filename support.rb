@@ -5,36 +5,33 @@ class Logger
 		@@ai = ai
 		@start = Time.now
 
-		@f = nil
-		@f = File.new( "log.txt", "w") if @log
+		@f = {}
+		@f[ "Main" ] = File.new( "log.txt", "w") if @log
 	end
 
 	def info str = nil
-		if @log
-			time = (Time.now - @start)*1000
+		return unless @log
 
-			thread = ""
-			if Thread.current != Thread.main
-				thread = "#{ Thread.current[ :name ] } "
-			end
+		time = (Time.now - @start)*1000
 
-			if str
-				out "#{ time.to_i } - #{ thread }#{ caller_method_name}: #{ str }"
-			end
-			if block_given?
-				out "#{ time.to_i } - #{ thread }#{ caller_method_name }: #{ yield }"
-			end
-		end
-	end
+		thread_disp = ""
+		if Thread.current != Thread.main
+			thread = Thread.current[ :name ]
+			thread_disp = "#{ thread } "
 
-	def out str
-		if @f 
-			@f.write str + "\n"
-			@f.flush
+			if @f[thread].nil?	
+				@f[ thread ] = File.new( thread + "_log.txt", "w")
+			end
+		else 
+			thread = "Main"
 		end
 
-		#@@ai.stdout.puts str 
-		#@@ai.stdout.flush
+		if str
+			out thread, "#{ time.to_i } - #{ thread_disp }#{ caller_method_name}: #{ str }"
+		end
+		if block_given?
+			out thread, "#{ time.to_i } - #{ thread_disp }#{ caller_method_name }: #{ yield }"
+		end
 	end
 
 	def log= val
@@ -42,6 +39,17 @@ class Logger
 	end
 
 	private
+
+	def out thread, str
+		if @log 
+			@f[ thread ].write str + "\n"
+			@f[ thread ].flush
+		end
+
+		#@@ai.stdout.puts str 
+		#@@ai.stdout.flush
+	end
+
 
 	# Source: http://snippets.dzone.com/posts/show/2787
 	def caller_method_name
@@ -186,6 +194,9 @@ class Order
 		@liaison = nil
 	end
 
+	#
+	# NOTE: square actually returns a coord!
+	#
 	def square
 		if @square.respond_to? :square
 			sq = Coord.new @square.square
@@ -201,6 +212,9 @@ class Order
 		sq
 	end
 
+	def to_s
+		"Order #{ order }, #{ @square }, offset #{ @offset }"
+	end
 
 	def square= v
 		@square = v
@@ -242,7 +256,9 @@ class Order
 		return sq unless $region 
 
 		if @liaison
-			if @liaison == cur_sq
+			# First condition is to keep on moving to final target, 
+			# when all liaisons are passed.
+			if @liaison != sq and Distance.new( @liaison, cur_sq).dist <= 2
 				$logger.info { "Order #{ order } reached liaison #{ @liaison }" }
 				@liaison = nil
 			end
@@ -271,9 +287,15 @@ end
 
 
 
-def closest_ant l, ai 
+#
+# Determine closest ant by way of view distance.
+#
+# This is the old style of distance determination and still
+# useful when you are only interested in viewing
+#
+def closest_ant_view l, ai 
 	
-	$logger.info { "closest_ant start" }
+	$logger.info { "start" }
 
 	ants = ai.my_ants 
 
@@ -281,17 +303,8 @@ def closest_ant l, ai
 	cur_dist = nil
 
 	ants.each do |ant|
-
-		unless $region
-			# Use the old distance approach for bots which 
-			# don't have regions implemented
-			d = Distance.new ant, l
-			dist = d.dist
-		else
-			pathinfo = Pathinfo.new ant.square, ai.map[ l[0] ][ l[1] ]
-			next unless pathinfo.path?
-			dist = pathinfo.dist	
-		end
+		d = Distance.new ant, l
+		dist = d.dist
 
 		if !cur_dist || dist < cur_dist
 			cur_dist = dist
@@ -299,9 +312,10 @@ def closest_ant l, ai
 		end
 	end
 
-	$logger.info { "closest_ant end" }
+	$logger.info { "end" }
 	cur_best
 end
+
 
 #
 # Following derived from Harvesters

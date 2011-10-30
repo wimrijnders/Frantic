@@ -1,5 +1,5 @@
-require 'thread'
-$mutex = Mutex.new
+#require 'thread'
+#$mutex = Mutex.new
 
 class Pathinfo
 	@@region = nil
@@ -53,7 +53,7 @@ class Pathinfo
 		end
 
 		path_length = path.length() - 1
-		$logger.info { "Distance path #{ path } through #{ path_length } liasions: #{ total }." }
+		#$logger.info { "Distance path #{ path } through #{ path_length } liasions: #{ total }." }
 		total
 	end
 
@@ -78,7 +78,7 @@ class Pathinfo
 
 		path_length = @path.length() - 1
 		path_length = 0 if path_length < 0
-		$logger.info { "Distance #{ @from.to_s }-#{ @to.to_s } through #{ path_length } liasions: #{ total }." }
+		#$logger.info { "Distance #{ @from.to_s }-#{ @to.to_s } through #{ path_length } liasions: #{ total }." }
 
 		total
 	end
@@ -211,7 +211,7 @@ class LiaisonSearch
 				throw :done, current_path + [to]
 			end
 
-			cur.each_key do |key|
+			cur.keys.each do |key|
 				unless current_path.include? key
 					search_liaison key, to, current_path + [key]
 				end
@@ -243,10 +243,10 @@ class LiaisonSearch
 	
 
 		$logger.info { "search_liaisons searching #{ from }-#{ to_list }: #{ current_path }" }
-		cur = @liaison[from]
 		results = []
 		found_to = []
 
+		cur = @liaison[from]
 		if cur
 			to_list.each do |to|
 
@@ -279,7 +279,7 @@ class LiaisonSearch
 
 			to_list -= found_to
 
-			cur.each_key do |key|
+			cur.keys.each do |key|
 				unless current_path.include? key
 					tmp = search_liaisons key, to_list, current_path + [key]
 					results.concat tmp unless tmp.nil? 
@@ -322,12 +322,10 @@ class Region
 					path = @@add_paths.pop
 					next if path.length == 0
 
-					from_r = path[0]
-					to_r   = path[-1]
-					$logger.info { "saving path #{ from_r } to #{ to_r }: #{ path }" }
+					$logger.info { "saving path: #{ path }" }
 					# Cache the result
-					set_path from_r, to_r, path
-					set_path to_r, from_r, path.reverse
+					set_path path
+					set_path path.reverse
 
 					count += 1
 				end
@@ -473,16 +471,16 @@ class Region
 		# Don't overwrite existing liaison
 		unless get_liaison from, to
 
-			$mutex.synchronize do
+			#$mutex.synchronize do
 				unless @liaison[ from ]
 					@liaison[from] = { to => square }
 				else
 					@liaison[from][ to ] = square
 				end
-			end
+			#end
 			$logger.info { "#{ square } liaison for #{ from }-#{ to }." }
 
-			set_path from, to, [ from, to]
+			set_path [ from, to ]
 
 			# New liaisons added; need to retest for new possible paths
 			clear_non_paths
@@ -540,10 +538,11 @@ class Region
 	end
 
 
-	def set_path from_old, to_old, path
-		# We assume here that these are new paths
-		# Try to add the sub paths as well
+	def set_path path
+		new_count = 0
+		known_count = 0
 
+		# Try to add the sub paths as well
 		0.upto( path.length-2) do |i|
 			# Doing longest path first
 			( path.length-1).downto(i+1) do |j|
@@ -555,7 +554,7 @@ class Region
 
 				if prev_item.nil?
 					set_path_basic from, to, new_path 
-					$logger.info { "Added new path #{ from }-#{ to }: #{ new_path }" }
+					new_count += 1
 					changed = true
 				else
 					prev_path = prev_item[ :path ]
@@ -577,11 +576,13 @@ class Region
 				if not changed
 					# This path was known; so all sub-paths are also known.
 					# No need to check these
-					$logger.info "Known path #{ new_path }; skipping sub-paths"
+					known_count += 1
 					break
 				end
 			end
 		end
+
+		$logger.info { "path #{ path }: added #{ new_count }, known #{ known_count}" }
 	end
 
 public
@@ -736,11 +737,12 @@ private
 		liaison = get_liaison path[0], path[1]
 		$logger.info { "path_direction liaison #{ liaison }, from #{ from }" }
 
-		if liaison and liaison.row == from.row and liaison.col == from.col
-			$logger.info { "path_direction #{ from } already at liaison. skipping."} 
+		#if liaison and liaison.row == from.row and liaison.col == from.col
+		if liaison and Distance.new( liaison, from ).dist <= 2
+			$logger.info { "path_direction #{ from } close enough to  liaison. skipping."} 
 
 			path = path[1,-1]
-			return nil if path.nil?
+			return false if path.nil?
 			return false if path.length < 2
 			liaison = get_liaison path[0], path[1]
 		end
@@ -1022,8 +1024,8 @@ private
 		end
 		return [] if ants.length == 0
 
-		$logger.info { "entered, from: #{ ant }" }
-		$logger.info { "Ants : #{ ants }" }
+		$logger.info { "from: #{ ant } to #{ ants.length } ants." }
+		#$logger.info { "Ants : #{ ants }" }
 
 		sq_ants   = Region.ants_to_squares ants
 		#$logger.info { "Ant squares: #{ sq_ants }" }

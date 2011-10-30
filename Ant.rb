@@ -456,9 +456,14 @@ class MyAnt < Ant
 			end
 			return 
 		end
-	
-		# Otherwise, just run away
-		retreat
+
+		# when defending a hill, stay put	
+		if find_order :DEFEND_HILL
+			stay
+		else
+			# Otherwise, just run away
+			retreat
+		end
 		return 
 	end
 
@@ -469,6 +474,7 @@ class MyAnt < Ant
 		# Find an attacked neighbour and move in to help
 		ai.my_ants.each do |l|
 			next unless l.attacked?
+			next if l.collective?	# Collectives can fend for themselves
 	
 			d = Distance.new self, l.pos	
 	

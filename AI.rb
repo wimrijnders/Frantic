@@ -29,6 +29,7 @@ class Hills
 		key = coord[0].to_s + "_" + coord[1].to_s
 
 		if @list[key].nil?
+			$logger.info { "Adding hill at #{ key }." }
 			@list[key] = owner
 			true
 		else
@@ -70,11 +71,27 @@ class Hills
 			next if owner == 0
 			next if owner == -1 
 
+			$logger.info { "hill owner #{ owner }" }
 			coord = key.split "_"
 			coord[0] = coord[0].to_i
 			coord[1] = coord[1].to_i
 
 			yield owner, coord
+		end
+	end
+
+
+	def each_friend
+		@list.each_pair do |key, owner|
+			# Skip enemies and dead hills
+			next if owner == -1 
+			next if owner != 0
+
+			coord = key.split "_"
+			coord[0] = coord[0].to_i
+			coord[1] = coord[1].to_i
+
+			yield Square.coord_to_square coord
 		end
 	end
 end
@@ -103,6 +120,7 @@ class Food
 	def add_ant ant
 		unless @ants.include? ant
 			@ants << ant
+			$logger.info { "Added ant #{ ant } to food." }
 		else
 			$logger.info { "Ant #{ ant } already present in food." }
 		end
@@ -139,6 +157,8 @@ class Food
 		@ants.each do | ant |
 			# Note that this is square of food
 			sq_search = ant.ai.map[ row ][ col] if sq_search.nil?
+
+			$logger.info "Testing #{ ant }"
 
 			list = ant.find_orders :FORAGE, sq_search
 
