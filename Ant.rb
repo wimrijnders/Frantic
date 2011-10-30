@@ -396,11 +396,12 @@ class MyAnt < Ant
 	end
 
 	def make_collective size = nil
-		if !size.nil? and size >= 2
-			@collective = Collective3.new 
-		else
+		# Creation Collective3's blocked for the time being
+		#if !size.nil? and size >= 2
+		#	@collective = Collective3.new 
+		#else
 			@collective = Collective2.new 
-		end
+		#end
 		@collective.add self
 		clear_orders
 	end
@@ -533,7 +534,7 @@ class MyAnt < Ant
 	end
 
 	def harvesting?
-		!find_order( :HARVEST).nil?
+		has_order :HARVEST
 	end
 end
 

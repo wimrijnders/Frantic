@@ -69,9 +69,17 @@ class Strategy < BaseStrategy
 				# Assign at least one blocker per attacker
 				att_i = 0
 				defenders.each do |d|
-					unless d.has_order :BLOCK
-						d.set_order defenders[ att_i ], :BLOCK
+					unless d.has_order :ATTACK
+						d.set_order attackers[ att_i ], :ATTACK
 						att_i = ( att_i + 1 ) % attackers.length()
+					end
+				end
+			else
+				near_friends = BaseStrategy.nearby_ants_region square, ai.my_ants, true 
+				if near_friends.length > 0
+					$logger.info "Disbanding defenders"
+					near_friends.each do |ant|
+						ant.remove_target_from_order square
 					end
 				end
 			end
@@ -129,9 +137,10 @@ class Strategy < BaseStrategy
 				next if ant.moved?
 
 				# if not doing anything else, move towards a random enemy
-				enemy = ai.enemy_ants[ rand (ai.enemy_ants.length ) ]
-
-				ant.set_order enemy.square, :ATTACK
+				if ant.enemies and ant.enemies.length > 0
+					enemy = ant.enemies[ Random.rand( ant.enemies.length ) ][0]
+					ant.set_order enemy.square, :ATTACK
+				end
 			end
 		end
 

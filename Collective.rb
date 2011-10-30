@@ -429,7 +429,12 @@ class Collective
 			dir = nil
 			if !assembled?
 				$logger.info "#{ leader.to_s } not assembled"
-				dir = stay_away enemy, dist
+				if not leader.has_order :DEFEND_HILL
+					dir = stay_away enemy, dist
+				else
+					# Advance up to peril distance
+					hold_ground dist if dist.in_peril?
+				end
 			else
 				dir = dist.attack_dir
 				$logger.info "Attack dir #{ leader.to_s }: #{ dir }"

@@ -7,7 +7,7 @@ module Orders
 	private
 
 	Order_priority = [
-		:BLOCK,
+		:ATTACK,
 		:ASSEMBLE,
 		:DEFEND_HILL,
 		:FORAGE,
@@ -170,8 +170,9 @@ module Orders
 	# Delete order aimed at specific square
 	#
 	def remove_target_from_order t
+		p = nil
+
 		if orders?
-			p = nil
 			@orders.each do |o|
 				if o.target? t
 					p = o 
@@ -184,6 +185,8 @@ module Orders
 				if p.order == :FORAGE
 					ai.food.remove_ant self, [ p.sq_int.row, p.sq_int.col ]
 				end
+
+				$logger.info { "Removing order #{ p.order } from #{ self.to_s }" }
 				@orders.delete p
 				evade_reset
 			end
@@ -423,7 +426,7 @@ module Orders
 
 		count = 0
 		@orders.each do |n|
-			$logger.info { "Testing #{ what }, #{ sq } against #{ n.order },#{ n.square }" }
+			#$logger.info { "Testing #{ what }, #{ sq } against #{ n.order },#{ n.square }" }
 			if n.order == what
 				$logger.info { "found #{ what }" }
 
@@ -460,7 +463,7 @@ module Orders
 	end
 
 	def can_raze?
-		not orders? or first_order :HARVEST
+		not orders? or ( first_order :HARVEST and not has_order :DEFEND_HILL )
 	end
 
 end

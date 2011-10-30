@@ -148,10 +148,12 @@ class BaseStrategy
 
 		$logger.info "=== Default Move Phase ==="
 		ai.my_ants.each do |ant|
+			$logger.info "doing default move #{ ant }"	
+			$logger.info { "#{ ant.moved? },#{ ant.collective? }, #{ ant.harvesting? }" }
 			next if ant.moved?
 			next if ant.collective?
 			next if ant.harvesting?
-	
+
 			default_move ant
 		end
 	
