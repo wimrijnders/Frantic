@@ -521,7 +521,7 @@ class AI
 
 		my_ants.each do |ant|
 			$region.find_regions ant.square
-		end
+		end unless $region.nil?
 
 		detect_enemies new_enemy_ants
 

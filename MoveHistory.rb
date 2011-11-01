@@ -93,8 +93,8 @@ class MoveHistory
 
 
 	def advancing? pos
-		# special case for straigh-liners; sometimes one can be seen
-		# as advincing when directly in front of leader
+		# special case for straight-liners; sometimes one can be seen
+		# as advancing when directly in front of leader
 		if straight_line?
 			if first and @list[-2]
 				dist1 = Distance.new pos, first.pos
@@ -179,6 +179,23 @@ class MoveHistory
 
 	def dir 
 		@list[-1].dir
+	end
+
+
+	def guess_dir
+		if straight_line?
+			dir
+		elsif twitch?
+			reverse dir
+		elsif stay?
+			:STAY
+		elsif dir.nil?
+			# Assume ant stays still and hope, really hope for the best
+			:STAY 
+		else
+			# Assume ant continues previous movement and hope for the best
+			dir	
+		end
 	end
 end
 

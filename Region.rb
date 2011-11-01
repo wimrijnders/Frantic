@@ -316,6 +316,7 @@ class Region
 				sleep 0.2 while @@add_paths.length == 0
 
 				count = 0
+				new_count, known_count, replaced_count = 0, 0, 0 
 				start = Time.now
 				while @@add_paths.length > 0
 					# Remove first item
@@ -324,8 +325,15 @@ class Region
 
 					$logger.info { "saving path: #{ path }" }
 					# Cache the result
-					set_path path
-					set_path path.reverse
+					new_tmp, known_tmp, replaced_tmp = set_path path
+					new_count      += new_tmp
+					known_count    += known_tmp
+					replaced_count += replaced_tmp
+
+					new_tmp, known_tmp, replaced_tmp = set_path path.reverse
+					new_count      += new_tmp
+					known_count    += known_tmp
+					replaced_count += replaced_tmp
 
 					count += 1
 				end
@@ -338,9 +346,10 @@ class Region
 						longest_count = count
 
 					end
+					stats = "new: #{new_count}, known: #{ known_count }, replaced: #{ replaced_count }"
 					str = " Longest: #{ longest_count } in #{ longest_diff } msec"
 
-					"added #{ count } results in #{ diff} msec. #{ str }" 
+					"added #{ count } results in #{ diff} msec. #{ stats }. #{ str }" 
 				}
 
 			end
@@ -541,6 +550,7 @@ class Region
 	def set_path path
 		new_count = 0
 		known_count = 0
+		replaced_count = 0
 
 		# Try to add the sub paths as well
 		0.upto( path.length-2) do |i|
@@ -569,6 +579,7 @@ class Region
 							$logger.info { "Found shorter path for #{ from }-#{ to }: #{ new_path }; prev_dist: #{ prev_dist }, new_dist: #{ new_dist }" }
 							set_path_basic from, to, new_path, new_dist 
 							changed = true
+							replaced_count += 1
 						end
 					end
 				end
@@ -582,7 +593,8 @@ class Region
 			end
 		end
 
-		$logger.info { "path #{ path }: added #{ new_count }, known #{ known_count}" }
+		#$logger.info { "path #{ path }: added #{ new_count }, known #{ known_count}" }
+		[ new_count, known_count, replaced_count ]
 	end
 
 public

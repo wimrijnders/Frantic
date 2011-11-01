@@ -5,6 +5,9 @@ $:.unshift File.dirname($0)
 # - IMPORTANT: Defend your hill; some players (include me!) are good at targetting
 #   these.
 #		- Especially, throw up a defence if enemy close.
+# - 2-collectives can twitch when leader on diagonal to enemy ( eg. orient N/S and distance(-n,n) ).
+# - Make defensive collectives less scared; if they can surely winning, attack or at the least hold ground
+# - Improve attack resolution; handle multiple attackers.
 #
 #
 #######################################
@@ -32,6 +35,20 @@ class Strategy < BaseStrategy
 		ant.move ant.default 
 	end
 
+	def enough_collectives ai
+		num_collectives = 0
+		ai.my_ants.each do |ant|
+			num_collectives += 1 if ant.collective_leader?
+		end
+		num_ants = ai.my_ants.length
+
+		if 2*num_collectives >=  num_ants/2
+			$logger.info { "Enough collectives: #{ num_collectives } collectives for #{ num_ants }" }
+			true
+		else
+			false
+		end
+	end
 
 	#
 	# Handle non-collective ants which are in a conflict situation
@@ -99,9 +116,14 @@ class Strategy < BaseStrategy
 
 		$logger.info "=== Collective Phase ==="
 		Collective.complete_collectives ai
-		Collective.create_collectives ai unless ai.kamikaze? 
-		ant_conflict ai
+		if not ai.kamikaze? 
+			unless enough_collectives ai
+				Collective.create_collectives ai unless ai.kamikaze? 
+			else
+			end
+		end
 		find_food ai
+		ant_conflict ai
 
 		$logger.info "=== Hill Phase ==="
 
@@ -216,5 +238,3 @@ $ai.run do |ai|
 		end
 	end
 end
-
-

@@ -269,6 +269,7 @@ class Distance
 	end
 
 
+
 	#
 	# Check if we are close to being attacked.
 	#

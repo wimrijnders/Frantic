@@ -82,7 +82,17 @@ class EnemyAnt < Ant
 	def dir
 		@state.dir
 	end 
-	
+
+
+	def guess_next_pos
+		dir = @state.guess_dir
+
+		if dir == :STAY
+			square
+		else
+			square.neighbor dir
+		end
+	end	
 end
 
 
