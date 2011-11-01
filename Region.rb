@@ -354,7 +354,7 @@ class Region
 
 			end
 
-			$logger.info "Thread1 closing down."
+			$logger.info "closing down."
 		end
 
 		Thread.new do
@@ -643,8 +643,12 @@ private
 	#
 	def set_region square, x, y
 		sq = square.rel [ x, y ]
-		if !sq.region
-			return if sq.water?
+		if sq.region.nil?
+			if sq.water?
+				# Set water so that we know it has been scanned
+				sq.region = false
+				return
+			end
 
 			# If no region present, fill one in
 			# Check neighbor regions, and select that if present	

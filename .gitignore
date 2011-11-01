@@ -1,7 +1,7 @@
-tools
-tools2
-tools3
+tools*
+frantic*
 profile*.txt
+*log.txt
 tags
 zFrantic.zip
 download

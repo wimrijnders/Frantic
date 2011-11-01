@@ -22,8 +22,8 @@ $:.unshift File.dirname($0)
 #
 #######################################
 
-ENABLE_PROFILING = false
-NUM_TURNS 		 = 265
+ENABLE_PROFILING = true
+NUM_TURNS 		 = 150
 
 require 'AI.rb'
 require 'BaseStrategy'
@@ -124,6 +124,15 @@ class Strategy < BaseStrategy
 
 
 	def turn ai
+		# Determine ant furthest away from first own active hill,
+		# for the pattern matcher
+		ai.hills.each_friend do |sq|
+			furthest = BaseStrategy.nearby_ants_region( sq, ai.my_ants).reverse[0]
+
+			$patterns.add_square furthest.square if furthest
+			break
+		end
+
 		check_attacked ai	
 
 		$logger.info "=== Collective Phase ==="
@@ -258,7 +267,7 @@ $ai.run do |ai|
 			#printer = RubyProf::FlatPrinter.new(result)
 			printer = RubyProf::GraphPrinter.new(result)
 			#printer.print(STDOUT)
-			printer.print( File.new("profile4.txt","w"))
+			printer.print( File.new("profile2.txt","w"))
 		
 			$logger.info { "Profiling done." }
 		end

@@ -12,6 +12,7 @@ require 'MoveHistory.rb'
 require 'Collective.rb'
 require 'Harvesters.rb'
 require 'Region.rb'
+require 'Patterns.rb'
 require 'Ant.rb'
 
 class Hills
@@ -762,3 +763,4 @@ $logger = Logger.new $ai
 $timer = Timer.new
 Distance.set_ai $ai
 Coord.set_ai $ai
+$patterns = Patterns.new $ai
