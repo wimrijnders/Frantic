@@ -8,7 +8,17 @@ $:.unshift File.dirname($0)
 # - 2-collectives can twitch when leader on diagonal to enemy ( eg. orient N/S and distance(-n,n) ).
 # - Make defensive collectives less scared; if they can surely winning, attack or at the least hold ground
 # - Improve attack resolution; handle multiple attackers.
+# - Don't turn all ants into collectives, if there is no direct threat (but enemies nearby), go forage and harvest.
+# - Don't forage too early in the game (like the first turn).
+# - NB: improve detection of enemy moves - especially snakes like with GoSouth
 #
+# Detect symmetry in map!
+#
+#
+# Games to beat:
+# Both with 3xGoSouth
+# 		open 
+# 		h 4 1
 #
 #######################################
 
@@ -77,6 +87,8 @@ class Strategy < BaseStrategy
 				defenders = []
 				near_friends = BaseStrategy.nearby_ants_region square, ai.my_ants, true 
 				near_friends.each do |ant|
+					next if Distance.new( ant, square).dist > 15
+
 					defenders << ant
 					unless ant.has_order  :DEFEND_HILL
 						ant.set_order square, :DEFEND_HILL
@@ -132,6 +144,14 @@ class Strategy < BaseStrategy
 			sq = ai.map[ l[0] ][ l[1] ]
 			$logger.info { "Targetting hill #{ sq }" }
 
+			# Determine if there are defenders
+			if ai.defensive?
+				defenders = BaseStrategy.nearby_ants_region sq, ai.enemy_ants
+				$logger.info "Defensive mode and #{ defenders.length } defenders for hill #{ sq}. Not razing."
+				next
+			end
+
+
 			# Make list of ants which are available for attacking the hill
 			available_ants = []
 			ai.my_ants.each do |ant|
@@ -150,7 +170,7 @@ class Strategy < BaseStrategy
 				ant.set_order sq, :RAZE
 			end unless nearby_ants.nil?
 
-		end if $region #and not ai.defensive?
+		end if $region
 
 		if ai.kamikaze? and ai.enemy_ants.length > 0
 			$logger.info "=== Kamikaze Phase ==="
@@ -167,15 +187,21 @@ class Strategy < BaseStrategy
 		end
 
 		$logger.info "=== Harvester Enlist Phase ==="
-		ai.my_ants.each do |ant|
-			next if ant.moved?
-			next if ant.collective?
+		# Don't harvest if	not enough ants
+		if ai.my_ants.length > 10
+			ai.my_ants.each do |ant|
+				next if ant.orders?
+				next if ant.moved?
+				next if ant.collective?
+				#next if Trail.follow_trail ant
 
-			#next if Trail.follow_trail ant
+				# Don't harvest if other ants around
+				next if ant.neighbor_friends( 10).length > 0
+				next if ant.neighbor_enemies( 10).length > 0
 
-			# If nothing else to do, turn into a harvester
-			next if ant.orders?
-			ai.harvesters.enlist ant
+				# If nothing else to do, turn into a harvester
+				ai.harvesters.enlist ant
+			end
 		end
 
 		$logger.info "=== Move Collective Phase ==="

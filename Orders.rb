@@ -7,10 +7,10 @@ module Orders
 	private
 
 	Order_priority = [
+		:FORAGE,
 		:ATTACK,
 		:ASSEMBLE,
 		:DEFEND_HILL,
-		:FORAGE,
 		:RAZE,
 		:HARVEST
 	]
@@ -460,6 +460,10 @@ module Orders
 		else
 			false
 		end
+	end
+
+	def get_first_order
+		@orders[0]
 	end
 
 	def can_raze?

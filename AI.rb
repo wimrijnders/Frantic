@@ -99,10 +99,13 @@ end
 class Food
 	attr_accessor :coord, :active
 
+	COUNTER_LIMIT = 20
+
 	def initialize coord
 		@coord = coord
 		@active = true
 		@ants = []
+		@counter = 0
 	end
 
 	def == coord
@@ -149,6 +152,14 @@ class Food
 	def should_forage?
 		# Only forage active food
 		return false unless active
+
+		if @counter > COUNTER_LIMIT	
+			$logger.info "Finding food taking too long. Forcing search."
+			@counter = 0
+			return true
+		else
+			@counter += 1
+		end
 
 		# Make a list of all the current orders for foraging.
 		# Keep track of the forage order sequence.
@@ -491,11 +502,10 @@ class AI
 					end
 				else
 					$logger.info { "Enemy ant died at #{ sq }, owner #{ owner }." }
+					sq.ant = EnemyAnt.new owner, sq, self, false
+					new_enemy_ants.push sq.ant 
 				end
 
-				# No need to remember dead ants; they don't obstruct
-				#d=Ant.new false, owner, sq, self
-				#sq.ant = d
 			when 'r'
 				# pass
 			else
@@ -599,6 +609,58 @@ class AI
 
 		$logger.info "Entered detect_enemies"
 
+		# First, check new enemies wrt. previous ones
+		$logger.info { "Pre new ants: #{ @enemy_ants.length} ants." }
+		count = 0
+		found_some = true
+		while found_some  and @enemy_ants.length > 0
+			count += 1
+			found_some = false
+
+			new_enemy_ants.each do |b|
+				next if b.state?
+
+				list = []
+				@enemy_ants.each do |a|
+					d = Distance.new b,a
+					if d.dist == 1
+						list << a
+					end
+				end
+
+				if list.length == 1
+					a = list[0]
+
+					$logger.info "Found only one option for new ant"
+					if b.dead?
+						$logger.info { "Dead #{ b } detected" }
+						# Use state for signalled this ant has been found
+						b.state = true
+					else
+						$logger.info { "Alive #{ b } detected" }
+						b.transfer_state a
+					end
+
+					@enemy_ants.delete a
+					found_some = true
+				end
+			end
+		end
+		$logger.info { "post new ants: #{ @enemy_ants.length} ants; iterations: #{ count }" }
+		
+		# reset states for dead ants
+		new_enemy_ants.each do |b|
+			b.state = nil if b.dead? and b.state?
+		end
+
+
+		# Need to define list here for the lambda
+		list = []
+		lam = lambda do |a,dir|
+			b = a.square.neighbor( dir ).ant
+			list << b if b and b.enemy? and not b.state?
+		end
+
 		# Match the previous enemy ants with the new ones
 		$logger.info { "Match pre: #{ @enemy_ants.length} ants." }
 		count = 0
@@ -606,21 +668,41 @@ class AI
 		while found_some  and @enemy_ants.length > 0
 			count += 1
 			found_some = false
-			@enemy_ants.each do |a|
+
+			# Handle ants with longest history list first
+			antlist= @enemy_ants.sort do |a,b|
+				# All current ants have state. No need to test
+				b.state.length <=> a.state.length
+			end
+
+			$logger.info { "sorted antlist: #{ antlist }" }
+
+			antlist.each do |a|
 				list = []
-				b = a.square.ant
-				list << b if b and b.enemy? and b.alive? and not b.state?
-				b = a.square.neighbor( :N ).ant
-				list << b if b and b.enemy? and b.alive? and not b.state?
-				b = a.square.neighbor( :E ).ant
-				list << b if b and b.enemy? and b.alive? and not b.state?
-				b = a.square.neighbor( :S ).ant
-				list << b if b and b.enemy? and b.alive? and not b.state?
-				b = a.square.neighbor( :W ).ant
-				list << b if b and b.enemy? and b.alive? and not b.state?
+				[ :STAY, :N, :E, :S, :W].each do |dir|
+					lam.call a, dir
+				end
+
+				# Try by detected movement
+				if list.length != 1
+					if a.state.can_guess_dir?
+						list = []
+						$logger.info { "Can guess dir of #{ a }" }
+						lam.call a, a.state.guess_dir
+					end
+				end
+
 
 				if list.length == 1
-					list[0].transfer_state a
+					# Only add if there is one possibility
+					b = list[0]
+					if b.dead?
+						$logger.info { "Dead #{ b } detected" }
+					else
+						$logger.info { "Alive #{ b } detected" }
+						b.transfer_state a
+					end
+
 					@enemy_ants.delete a
 					found_some = true
 				end
@@ -648,7 +730,16 @@ class AI
 
 
 		$logger.info { "Match post: #{ @enemy_ants.length} ants; iterations: #{ count }" }
-		
+	
+		# Clean up dead ants
+		new_enemy_ants.clone.each do |a|
+			if a.dead?
+				a.square.ant = nil
+				new_enemy_ants.delete a
+				$logger.info { "Cleaned up dead #{ a.to_s }" }
+			end
+		end
+	
 		new_enemy_ants.each do |a|
 			a.init_state unless a.state?
 			$logger.info { a.to_s }
@@ -656,9 +747,7 @@ class AI
 
 		@enemy_ants = new_enemy_ants
 
-		$logger.info { "Sorting pre" }
 		@my_ants.each { |b| b.add_enemies @enemy_ants }
-		$logger.info { "Sorting post" }
 	end
 end
 

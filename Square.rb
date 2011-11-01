@@ -94,6 +94,8 @@ class Square
 			row, col = @@ai.normalize @row+1, @col
 		when :W
 			row, col = @@ai.normalize @row, @col-1
+		when :STAY
+			row, col = @row, @col
 		else
 			raise 'incorrect direction'
 		end

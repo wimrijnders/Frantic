@@ -85,6 +85,9 @@ class MoveHistory
 		@list << new
 	end
 
+	def length
+		@list.length 
+	end
 
 	def clear
 		$logger.info "Clearing attack list."
@@ -181,6 +184,10 @@ class MoveHistory
 		@list[-1].dir
 	end
 
+
+	def can_guess_dir?
+		straight_line? or twitch?  or stay?
+	end
 
 	def guess_dir
 		if straight_line?

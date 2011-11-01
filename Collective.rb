@@ -245,6 +245,7 @@ class Collective
 		ai.my_ants.each do |ant|
 			next if ant.collective?
 			next unless ant.attacked? 
+			next if ant.has_order :RAZE 
 	
 			# Don't even think about assembling if not enough ants around
 			next if ant.ai.my_ants.length < AntConfig::ASSEMBLE_LIMIT
@@ -303,11 +304,143 @@ class Collective
 		false
 	end
 
+
 	#
-	# Placeholder
+	# Determine best move in conflict between single collective2 and multiple enemies
+	#
+	# No other neighboring friends are taken into account.
+	#
+	# Pre: Collective must be assembled.
 	#
 	def analyze_attack()
-		return false
+		enemies = []
+		guess = []
+		leader.enemies_in_view.each do |e|
+			adist = Distance.new( leader.pos, e.pos)
+			break unless adist.in_peril?
+
+			enemies << e 
+
+			guess << e.guess_next_pos
+		end
+		return false if guess.length == 0
+
+		$logger.info { "Enemies in peril distance: #{ enemies }" }
+		$logger.info { "Enemies guess next pos: #{ guess }" }
+
+		# Generate all possible movements of current collective
+		moves = {} 
+
+		lam = lambda do |dir| 
+			# Test movement of collective
+			if can_pass? dir
+				moves[ dir ] = @ants.collect { |a| a.square.neighbor dir }
+			end
+		end
+
+		# Note that we don't bother with orientation so close to conflict	
+		moves[ :STAY ] = @ants.collect { |a| a.square }
+		lam.call :N
+		lam.call :E
+		lam.call :S
+		lam.call :W
+
+		$logger.info { "possible moves: #{ moves }" }
+		return false if moves.length == 0
+
+		# calculate the body count for all possible moves
+		# Select the best result
+		best_dir = nil
+		best_dead = nil
+		count = 0
+		moves.each_pair do |dir, move|
+			$logger.info "Analyzing direction #{ dir }"
+			dead = analyze_hits guess, move
+
+			if  best_dir.nil? or
+				( dead[0] == 0 and dead[1] > best_dead[1] ) or
+				( dead[0] == 0 and best_dead[0] > 0 ) or
+				( dead[0] < best_dead[0] )
+
+				best_dir = dir
+				best_dead = dead
+				count = 1
+			else 
+				if dead[0] == best_dead[0] and dead[1] == best_dead[1] 
+					count += 1
+				end
+			end
+		end
+
+		$logger.info { 
+			if best_dir.nil?
+				"No best move!"
+			elsif count == moves.length
+				"All moves are valid"
+			else
+				"Best move: #{ best_dir }; friends dead: #{ best_dead[0] }, enemies dead: #{ best_dead[1] }"
+			end
+		}
+
+		# In the case of all moves valid or no moves at all, let the old logic handle it.
+		return false if best_dir.nil? or count == moves.length
+		best_dir
+	end
+
+
+	def analyze_hits guess, move
+		# Now, analyze the hits between the ants
+		# Note that no distinction is made between various enemies
+		enemy_hits = {}
+		friend_hits = {}
+		guess.each_index do |e|
+			move.each_index do |f|
+				dist = Distance.new( guess[e], move[f])
+				#$logger.info "dist: #{ dist }, #{ dist.dist}"
+				if dist.in_attack_range?
+					#$logger.info "In attack range"
+					if enemy_hits[e].nil?
+						enemy_hits[e] = [f]
+					else
+						enemy_hits[e] << f
+					end
+					if friend_hits[f].nil?
+						friend_hits[f] = [e]
+					else
+						friend_hits[f] << e
+					end
+				end
+			end
+		end
+
+		return [0,0] if enemy_hits.length == 0
+		
+		$logger.info { "enemy hit results: #{ enemy_hits }" }
+		$logger.info { "friend hit results: #{ friend_hits }" }
+
+		# Analyze
+		enemy_dead = 0
+		friend_dead = 0
+		enemy_hits.each_pair do |k,list|
+			list.each do |v|
+				if list.length >= friend_hits[v].length
+					enemy_dead += 1
+					break
+				end
+			end 
+		end
+
+		friend_hits.each_pair do |k,list|
+			list.each do |v|
+				if list.length >= enemy_hits[v].length
+					friend_dead += 1 
+					break
+				end
+			end 
+		end
+		$logger.info { "Conflict result : friends dead: #{ friend_dead }, enemies dead: #{ enemy_dead }" }
+
+		[ friend_dead, enemy_dead]
 	end
 
 	private
@@ -407,10 +540,6 @@ class Collective
 	def move2
 		dist = attack_distance
 
-		#
-		# NOTE: Following distance stategy does not take switching of opponents
-		#       into account. TODO: Fix this if strategy proves viable.
-		#
 		$logger.info "#{ leader.to_s } dist: #{ dist.to_s }"
 		if dist and dist.in_view?
 			# It is possible to approach an anthill completely and 
@@ -433,6 +562,14 @@ class Collective
 			dir = nil
 			if !assembled?
 				$logger.info "#{ leader.to_s } not assembled"
+
+				# If followers are close, don't move
+				if size == fullsize and furthest_follower_distance < 3
+					$logger.info "#{ leader.to_s } almost assembled. waiting"
+					leader.stay
+					return
+				end
+
 				if not leader.has_order :DEFEND_HILL
 					dir = stay_away enemy, dist
 				else
@@ -446,13 +583,6 @@ class Collective
 					if dir == :STAY
 						stay
 						return
-					elsif dir == :ORIENT
-						unless @orient_dir.nil?
-							orient left (@orient_dir )	# NOTE: not defined for all collectives!
-						else
-							$logger.info "WARNING: orient_dir not defined for this collective."
-							#fall thru
-						end
 					else
 						# Note that evading is not taken into account
 						# It is excluded in analyze_attack with test of can_pass?
@@ -569,6 +699,25 @@ class Collective
 
 			a.stay
 		end
+	end
+
+
+	# Pre: collective complete
+	def furthest_follower_distance
+		leader = @ants[0]
+
+		#$logger.info " ants: #{ @ants }"
+
+		found_dist = nil
+		@ants[1..-1].each do |ant|
+			d = Distance.new leader, ant
+
+			if found_dist.nil? or d.dist > found_dist
+				found_dist = d.dist
+			end
+		end
+
+		found_dist
 	end
 
 
@@ -867,148 +1016,6 @@ class Collective2 < Collective
 		false
 	end
 
-
-	#
-	# Determine best move in conflict between single collective2 and multiple enemies
-	#
-	# No other neighboring friends are taken into account.
-	#
-	# Pre: Collective must be assembled.
-	#
-	def analyze_attack()
-		enemies = []
-		guess = []
-		leader.enemies_in_view.each do |e|
-			adist = Distance.new( leader.pos, e.pos)
-			break unless adist.in_peril?
-
-			enemies << e 
-
-			guess << e.guess_next_pos
-		end
-		return false if guess.length == 0
-
-		$logger.info { "Enemies in peril distance: #{ enemies }" }
-		$logger.info { "Enemies guess next pos: #{ guess }" }
-
-		# Generate all possible movements of current collective
-		moves = {} 
-
-		lam = lambda do |dir| 
-			# Test movement of collective
-			if can_pass? dir
-				moves[ dir ] = @ants.collect { |a| a.square.neighbor dir }
-			end
-		end
-
-		lam2 = lambda do |dir1, dir2|
-			if ( dir1 == :W and @ants[0].can_pass? dir1 ) or @ants[1].can_pass? dir2 
-				moves[ :ORIENT ] = [ @ants[0].square.neighbor(dir1),  @ants[1].square.neighbor(dir2) ]
-			end
-		end 
-	
-		moves[ :STAY ] = @ants.collect { |a| a.square }
-		lam.call :N
-		lam.call :E
-		lam.call :S
-		lam.call :W
-
-		# Change orientation as well
-		$logger.info "orient_dir: #{ @orient_dir }" 
-		if [:E,:W].include? @orient_dir
-			lam2.call :W, :N
-		elsif [:N,:S].include? @orient_dir
-			lam2.call :E, :S
-		end
-
-		$logger.info { "possible moves: #{ moves }" }
-		return false if moves.length == 0
-
-		# calculate the body count for all possible moves
-		# Select the best result
-		best_dir = nil
-		best_dead = nil
-		moves.each_pair do |dir, move|
-			$logger.info "Analyzing direction #{ dir }"
-			dead = analyze_hits guess, move
-
-			if  best_dir.nil? or
-				( dead[0] == 0 and dead[1] > best_dead[1] ) or
-				( dead[0] == 0 and best_dead[0] > 0 ) or
-				( dead[0] < best_dead[0] )
-
-				best_dir = dir
-				best_dead = dead
-			end
-		end
-
-		$logger.info { 
-			if best_dir.nil?
-				"No best move!"
-			else
-				"Best move: #{ best_dir }; friends dead: #{ best_dead[0] }, enemies dead: #{ best_dead[1] }"
-			end
-		}
-
-		return false if best_dir.nil?
-		best_dir
-	end
-
-
-	def analyze_hits guess, move
-		# Now, analyze the hits between the ants
-		# Note that no distinction is made between various enemies
-		enemy_hits = {}
-		friend_hits = {}
-		guess.each_index do |e|
-			move.each_index do |f|
-				dist = Distance.new( guess[e], move[f])
-				#$logger.info "dist: #{ dist }, #{ dist.dist}"
-				if dist.in_attack_range?
-					#$logger.info "In attack range"
-					if enemy_hits[e].nil?
-						enemy_hits[e] = [f]
-					else
-						enemy_hits[e] << f
-					end
-					if friend_hits[f].nil?
-						friend_hits[f] = [e]
-					else
-						friend_hits[f] << e
-					end
-				end
-			end
-		end
-
-		return [0,0] if enemy_hits.length == 0
-		
-		$logger.info { "enemy hit results: #{ enemy_hits }" }
-		$logger.info { "friend hit results: #{ friend_hits }" }
-
-		# Analyze
-		enemy_dead = 0
-		friend_dead = 0
-		enemy_hits.each_pair do |k,list|
-			list.each do |v|
-				if list.length >= friend_hits[v].length
-					enemy_dead += 1
-					break
-				end
-			end 
-		end
-
-		friend_hits.each_pair do |k,list|
-			list.each do |v|
-				if list.length >= enemy_hits[v].length
-					friend_dead += 1 
-					break
-				end
-			end 
-		end
-		$logger.info { "Conflict result : friends dead: #{ friend_dead }, enemies dead: #{ enemy_dead }" }
-
-		[ friend_dead, enemy_dead]
-	end
 end
 
 

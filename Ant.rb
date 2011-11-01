@@ -36,14 +36,12 @@ end
 
 class EnemyAnt < Ant
 
-	def initialize owner, square, ai
-		super  true, owner, square, ai
+	attr_accessor :state
+
+	def initialize owner, square, ai, alive = true
+		super  alive, owner, square, ai
 
 		@state = nil
-	end
-
-	def state
-		@state
 	end
 
 	def state?
@@ -406,7 +404,6 @@ class MyAnt < Ant
 	end
 
 	def make_collective size = nil
-		# Creation Collective3's blocked for the time being
 		#if !size.nil? and size >= 2
 		#	@collective = Collective3.new 
 		#else
