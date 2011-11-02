@@ -335,6 +335,15 @@ module Orders
 							next
 						else
 							$logger.info "Food still there: yes"
+
+							# Very special case; sometimes food appears right next to
+							# ant (eg first turn next to an anthill). For some reason
+							# it does not get consumed immediately
+							if d.dist == 1
+								$logger.info "Right next to food"
+								stay
+								return
+							end
 						end
 					end
 				end

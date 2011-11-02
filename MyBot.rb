@@ -20,10 +20,42 @@ $:.unshift File.dirname($0)
 # 		open 
 # 		h 4 1
 #
+#======================================
+#
+# regions: don't assume hills centered; same parts are always mirrored/rotated
+# food placed in same manner in all regions (obeys symmetry)
+# slices: row/col distances are always board.[row|col]/num_players	- no rotations, mirrors
+#
+# maze -
+#
+#
+#  even p - squares (sometimes with diagonal splits) or slices
+#
+#		- slices can also occur in 2p situation -> m 2 1
+#       - see m 2 2 for diagonal split 
+#
+#	uneven p - always slices, as in random walk
+#
+# multi-hill -
+#
+#	m21	- mirrored halves; per half three hills, players inverse of other half
+#	m22	- mirrored halves; 4 hills per half, player on own half
+#	m31 - 3 slices; 8 hills per slice; players permuted per slice
+#	m41 - slices; 6 hills per slice; players permuted (but obviously not all permutations 
+#	m51 - slices; 5 hills per slice; players permuted
+#	m61 - doesn't exist
+#	m71	- slices; 4 hills per slice; permuted
+#	m81	- quadrants divided diagonally; per 'triangle' 3 hills, different colours
+#
+#
+# random walk -
+#
+#    always slices with equal distance between players
+#
 #######################################
 
-ENABLE_PROFILING = true
-NUM_TURNS 		 = 150
+ENABLE_PROFILING = false
+NUM_TURNS 		 = 250
 
 require 'AI.rb'
 require 'BaseStrategy'
