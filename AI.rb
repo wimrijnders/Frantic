@@ -95,6 +95,14 @@ class Hills
 			yield Square.coord_to_square coord
 		end
 	end
+
+	def each_pair 
+		# Adding clone allows to change the @hills
+		# within the called block
+		@list.clone.each_pair do |key, owner|
+			yield key, owner
+		end
+	end
 end
 
 class Food
@@ -566,11 +574,14 @@ class AI
 
 	def food; @food; end
 	
+	#
 	# If row or col are greater than or equal map width/height, makes them fit the map.
 	#
-	# Handles negative values correctly (it may return a negative value, but always one that is a correct index).
+	# Handles negative values correctly (it may return a negative value,
+	# but always one that is a correct index).
 	#
 	# Returns [row, col].
+	#
 	def normalize row, col
 		[row % @rows, col % @cols]
 	end
@@ -763,4 +774,11 @@ $logger = Logger.new $ai
 $timer = Timer.new
 Distance.set_ai $ai
 Coord.set_ai $ai
-$patterns = Patterns.new $ai
+
+$ai.setup do |ai|
+	ai.harvesters = Harvesters.new ai.rows, ai.cols, ai.viewradius2
+	$region = Region.new ai
+	Pathinfo.set_region $region
+	$patterns = Patterns.new ai
+end
+

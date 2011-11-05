@@ -31,6 +31,12 @@ class Square
 		@@ai.map[ coord[0] ][ coord[1] ]
 	end
 
+	# This makes it easier to create functionality
+	# for both ants and squares
+	def square
+		self
+	end
+
 	
 	# Returns true if this square is not water.
 	def land?; !@water; end

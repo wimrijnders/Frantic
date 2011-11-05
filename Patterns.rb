@@ -1,8 +1,10 @@
 require 'prime'
 
 class Hypothesis
+	CONFIRM_LIMIT = 10
+
 	attr_accessor :parent, :name, :type, :orient, :num_players, :row_inc, :col_inc
-	attr_accessor :negated, :supported, :good_matches
+	attr_accessor :negated, :supported, :good_matches, :confirmed
 
 	@@ai = nil
 
@@ -13,6 +15,18 @@ class Hypothesis
 		@negated = nil
 		@supported = nil
 		@good_matches = 0
+		@symmetry_items = []
+		@confirmed = false
+	end
+
+	def symmetry_item
+		#$logger.info "entered"
+
+		@symmetry_items.each do |s|
+			return s[0] if s[1] >= CONFIRM_LIMIT
+		end
+
+		nil
 	end
 
 	def self.set_ai ai
@@ -20,12 +34,22 @@ class Hypothesis
 	end
 
 	def to_s
+		name.to_s
+	end
+
+	def info
 		str = ""
-		if good_matches > 0
-			str << "; good matches: #{ good_matches }"
+		if @confirmed
+			str << "; Confirmed"
+		elsif good_matches > 0
+			str << "; matches: #{ good_matches }"
 		end
 
-		name.to_s + str
+		if @symmetry_items.length > 0
+			str << "; symmetry lines/points: #{ @symmetry_items }"
+		end
+
+		to_s + str
 	end
 
 
@@ -38,11 +62,227 @@ class Hypothesis
 		iterate source, rows - 1
 	end
 
+
+	def confirm
+		return if @symmetry_items.length == 0
+
+		$logger.info "entered"
+
+		# Generate a couple of random test points
+		# Already mapped points are used, because otherwise the matching will take too long
+		points = pick_done_regions 
+		$logger.info { "Test points: #{ points }" }
+
+
+		@symmetry_items.clone.each do |sym|
+			points.each do |point|
+				result = test_sym sym[0], point
+
+				if result.nil?
+					$logger.info "line/point #{ sym[0] } negated."
+					@symmetry_items.delete sym
+					break # to outer loop
+				elsif result
+					#$logger.info "Confirmation!"
+					sym[1] += 1
+				end
+			end
+
+			# Final confirmation
+			if sym[1] >= CONFIRM_LIMIT
+				@confirmed = true
+				@symmetry_items = [ sym ]
+				break
+			end
+		end
+	end
+
+	def get_source_targets source
+		targets = get_targets source, self.symmetry_item, name
+
+		# add direction info
+		case self.name
+		when :DIAG_TLBR
+			[[ targets[0], :mir90 ]]
+		when :DIAG_BLTR
+			[[ targets[0], :mir270 ]]
+		when :SLICE
+			targets.collect { |t| [ t, :rot0] }
+		when :HOR
+			[[ targets[0], :mir0 ]]
+		when :VERT
+			[[ targets[0], :mir180 ]]
+		when :ROT90
+			[[ targets[0], :rot90 ], [ targets[0], :rot270 ]]
+		when :ROT180
+			[[ targets[0], :rot180 ]]
+		end
+			
+	end
+
 	private 
+
+	# Source: http://snippets.dzone.com/posts/show/2087 (javascript)
+	def checkIntersection line1, line2
+		#$logger.info "entered; line1 #{ line1 }, line2 #{ line2 }"
+
+		# Internally, lines are defined by two points on the line	
+		lineAx1 = line1[0][0]
+		lineAy1 = line1[0][1]
+		lineAx2 = lineAx1 + line1[1][0]
+		lineAy2 = lineAy1 + line1[1][1]
+
+		lineBx1 = line2[0][0]
+		lineBy1 = line2[0][1]
+		lineBx2 = lineBx1 + line2[1][0]
+		lineBy2 = lineBy1 + line2[1][1]
+
+		ret = [ 0, 0 ]
+	
+		if lineAx2 == lineAx1
+	    	bM = (lineBy2-lineBy1)/(lineBx2-lineBx1)
+	    	bB = lineBy2-bM*lineBx2
+	
+	    	x = lineAx1
+	    	ret = [ x, bM*x + bB ]
+	  	elsif lineBx2 == lineBx1
+	    	aM = (lineAy2-lineAy1)/(lineAx2-lineAx1)
+	    	aB = lineAy2-aM*lineAx2
+	
+	    	x = lineBx1
+			ret = [ x, aM*x + aB ]
+		else
+		    aM = (lineAy2-lineAy1)/(lineAx2-lineAx1)
+			bM = (lineBy2-lineBy1)/(lineBx2-lineBx1)
+			aB = lineAy2-aM*lineAx2
+			bB = lineBy2-bM*lineBx2
+	
+			x = [ ((bB-aB)/(aM-bM)),0].max
+			ret = [ x, aM*x + aB ]
+		end
+	
+		#$logger.info { "#{ line1}, #{ line2} intersection at #{ ret } " }
+		ret
+	end
+
+	def right d
+		[ d.col, -d.row]
+	end
+
+	def right2 d
+		[ -d.row, -d.col]
+	end
+
+	def left d
+		[ -d.col, d.row]
+	end
+
+	def get_targets source, sym, which
+		targets = []
+
+		if sym[0].kind_of? Array
+			# Mirror over line - this works for all line symmetries
+			# param 'which' not used here
+
+			# Test line symmetry
+			coeff  = sym[1]
+			coeff2 = [ coeff[1], -coeff[0] ] 
+
+			intersect = checkIntersection sym, [ [ source.row, source.col], coeff2]
+			diff = [ source.row - intersect[0], source.col - intersect[1] ]
+
+			targets << ai.map[ (intersect[0] - diff[0] ) % ai.rows ][ ( intersect[1] - diff[1]) % ai.cols ]
+		elsif which == :ROT90 
+			# rot90
+			d = Distance.new sym, source
+			turn = right d	
+			coord = [ sym[0] + turn[0], sym[1] + turn[1] ]
+			targets << ai.map[ coord[0] % ai.rows ][ coord[1] % ai.cols ]
+		
+			# rot270
+			turn = left d
+			coord = [ sym[0] + turn[0], sym[1] + turn[1] ]
+			targets << ai.map[ coord[0] % ai.rows ][ coord[1] % ai.cols ]
+		elsif which == :ROT180
+			# rot 180
+			d = Distance.new sym, source
+			turn = right2 d
+			coord = [ sym[0] + turn[0], sym[1] + turn[1] ]
+			targets << ai.map[ coord[0] % ai.rows ][ coord[1] % ai.cols ]
+		elsif which == :SLICE
+			point = [ (source.row + sym[0] ) % ai.rows, ( source.col + sym[1] ) % ai.cols ]
+
+			while point[0] != source.row and point[1] != source.col
+				targets << ai.map[ point[0] ][ point[1] ]
+
+				point = [ (point[0] + sym[0] ) % ai.rows, ( point[1] + sym[1] ) % ai.cols ]
+			end
+
+		else
+			raise "get_targets unknown hypothesis name"
+		end
+
+		targets
+	end
+
+
+	def test_sym sym, point
+		$logger.info "entered"
+
+		targets = get_targets point, sym, orient
+
+		$logger.info "Entering match_square #{ point}, #{ targets[0] }, #{ orient }"
+		match = parent.match_range point, targets[0], orient
+
+		return nil if match.nil?
+
+		detect_good_match match, targets[0]
+	end
 
 	def ai
 		@@ai
 	end
+
+	#
+	# Randomly pick a number of done_region points for 
+	# confirmation testing
+	#
+	def pick_done_regions
+		$logger.info "entered"
+
+		list = []
+		(0...ai.rows).each do |row|
+			(0...ai.cols).each do |col|
+				sq = ai.map[row][col]
+				list << sq if sq.done_region
+			end
+		end
+
+		indexes = []
+		while indexes.length < 10 and indexes.length < list.length
+			n = rand( list.length )
+			indexes << n unless indexes.include? n
+		end
+
+		out = []
+		indexes.each {|i| out << list[i] }
+
+		out
+	end
+
+
+	def detect_good_match match, target
+		# signal 50% matches
+		if match >= (2*parent.radius+1)**2/2
+			$logger.info { "Hypothesis #{ self } good match on #{ target}." }
+			@good_matches += 1
+			parent.show_field target
+			true
+		else
+			false
+		end
+	end
+
 
 	def iterate source, max_count
 		#$logger.info "Running test #{ self }"
@@ -70,11 +310,42 @@ class Hypothesis
 			else
 				match_count += 1
 
-				# signal 50% matches
-				if match >= (2*parent.radius+1)**2/2
-					$logger.info { "Hypothesis #{ self } good match on #{ target}." }
-					@good_matches += 1
-					parent.show_field target
+				if detect_good_match match, target
+
+					item = nil
+					if self.is_a? SliceHyp
+						# Good matches are offsets
+						item = [ row_inc, col_inc ] 
+				
+						index = @symmetry_items.index { |n| n[0] == item } 
+						unless index.nil? 
+							$logger.info "Symmetry item offset #{ item } already present."
+						else
+							@symmetry_items << [ item, 0]
+						end
+					else
+						# Good matches for this category are lines
+
+						tmp_coord  =  [
+							( (source.row + target.row)*1.0/2 ) % ai.rows,  
+							( (source.col + target.col)*1.0/2 ) % ai.cols
+						]
+						$logger.info "coord: #{ tmp_coord }"
+
+						# First element is coordinate, second is coefficient.
+						# note that coeff is rotated 90%
+						item = [ tmp_coord, [ col_inc, -row_inc]  ] 
+
+						index = @symmetry_items.index { |n|
+							compare_lines( n[0], item )
+						} 
+						unless index.nil? 
+							$logger.info "Symmetry item line #{ item } already present."
+						else
+							$logger.info "Symmetry item line #{ item } not present."
+							@symmetry_items << [ item, 0 ]
+						end
+					end
 				end
 			end
 		end
@@ -114,10 +385,26 @@ class Hypothesis
 		end
 	end
 
+
+	def compare_lines line1, line2
+		$logger.info "entered"
+
+		# Lines should be at least in same orientation
+		return false if line1[1] != line2[1]
+
+		# hor/vert lines
+		return ( line1[0][1] == line2[0][1] )  if line1[1][1] == 0 
+		return ( line1[0][0] == line2[0][0] ) if line1[1][0] == 0 
+
+		# Same direction, check if point of line2 is on line1
+		(line2[0][0] - line1[0][0]) / line1[1][0] == 
+		   (line2[0][1] - line1[0][1]) / line1[1][1]  
+	end
 end
 
+
 class RotHypothesis < Hypothesis
-	TEST_LIMIT = 100
+	TEST_LIMIT = 50
 
 	def initialize parent, name
 		super parent, name, nil, nil, nil, nil, nil
@@ -146,17 +433,6 @@ class RotHypothesis < Hypothesis
 		end
 	end
 
-	def right d
-		[ d.col, -d.row]
-	end
-
-	def right2 d
-		[ -d.row, -d.col]
-	end
-
-	def left d
-		[ -d.col, d.row]
-	end
 
 
 	def test_match source
@@ -169,39 +445,26 @@ class RotHypothesis < Hypothesis
 			final = start - 1 + TEST_LIMIT
 		end
 
-		@skip_test = 0
 		@rot_points[start..final].clone.each do |point|
 			d = Distance.new( point, source )
 
-			# Skip tests on possible border points; these are bound to fail
-			if ( d.row.abs >= ( ai.rows/2 - parent.radius ) ) or
-				( d.col.abs >= ( ai.cols/2 - parent.radius  ) )
-				@skip_test += 1
-
-				#$logger.info { "#{ source} possible border point for center #{ point}; skipping test" }
-				next
-			end
-
 			do_test source, d, point
 		end
-
-		$logger.info { "Skipped #{ skip_test }/#{ TEST_LIMIT } on border tests for #{ source}" }
 
 		@negated = true if @rot_points.length == 0
 	end
 
 
-	def to_s
-		str = "; #{ @rot_points.length }/#{ @total }"
-
-		if good_matches > 0
-			str << "; good matches: #{ good_matches }"
+	def info
+		str = ""
+		unless @confirmed
+			str = "; #{ @rot_points.length }/#{ @total }"
 		end
-
-		name.to_s + str
+		super + str
 	end
 
 	private
+
 
 	def test_target source, d, point, what
 		if what == :rot90
@@ -213,19 +476,25 @@ class RotHypothesis < Hypothesis
 			turn = right2 d
 		end
 
-		target = ai.map[ point[0] ][ point[1] ].rel  turn
+		coord  = ai.normalize point[0] + turn[0], point[1] + turn[1]
+		target = ai.map[ coord[0] ][ coord[1] ]
 
 		match = parent.match_range source, target, what
 		if match.nil?
 			#$logger.info { "#{ name }; point #{ point } negated." }
+
 			@rot_points.delete point
 			return false
 		else
-			# signal 50% matches
-			if match >= (2*parent.radius+1)**2/2
-				$logger.info { "Hypothesis #{ self } good match on #{ target}, center #{ point }." }
-				@good_matches += 1
-				parent.show_field target
+			if detect_good_match match, target
+				# Good matches for this category are points
+
+				index = @symmetry_items.index { |n| n[0] == point } 
+				unless index.nil?
+					$logger.info "Symmetry item #{ point } already present."
+				else
+					@symmetry_items << [ point, 0 ]
+				end
 			end
 		end
 
@@ -233,16 +502,39 @@ class RotHypothesis < Hypothesis
 	end
 end
 
+
 class Rot90Hyp < RotHypothesis
+	# h 4 2 correct center: [85.5, 24.5] - not detected!
+	#		there are in fact two centers, diametrically opposite on the torus
+
 	def initialize parent
 		super parent, :ROT90
 	end
 
 	def do_test source, d, point
+
 		return false unless test_target source, d, point, :rot90
 		test_target source, d, point, :rot270
 	end
+
+
+	# Test quarter-rotational symmetry
+	def test_sym sym, point
+		$logger.info "entered"
+
+		targets = get_targets point, sym, name
+
+		# There are always two targets
+		match = parent.match_range point, targets[0], :rot90
+		return nil if match.nil?
+
+		match2 = parent.match_range point, targets[1], :rot270
+		return nil if match2.nil?
+
+		detect_good_match( match, targets[0]) and  detect_good_match( match2, targets[1] )
+	end
 end
+
 
 class Rot180Hyp < RotHypothesis
 
@@ -253,6 +545,19 @@ class Rot180Hyp < RotHypothesis
 
 	def do_test source, d, point
 		test_target source, d, point, :rot180
+	end
+
+
+	# Test half-rotational symmetry
+	def test_sym sym, point
+		$logger.info "entered"
+
+		targets = get_targets point, sym, name
+		# always one solution
+		match = parent.match_range point, targets[0], :rot180
+		return nil if match.nil?
+
+		detect_good_match( match, targets[0])
 	end
 end
 
@@ -281,17 +586,30 @@ class SliceHyp < Hypothesis
 
 	def to_s
 		str = "[ #{ row_inc}, #{col_inc}]"
+		super + str
+	end
 
-		if good_matches > 0
-			str << "; good matches: #{ good_matches }"
-		end
+	# Test slice symmetry
+	def test_sym sym, point
+		$logger.info "entered"
 
-		name.to_s + str
+		targets = get_targets point, sym, name
+
+		# Just do one step of the symmetry
+
+		$logger.info "Entering match_square #{ point}, #{ targets[0] }, #{ orient }"
+		match = parent.match_range point, targets[0], orient
+		return nil if match.nil?
+
+		detect_good_match match, targets[0]
 	end
 end
 
 
 class Patterns
+
+	Rot_tests = [ :ROT90, :ROT180 ]
+	Line_tests = [ :DIAG_TLBR, :DIAG_BLTR, :HOR, :VERT]
 
 	def add_square square
 		@add_squares.push square
@@ -328,7 +646,21 @@ class Patterns
 
 				match_tests square
 
-			end
+
+				# Loop exit condition; no more tests to do.
+
+				all_confirmed = true 
+				@tests.each do |t|
+					unless t.confirmed
+						all_confirmed = false
+						break
+					end
+				end
+				if all_confirmed
+					$logger.info "No more open tests; yay, we're done!"
+					doing = false
+				end
+			end rescue $logger.info "Boom! #{ $! }"
 
 			$logger.info "closing down."
 		end
@@ -382,7 +714,7 @@ class Patterns
 			str << "\n"
 		end
 
-		$logger.info "pattern region:\n#{ str }" 
+		$logger.info "pattern region #{ square }:\n#{ str }" 
 	end
 
 	def radius 
@@ -407,8 +739,8 @@ class Patterns
 			$logger.info "square board. Diagonal/rotational symmetry possible."
 
 			@tests << Rot90Hyp.new( self )
-			@tests << DiagHyp.new( self, :DIAG_BLTR, :ONE, :mir90,  nil, 1, 1 )
-			@tests << DiagHyp.new( self, :DIAG_TLBR, :ONE, :mir270, nil, -1, 1 )
+			@tests << DiagHyp.new( self, :DIAG_BLTR, :ONE, :mir270,  nil, 1, 1 )
+			@tests << DiagHyp.new( self, :DIAG_TLBR, :ONE, :mir90, nil, -1, 1 )
 		end
 
 		@tests << Rot180Hyp.new( self )
@@ -451,18 +783,126 @@ class Patterns
 		$logger.info "done"
 	end
 
+	def fill_region source, target, orient
+		#$logger.info "entered"
+#
+		return if target.done_region
 
+		# Set all known water fields
+		$region.all_region do |row, col|
+			sq_a = source.rel [ row, col ]
+			sq_b = target.rel target_coord( row, col, orient )
+
+			# Sanity check; if water already present in target, 
+			# it should also be in the source
+			if sq_b.water? and not sq_a.water?
+				raise "target has water, but source hasn't"
+			end
+
+			sq_b.water = sq_a.water
+		end
+
+		# fill in the regions
+		$region.find_regions target 
+	end
+
+
+	#
+	#	Given the symmetry and the symmetry point, fill in the blanks
+	#
+	def fill_all test 
+		$logger.info "entered"
+
+		(0...ai.rows).each do |row|
+			(0...ai.cols).each do |col|
+				source = ai.map[row][col]
+
+				if source.done_region
+					targets = test.get_source_targets source
+					targets.each do |t|
+						fill_region source, t[0], t[1]
+					end
+				end
+			end
+		end
+	end
+
+
+	def handle_confirm test
+		$logger.info "#{ test } is confirmed"
+
+		# Kill of the competing tests with incompatible symmetry
+		$logger.info "remove incompatible symmetry tests"
+
+		if test.name == :SLICE
+			@tests.each do |t| 
+				if (Rot_tests + Line_tests ).include? t.name 
+					t.negated = true
+				end
+			end 
+		elsif Line_tests.include? test.name 
+			@tests.each do |t| 
+				if (Rot_tests + [ :SLICE ] ).include? t.name 
+					t.negated = true
+				end
+			end 
+		elsif Rot_tests.include? test.name 
+			@tests.each do |t| 
+				if ( Line_tests + [ :SLICE ] ).include? t.name 
+					t.negated = true
+				end
+			end 
+		end
+
+		# Use the info gained to fill the map
+		# This is the preliminary fill; afterwards, every new ant step will
+		# fill in symmetrically
+		$logger.info "Fill in rest of map"
+		fill_all test 
+
+		# Determine new hill locations
+				
+		$logger.info "putting new hills on the map"
+		ai.hills.each_pair do |key, owner|
+			coord = key.split "_"
+			coord.collect! { |c| c.to_i }
+			source = Square.coord_to_square coord
+
+			# Put them all on the map, irrespective of already present or not
+			# class Hills filters out the hills already present
+
+			targets = test.get_source_targets source
+			targets.each do |t|
+				# not using rotation type info in t[1],
+				# not needed for one point
+				# 100 is the number of a non-existent player
+				if ai.hills.add 100,  [ t[0].row, t[0].col ]
+					# It's a new hill, start a path search to it from all our hills
+					ai.hills.each_friend do |c|
+						$logger.info "starting search to the hill"
+						Region.add_searches  c,  [ t[0] ]
+					end
+				end
+			end
+		end
+	end
 
 	def match_tests source
 		@tests.each do |test|
-			test.test_match source
+			unless test.confirmed
+				test.test_match source
+				test.confirm
+
+				handle_confirm test if test.confirmed
+			end
 		end
 
 		# clean up negated tasks
 		@tests.delete_if { |t| t.negated === true }
 		@tests.compact!
 
-		$logger.info { "Tests still in the running:\n\t#{ @tests.join( "\n\t") }" }
+
+		$logger.info { "Tests still in the running:\n\t#{ ( @tests.collect { |t| t.info} ).join( "\n\t") }" }
 	end
 
 	def match source
@@ -503,19 +943,19 @@ class Patterns
 		when :rot0
 			[ row, col ]
 		when :rot90
-			[ -col, row ]
+			[ col, -row ]
 		when :rot180
 			[ -row, -col ]
 		when :rot270
-			[ col, -row ]
+			[ -col, row ]
 		when :mir0
 			[ -row, col ]
 		when :mir90
-			[ -col, -row ]
+			[ col, row ]
 		when :mir180
 			[ row, -col ]
 		when :mir270
-			[ col, row ]
+			[ -col, -row ]
 		end
 	end
 

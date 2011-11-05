@@ -449,6 +449,24 @@ class Region
 		str
 	end
 
+	#
+	# Return relative offsets for a given square, for all the
+	# points that are within the template.
+	#
+	def all_region
+		dim = @template.length
+		(1...dim).each do |x|
+			(0...dim).each do |y|
+				if @template[x][y]
+					yield x, y 
+					yield y, -x 
+					yield -x, -y 
+					yield -y, x 
+				end
+			end
+		end
+	end
+
 	def show_regions square
 		str = "\n"
 		dim = @template.length

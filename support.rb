@@ -20,7 +20,11 @@ class Logger
 			thread_disp = "#{ thread } "
 
 			if @f[thread].nil?	
-				@f[ thread ] = File.new( thread + "_log.txt", "w")
+				filename = thread + "_log.txt"
+
+    			#File.delete( filename ) if File.exist?( filename )
+
+				@f[ thread ] = File.new( filename, "w")
 			end
 		else 
 			thread = "Main"

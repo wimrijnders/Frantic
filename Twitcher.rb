@@ -27,12 +27,6 @@ end
 $logger.log = false
 strategy = Strategy.new
 
-$ai.setup do |ai|
-	$region = Region.new ai
-	Pathinfo.set_region $region
-end
-
-
 $ai.run do |ai|
 	strategy.turn ai
 end

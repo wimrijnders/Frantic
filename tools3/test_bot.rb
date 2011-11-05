@@ -60,9 +60,9 @@ bots = [
 	"ruby ../Inertia.rb",
 	"ruby ../GoSouth.rb",
 	"ruby ../frantic03/MyBot.rb",		# Frantic - previous version
-	"python submission_test/TestBot.py",
 	"python sample_bots/python/LeftyBot.py",
 	"python2.7 sample_bots/python/HunterBot.py",
+	"python submission_test/TestBot.py"
 ]
 
 

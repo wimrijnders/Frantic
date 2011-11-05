@@ -261,12 +261,6 @@ end
 
 strategy = Strategy.new
 
-$ai.setup do |ai|
-	ai.harvesters = Harvesters.new ai.rows, ai.cols, ai.viewradius2
-	$region = Region.new ai
-	Pathinfo.set_region $region
-end
-
 first = false
 
 $ai.run do |ai|
