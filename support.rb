@@ -93,6 +93,10 @@ class Timer
 		end
 	end
 
+	def clear
+		@list = {}
+	end
+
 	def display
 		$logger.info {
 			str = "Timer results:\n";
@@ -102,7 +106,16 @@ class Timer
 
 			str
 		}
-		@list = {}
+	end
+
+
+	def get str
+		v = @list[str]
+		unless v.nil?
+			( (v[1] - v[0])*1000).to_i
+		else
+			nil
+		end
 	end
 end
 

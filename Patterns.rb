@@ -664,7 +664,7 @@ class Patterns
 
 			$logger.info "closing down."
 		end
-		t.priority = -1
+		t.priority = -3
 	end
 
 

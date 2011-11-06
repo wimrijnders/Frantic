@@ -1,6 +1,133 @@
 #require 'thread'
 #$mutex = Mutex.new
 
+class WorkerThread < Thread
+
+	def initialize name, region, list
+		@region = region
+		@list = list
+
+		super do 
+		begin
+			Thread.current[ :name ] = name 
+
+			$logger.info "activated"
+
+			longest_diff = nil
+			longest_count = nil
+
+			doing = true
+			while doing
+				$logger.info "waiting"
+				sleep 0.2 while list.length == 0
+
+				count = 0
+				start = Time.now
+				init_loop
+				while list.length > 0
+					# Handle next item
+					action list.pop
+
+					count += 1
+				end
+				done_loop
+
+				$logger.info {
+					diff = ( (Time.now - start)*1000 ).to_i
+
+					if longest_diff.nil? or diff > longest_diff
+						longest_diff = diff
+						longest_count = count
+
+					end
+
+					str = " Longest: #{ longest_count } in #{ longest_diff } msec"
+
+					"added #{ count } results in #{ diff} msec. #{ str }" 
+				}
+
+			end
+
+			$logger.info "closing down."
+		end rescue $logger.info( "Boom! #{ $! }" )
+		end
+	end
+
+	def list
+		@list
+	end
+
+
+	def init_loop
+	end
+
+
+	def done_loop
+	end
+end
+
+
+class Thread1 < WorkerThread
+	def initialize region, list
+		super("Thread1", region, list)
+	end
+
+	def init_loop
+		@new_count, @known_count, @replaced_count = 0, 0, 0 
+	end
+
+	def action path
+		return if path.length == 0
+
+		$logger.info { "saving path: #{ path }" }
+		# Cache the result
+		new_tmp, known_tmp, replaced_tmp = @region.set_path path
+		@new_count      += new_tmp
+		@known_count    += known_tmp
+		@replaced_count += replaced_tmp
+
+		new_tmp, known_tmp, replaced_tmp = @region.set_path path.reverse
+		@new_count      += new_tmp
+		@known_count    += known_tmp
+		@replaced_count += replaced_tmp
+	end
+
+	def done_loop
+		$logger.info {
+			"new: #{ @new_count}, known: #{ @known_count }, replaced: #{ @replaced_count }"
+		}
+	end
+end
+
+class Thread2 < WorkerThread
+	def initialize region, list
+		super("Thread2", region, list)
+	end
+
+	def action item
+		from, to_list, do_shortest = item 
+
+		$logger.info { "searching #{ from }-#{ to_list }" }
+
+		# Results will be cached within this call
+		@region.find_paths from, to_list, do_shortest
+	end
+end
+
+
+class RegionsThread < WorkerThread
+	def initialize region, list
+		super("FindRegions", region, list)
+	end
+
+	def action source
+		$logger.info { "finding regions for #{ source }" }
+		@region.find_regions source 
+		$patterns.fill_map source 
+	end
+end
+
+
 class Pathinfo
 	@@region = nil
 
@@ -131,12 +258,14 @@ end
 class LiaisonSearch
 
 	NO_MAX_LENGTH      = -1
-	DEFAULT_MAX_LENGTH = 10
+	DEFAULT_MAX_LENGTH = 15
+	MAX_COUNT          = 4000
 
 	def initialize cache, find_shortest = false, max_length = nil
 		@liaison = cache
 		@find_shortest = find_shortest
 		@cached_results = {}
+		@count = 0
 
 		if max_length.nil?
 			@max_length = DEFAULT_MAX_LENGTH
@@ -158,6 +287,18 @@ class LiaisonSearch
 
 
 	def search from_r, to_list_r
+		$logger.info "entered #{ from_r }-#{ to_list_r }"
+		if from_r.nil?
+			$logger.info "from_r empty, not searching"
+			return
+		end
+
+		to_list_r.compact!
+		if to_list_r.length == 0
+			$logger.info "to_list_r empty, not searching."
+			return
+		end
+
 		@cur_best_dist = nil;
 
 		if to_list_r.length == 1 and not @find_shortest
@@ -214,6 +355,7 @@ class LiaisonSearch
 	#
 	def search_liaison from, to, current_path
 		$logger.info { "search_liaison searching #{ from }-#{ to }: #{ current_path }" }
+
 		if @max_length != NO_MAX_LENGTH and current_path.length >= @max_length 
 			$logger.info { "Path length >= #{ @max_length }; skipping" }
 			return nil
@@ -239,7 +381,15 @@ class LiaisonSearch
 
 
 	def search_liaisons from, to_list, current_path
+		to_list.compact!
 		return nil if to_list.length == 0
+
+		if @count >= MAX_COUNT
+			$logger.info { "Count #{ @count } hit the max; aborting this search." }
+			return []
+		else
+			@count +=1
+		end
 	
 		# Safeguard to avoid too deep searches
 		if @max_length != NO_MAX_LENGTH and current_path.length >= @max_length 
@@ -275,7 +425,6 @@ class LiaisonSearch
 		cur = @liaison[from]
 		if cur
 			to_list.each do |to|
-
 				if cur[ to ]
 					result = current_path + [to]
 					$logger.info { "search_liaisons found path#{ from }-#{ to_list }: #{ result }" }
@@ -315,6 +464,10 @@ class LiaisonSearch
 			end
 		end
 
+		$logger.info "Pausing for a breather"
+		sleep 0.02
+		Thread.pass
+
 		results
 	end
 end
@@ -332,146 +485,14 @@ class Region
 	private 
 
 	def do_thread
-		t1 = Thread.new do
-			Thread.current[ :name ] = "Thread1"
-			$logger.info "activated"
+		t = Thread1.new self, @@add_paths
+		t.priority = -2
 
-			longest_diff = nil
-			longest_count = nil
+		t = Thread2.new self, @@add_searches
+		t.priority = -1
+		t = RegionsThread.new self, @@add_regions
+		t.priority = -2
 
-			doing = true
-			while doing
-				$logger.info "waiting"
-				sleep 0.2 while @@add_paths.length == 0
-
-				count = 0
-				new_count, known_count, replaced_count = 0, 0, 0 
-				start = Time.now
-				while @@add_paths.length > 0
-					# Remove first item
-					path = @@add_paths.pop
-					next if path.length == 0
-
-					$logger.info { "saving path: #{ path }" }
-					# Cache the result
-					new_tmp, known_tmp, replaced_tmp = set_path path
-					new_count      += new_tmp
-					known_count    += known_tmp
-					replaced_count += replaced_tmp
-
-					new_tmp, known_tmp, replaced_tmp = set_path path.reverse
-					new_count      += new_tmp
-					known_count    += known_tmp
-					replaced_count += replaced_tmp
-
-					count += 1
-				end
-
-				$logger.info {
-					diff = ( (Time.now - start)*1000 ).to_i
-
-					if longest_diff.nil? or diff > longest_diff
-						longest_diff = diff
-						longest_count = count
-
-					end
-					stats = "new: #{new_count}, known: #{ known_count }, replaced: #{ replaced_count }"
-					str = " Longest: #{ longest_count } in #{ longest_diff } msec"
-
-					"added #{ count } results in #{ diff} msec. #{ stats }. #{ str }" 
-				}
-
-			end
-
-			$logger.info "closing down."
-		end rescue $logger.info( "Boom! #{ $! }" )
-		t1.priority = -1
-
-		t2 = Thread.new do
-			Thread.current[ :name ] = "Thread2"
-			$logger.info "activated"
-
-			longest_diff = nil
-			longest_count = nil
-
-			doing = true
-			while doing
-				$logger.info "waiting"
-				sleep 0.2 while @@add_searches.length == 0
-
-				count = 0
-				start = Time.now
-				while @@add_searches.length > 0
-					from, to_list, do_shortest = @@add_searches.pop
-
-					$logger.info { "searching #{ from }-#{ to_list }" }
-
-					# Results will be cached within this call
-					$region.find_paths from, to_list, do_shortest
-
-					count += 1
-				end
-
-				$logger.info {
-					diff = ( (Time.now - start)*1000 ).to_i
-
-					if longest_diff.nil? or diff > longest_diff
-						longest_diff = diff
-						longest_count = count
-					end
-					str = " Longest: #{ longest_count } searches in #{ longest_diff } msec"
-
-					"added #{ count } results in #{ diff} msec. #{ str }" 
-				}
-
-			end
-
-			$logger.info "closing down."
-		end rescue $logger.info( "Boom! #{ $! }" )
-		t2.priority = -1
-
-		t3 = Thread.new do
-			Thread.current[ :name ] = "FindRegions"
-			$logger.info "activated"
-
-			longest_diff = nil
-			longest_count = nil
-
-			doing = true
-			while doing
-				$logger.info "waiting"
-				sleep 0.2 while @@add_regions.length == 0
-
-				count = 0
-				start = Time.now
-				while @@add_regions.length > 0
-					source = @@add_regions.pop
-
-					$logger.info { "finding regions for #{ source }" }
-					find_regions source 
-					$patterns.fill_map source 
-
-					count += 1
-				end
-
-
-				$logger.info {
-					diff = ( (Time.now - start)*1000 ).to_i
-
-					if longest_diff.nil? or diff > longest_diff
-						longest_diff = diff
-						longest_count = count
-					end
-					str = " Longest: #{ longest_count } regions in #{ longest_diff } msec"
-
-					"added #{ count } regions in #{ diff} msec. #{ str }" 
-				}
-
-			end
-
-			$logger.info "closing down."
-		end rescue $logger.info( "Boom! #{ $! }" )
-		t3.priority = -1
 	end
 
 	def self.add_paths result
@@ -646,6 +667,7 @@ class Region
 		end
 	end
 
+public
 
 	def set_path path
 		new_count = 0
@@ -697,7 +719,6 @@ class Region
 		[ new_count, known_count, replaced_count ]
 	end
 
-public
 
 
 	#
@@ -888,6 +909,11 @@ private
 
 		from_r = from.region
 		to_list_r = Region.squares_to_regions to_list
+		to_list_r.compact!
+		if to_list_r.length == 0
+			$logger.info "to_list_r empty, not searching."
+			return
+		end
 
 		results = find_paths_cache from_r, to_list_r
 
@@ -910,6 +936,8 @@ private
 	def get_non_results from_r, to_list_r
 		non_results = []
 		to_list_r.each do | to_r |
+			next if to_r.nil?
+
 			if get_non_path from_r, to_r
 				non_results << to_r
 			end
@@ -926,11 +954,17 @@ private
 	#
 	#
 	def search_paths from_r, to_list_r, do_shortest, max_length = nil
+		to_list_r.compact!
+		if to_list_r.length == 0
+			$logger.info "to_list_r empty, not searching."
+			return
+		end
+
 		$logger.info "Called search_paths"
 
 		to_list_r -= get_non_results from_r, to_list_r
 
-		results = LiaisonSearch.new( @liaison, do_shortest, -1 ).search from_r, to_list_r
+		results = LiaisonSearch.new( @liaison, do_shortest, max_length ).search from_r, to_list_r
 
 		#
 		# Store non-paths
@@ -1080,7 +1114,7 @@ private
 		list = []
 
 		to_list.each do |to|
-			list << to.region
+			list << to.region unless to.region.nil?
 		end
 
 		list.uniq
@@ -1103,6 +1137,11 @@ private
 
 		results = []
 		to_list_r.each do |to_r|
+			if to_r.nil?
+				$logger.info "WARNING: nil detected for to_r"
+				next
+			end
+
 			if from_r == to_r
 				$logger.info { "same region #{ from_r }" }
 				results << { :path => [], :dist => 0 } 

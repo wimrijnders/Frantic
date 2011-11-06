@@ -31,6 +31,10 @@ class Square
 		@@ai.map[ coord[0] ][ coord[1] ]
 	end
 
+	def to_coord
+		[ row, col ]
+	end
+
 	# This makes it easier to create functionality
 	# for both ants and squares
 	def square

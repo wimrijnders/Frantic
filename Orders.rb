@@ -90,6 +90,10 @@ module Orders
 			end
 		end
 
+		if what == :EVADE_GOTO
+			clear_order :EVADE_GOTO
+		end
+
 		$logger.info { "Setting order #{ what } on square #{ square.to_s } for #{ self.to_s }" }
 
 		if $region

@@ -319,6 +319,7 @@ class AI
 		
 		@did_setup=false
 		@hills = Hills.new 
+		@do_throttle = false
 	end
 	
 	# Returns a read-only hash of all settings.
@@ -351,6 +352,24 @@ class AI
 		@did_setup=true
 	end
 
+	def set_throttle
+		val = $timer.get "turn"
+
+		if not val.nil? and val >= @turntime*0.75
+			@do_throttle = true 
+		else
+			@do_throttle = false
+		end
+
+		if @do_throttle
+			$logger.info "Throttling set"
+		end
+	end
+
+	def throttle?
+		@do_throttle
+	end	
+
 	
 	# Turn logic. If setup wasn't yet called, it will call it (and yield the block in it once).
 	def run &b # :yields: self
@@ -361,7 +380,11 @@ class AI
 			over=false
 			until over
 				$logger.info { "turn #{ turn_count }" }
+
+				set_throttle
+
 				$timer.start "turn"
+Thread.exclusive {
 				$timer.start "read"
 				over = read_turn
 				$timer.end "read"
@@ -371,6 +394,7 @@ class AI
 			
 				@stdout.puts 'go'
 				@stdout.flush
+}
 
 				$timer.end "turn"
 				$timer.display

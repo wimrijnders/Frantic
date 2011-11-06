@@ -163,6 +163,16 @@ class Strategy < BaseStrategy
 
 
 	def turn ai
+		if ai.throttle?
+			# All ants on top of hills should stay put
+			ai.my_ants.each do |ant|
+				if ai.hills.my_hill? ant.square.to_coord
+					$logger.info { "#{ ant } staying put on hill due to throttle." }
+					ant.stay
+				end
+			end
+		end
+
 		# Determine ant furthest away from first own active hill,
 		# for the pattern matcher
 		ai.hills.each_friend do |sq|
