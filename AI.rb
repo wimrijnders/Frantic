@@ -67,7 +67,7 @@ class Hills
 	end
 
 	def each_enemy
-		@list.each_pair do |key, owner|
+		@list.clone.each_pair do |key, owner|
 			# Skip self and dead hills
 			next if owner == 0
 			next if owner == -1 
@@ -83,7 +83,7 @@ class Hills
 
 
 	def each_friend
-		@list.each_pair do |key, owner|
+		@list.clone.each_pair do |key, owner|
 			# Skip enemies and dead hills
 			next if owner == -1 
 			next if owner != 0
@@ -538,9 +538,16 @@ class AI
 			end
 		end
 
+		# determine all known squares and regions
+		did_blanks = false
 		my_ants.each do |ant|
 			$region.find_regions ant.square
+			did_blanks = true if $patterns.fill_map ant.square
 		end unless $region.nil?
+
+		if did_blanks
+			$logger.info "Did fill_map"
+		end
 
 		detect_enemies new_enemy_ants
 

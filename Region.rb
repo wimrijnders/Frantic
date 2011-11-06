@@ -126,6 +126,7 @@ end
 
 class LiaisonSearch
 
+	NO_MAX_LENGTH      = -1
 	DEFAULT_MAX_LENGTH = 10
 
 	def initialize cache, find_shortest = false, max_length = nil
@@ -136,6 +137,10 @@ class LiaisonSearch
 			@max_length = DEFAULT_MAX_LENGTH
 		else
 			@max_length = max_length 
+
+			if max_length == NO_MAX_LENGTH
+				$logger.info "Doing search with unlimited depth"
+			end
 		end
 	end
 
@@ -199,7 +204,7 @@ class LiaisonSearch
 	#
 	def search_liaison from, to, current_path
 		$logger.info { "search_liaison searching #{ from }-#{ to }: #{ current_path }" }
-		if current_path.length >= @max_length 
+		if @max_length != NO_MAX_LENGTH and current_path.length >= @max_length 
 			$logger.info { "Path length >= #{ @max_length }; skipping" }
 			return nil
 		end
@@ -227,7 +232,7 @@ class LiaisonSearch
 		return nil if to_list.length == 0
 	
 		# Safeguard to avoid too deep searches
-		if current_path.length >= @max_length 
+		if @max_length != NO_MAX_LENGTH and current_path.length >= @max_length 
 			$logger.info { "Path length >= #{ @max_length }; skipping" }
 			return []
 		end
@@ -372,12 +377,12 @@ class Region
 				count = 0
 				start = Time.now
 				while @@add_searches.length > 0
-					from, to_list = @@add_searches.pop
+					from, to_list, do_shortest = @@add_searches.pop
 
 					$logger.info { "searching #{ from }-#{ to_list }" }
 
 					# Results will be cached within this call
-					$region.find_paths from, to_list
+					$region.find_paths from, to_list, do_shortest
 
 					count += 1
 				end
@@ -407,9 +412,9 @@ class Region
 
 	public 
 
-	def self.add_searches from, to_list
+	def self.add_searches from, to_list, do_shortest = false
 		sq_ants   = Region.ants_to_squares to_list
-		@@add_searches << [ from, sq_ants]
+		@@add_searches << [ from, sq_ants, do_shortest]
 	end
 
 
@@ -753,6 +758,17 @@ private
 		$logger.info { show_regions square }
 	end
 
+
+	def clear_path from, liaison
+		d = Distance.new( liaison, from )
+
+		# Must be next to liaison
+		return false if d.row.abs > 1 or d.col.abs> 1
+
+		# No obstructing water with liaison
+		not from.water_close?
+	end
+
 	#
 	# Given the from and to squares, determine
 	# to which liaison square we need to move in order
@@ -771,10 +787,8 @@ private
 		liaison = get_liaison path[0], path[1]
 		$logger.info { "path_direction liaison #{ liaison }, from #{ from }" }
 
-		#if liaison and liaison.row == from.row and liaison.col == from.col
-		if liaison and Distance.new( liaison, from ).dist <= 2
-			$logger.info { "path_direction #{ from } close enough to  liaison. skipping."} 
-
+		if liaison and clear_path from, liaison 
+			$logger.info { "path_direction #{ from } clear to  liaison. skipping."} 
 			path = path[1,-1]
 			return false if path.nil?
 			return false if path.length < 2
@@ -839,7 +853,7 @@ private
 
 		to_list_r -= get_non_results from_r, to_list_r
 
-		results = LiaisonSearch.new( @liaison, do_shortest, max_length ).search from_r, to_list_r
+		results = LiaisonSearch.new( @liaison, do_shortest, -1 ).search from_r, to_list_r
 
 		#
 		# Store non-paths

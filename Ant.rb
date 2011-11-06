@@ -210,7 +210,25 @@ class MyAnt < Ant
 			str +=  "passable"
 			order dir
 		else
-			evade dir
+			 path_finder = EvadePathFinder.new( square, dir, @left).move
+			 evade_target = path_finder.straight_path
+
+			if evade_target.nil?
+				# Follow the regular evasion
+				evade dir
+			else
+				str << "taking shortcut"
+
+				# Take a shortcut to a point on the evasion path
+				set_order evade_target, :EVADE_GOTO
+
+				# Take the first step, since we are already committed
+				# to moving.
+				dir = path_finder.first_dir
+				order dir unless dir.nil?
+
+			end
+
 		end
 		$logger.info { str }
 	end

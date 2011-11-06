@@ -96,3 +96,117 @@ module Evasion
 	end
 end
 
+
+#
+# pathfinder for single ant
+#
+class EvadePathFinder
+	include Evasion
+
+
+	def initialize square, dir, left
+		$logger.info "EvadePathFinder init #{ square} to #{ dir }"
+
+		@start_left = left
+
+		@start = square
+		@square = square
+		@dir = dir
+		@history = []
+
+		#evade_init
+
+		self
+	end
+
+	def find_path left
+		@left = left
+		@square = @start
+		@history.clear
+		evade_reset
+		catch :done do
+			evade @dir
+			evading while evading? and has_region?
+		end
+		str = (left )? "left" : "right"
+
+		$logger.info { "evasion going #{ str}  goes from #{ @start } to #{ @square} through #{ @history}" }
+	end
+
+	def move
+		# Go as far as you can while evading
+		find_path @start_left
+		self
+	end
+
+	def straight_path
+		opposite = {
+			:N => :S,
+			:E => :W,
+			:S => :N,
+			:W => :E
+		}[ @dir ]
+
+		count = 0
+		cur = @start  
+		last_zero = nil 
+		first_neg = false
+		first_pos = false
+		@history.each do |h|
+			cur = cur.neighbor h
+
+			if h == @dir
+				count += 1	
+			elsif h == opposite 
+				count -= 1	
+			end
+
+			if count == 0
+				last_zero = cur
+			elsif count < 0
+				break if first_pos
+				first_neg = true
+			else
+				break if first_neg
+				first_pos = true
+			end
+		end
+
+		$logger.info { "last_zero #{ last_zero }" }
+		last_zero
+	end
+
+
+	def first_dir
+		if @history.nil?
+			nil
+		else
+			@history[0]
+		end
+	end
+
+	# Following adapted from class Ant
+
+	#
+	# Test if folllowing square has been mapped
+	#
+	def has_region? 
+		not @square.neighbor(@next_dir).region.nil?
+	end
+
+	def can_pass? newdir
+		@square.neighbor(newdir).land?
+	end
+
+	def stay
+		$logger.info "called"
+		throw :done
+	end
+
+	def order dir
+		@history << dir
+		@square = @square.neighbor dir
+	end
+end
+
+

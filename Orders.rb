@@ -12,6 +12,7 @@ module Orders
 		:ASSEMBLE,
 		:DEFEND_HILL,
 		:RAZE,
+		:EVADE_GOTO,
 		:HARVEST
 	]
 

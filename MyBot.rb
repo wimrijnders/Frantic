@@ -7,13 +7,20 @@ $:.unshift File.dirname($0)
 #		- Especially, throw up a defence if enemy close.
 # - 2-collectives can twitch when leader on diagonal to enemy ( eg. orient N/S and distance(-n,n) ).
 # - Make defensive collectives less scared; if they can surely winning, attack or at the least hold ground
-# - Improve attack resolution; handle multiple attackers.
-# - Don't turn all ants into collectives, if there is no direct threat (but enemies nearby), go forage and harvest.
-# - Don't forage too early in the game (like the first turn).
 # - NB: improve detection of enemy moves - especially snakes like with GoSouth
 #
-# Detect symmetry in map!
-#
+# - All searches to the thread
+# - Allow unlimited depth searches -> store all interim results in cache
+# - Region mapping thru ant movement also with symmetry
+#     - same with food, if you please.
+# - Better raze attack. Currently, the horde is unorganized and tends to attack all hills at once.
+# - attack in collective-2's if at all possible
+# - Improve evasion (pathfinding?)
+# - Help symmetry tests with results of confirmed symmetries
+# - Pathfinder evasion for collectives
+# - !!! Deal with region going around corners (or even wrapping around!)
+# - evasion: choose best direction
+#     - ie. the direction which brings you closer to the target
 #
 # Games to beat:
 # Both with 3xGoSouth
@@ -140,7 +147,7 @@ class Strategy < BaseStrategy
 				if near_friends.length > 0
 					$logger.info "Disbanding defenders"
 					near_friends.each do |ant|
-						ant.remove_target_from_order square
+						ant.clear_order :DEFEND_HILL
 					end
 				end
 			end

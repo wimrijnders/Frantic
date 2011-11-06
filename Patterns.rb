@@ -722,6 +722,23 @@ class Patterns
 	end
 
 
+	#
+	# Perform all possible fill-ins, based
+	# on currently known symmetries.
+	#
+	def fill_map source
+		did_blanks = false
+
+		@tests.each do |test|
+			next unless test.confirmed
+			did_blanks = true
+
+			fill_square test, source
+		end
+
+		did_blanks
+	end
+
 	private 
 
 	def ai
@@ -807,22 +824,31 @@ class Patterns
 	end
 
 
+
+
 	#
 	#	Given the symmetry and the symmetry point, fill in the blanks
+	#
+	def fill_square test, source
+		if source.done_region
+			targets = test.get_source_targets source
+			targets.each do |t|
+				fill_region source, t[0], t[1]
+			end
+		end
+	end
+
+
+	#
+	# Fill in the blanks for all known points
+	# for a given test
 	#
 	def fill_all test 
 		$logger.info "entered"
 
 		(0...ai.rows).each do |row|
 			(0...ai.cols).each do |col|
-				source = ai.map[row][col]
-
-				if source.done_region
-					targets = test.get_source_targets source
-					targets.each do |t|
-						fill_region source, t[0], t[1]
-					end
-				end
+				fill_square test, ai.map[row][col]
 			end
 		end
 	end
@@ -880,7 +906,7 @@ class Patterns
 					# It's a new hill, start a path search to it from all our hills
 					ai.hills.each_friend do |c|
 						$logger.info "starting search to the hill"
-						Region.add_searches  c,  [ t[0] ]
+						Region.add_searches  c,  [ t[0] ], true
 					end
 				end
 			end

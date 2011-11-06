@@ -262,8 +262,8 @@ class Order
 		if @liaison
 			# First condition is to keep on moving to final target, 
 			# when all liaisons are passed.
-			if @liaison != sq and Distance.new( @liaison, cur_sq).dist <= 2
-				$logger.info { "Order #{ order } reached liaison #{ @liaison }" }
+			if @liaison != sq and ( @liaison == cur_sq or $region.clear_path(cur_sq, @liaison ) )
+				$logger.info { "Order #{ order } clear path to liaison #{ @liaison }" }
 				@liaison = nil
 			end
 		end

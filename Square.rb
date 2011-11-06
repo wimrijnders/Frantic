@@ -134,5 +134,22 @@ class Square
 			self.row == n[0] and self.col == n[1] 
 		end
 	end
+
+	#
+	# Check if water fields are close by
+	#
+	def water_close? range = 2
+		(-range..range).each do |row|
+			(-range..range).each do |col|
+				sq = rel [ row, col ]
+				if sq.water?
+					$logger.info { "square #{ self } has water in range #{ range}" }
+					return true
+				end
+			end
+		end
+
+		false
+	end
 end
 
