@@ -16,7 +16,7 @@ class Pathinfo
 			@path_dist = Pathinfo.path_distance path
 		else
 			# NOTE: from and to are squares here
-			path = $region.find_path from, to
+			path = $region.find_path from, to, false
 			if path
 				item = $region.get_path_basic path[0], path[-1]
 				$logger.info { "get_path_basic returned nil: #{ item.nil? }" }
@@ -28,12 +28,11 @@ class Pathinfo
 					@path_dist = Pathinfo.path_distance path
 				end
 			end
-
-			unless item.nil?
-			end
 		end
 
 		@distance = calc_distance if @path
+
+		self
 	end
 
 	def self.path_distance path
@@ -52,8 +51,11 @@ class Pathinfo
 			prev = cur
 		end
 
-		path_length = path.length() - 1
-		#$logger.info { "Distance path #{ path } through #{ path_length } liasions: #{ total }." }
+		#$logger.info {
+		#	path_length = path.length() - 1
+		#	"Distance path #{ path } through #{ path_length } liasions: #{ total }." 
+		#}
+
 		total
 	end
 
@@ -76,9 +78,11 @@ class Pathinfo
 			total += @path_dist
 		end
 
-		path_length = @path.length() - 1
-		path_length = 0 if path_length < 0
-		#$logger.info { "Distance #{ @from.to_s }-#{ @to.to_s } through #{ path_length } liasions: #{ total }." }
+		#$logger.info {
+		#	path_length = @path.length() - 1
+		#	path_length = 0 if path_length < 0
+		#	"Distance #{ @from.to_s }-#{ @to.to_s } through #{ path_length } liasions: #{ total }." 
+		#}
 
 		total
 	end
@@ -132,15 +136,23 @@ class LiaisonSearch
 	def initialize cache, find_shortest = false, max_length = nil
 		@liaison = cache
 		@find_shortest = find_shortest
+		@cached_results = {}
 
 		if max_length.nil?
 			@max_length = DEFAULT_MAX_LENGTH
 		else
 			@max_length = max_length 
 
-			if max_length == NO_MAX_LENGTH
-				$logger.info "Doing search with unlimited depth"
-			end
+			$logger.info {
+				str = "Doing search with "
+				if max_length == NO_MAX_LENGTH
+					str << "unlimited depth"
+				else
+					str << "depth #{ max_length }"
+				end
+
+				str
+			}
 		end
 	end
 
@@ -157,7 +169,7 @@ class LiaisonSearch
 
 		if @find_shortest and to_list_r.include? from_r 
 			# Same region always wins
-			$logger.info { "search_liaisons found same region" }
+			$logger.info { "found same region" }
 			return [ [] ]
 		end
 
@@ -177,11 +189,9 @@ class LiaisonSearch
 
 
 	#
-	# NOTE: Apparently not called any more;
-	#       Verify and remove if OK.
 	#
 	def find_first from_r, to_r
-		$logger.info { "find_first #{ from }-#{ to_list }" }
+		$logger.info { "find_first #{ from_r }-#{ to_r }" }
 
 		# Same region always wins
 		if from_r == to_r 
@@ -251,6 +261,17 @@ class LiaisonSearch
 		results = []
 		found_to = []
 
+		known_results = to_list & @cached_results.keys
+		if known_results.length > 0
+			$logger.info { "Already found results for targets #{ known_results}. Not searching these further." }
+			to_list -= @cached_results.keys
+
+			if to_list.length == 0
+				$logger.info "to_list now empty. Not searching further."
+				return []
+			end
+		end
+
 		cur = @liaison[from]
 		if cur
 			to_list.each do |to|
@@ -266,11 +287,13 @@ class LiaisonSearch
 							$logger.info { "search_liaisons path is new shortest" }
 							@cur_best_dist = dist
 							results << result 
+							@cached_results[to] = result
 						else
 							next
 						end
 					else
 						results << result 
+						@cached_results[to] = result
 					end
 
 					found_to << to
@@ -304,11 +327,12 @@ class Region
 
 	@@add_paths = []
 	@@add_searches = []
+	@@add_regions = []
 
 	private 
 
 	def do_thread
-		Thread.new do
+		t1 = Thread.new do
 			Thread.current[ :name ] = "Thread1"
 			$logger.info "activated"
 
@@ -360,9 +384,10 @@ class Region
 			end
 
 			$logger.info "closing down."
-		end
+		end rescue $logger.info( "Boom! #{ $! }" )
+		t1.priority = -1
 
-		Thread.new do
+		t2 = Thread.new do
 			Thread.current[ :name ] = "Thread2"
 			$logger.info "activated"
 
@@ -402,7 +427,51 @@ class Region
 			end
 
 			$logger.info "closing down."
-		end
+		end rescue $logger.info( "Boom! #{ $! }" )
+		t2.priority = -1
+
+		t3 = Thread.new do
+			Thread.current[ :name ] = "FindRegions"
+			$logger.info "activated"
+
+			longest_diff = nil
+			longest_count = nil
+
+			doing = true
+			while doing
+				$logger.info "waiting"
+				sleep 0.2 while @@add_regions.length == 0
+
+				count = 0
+				start = Time.now
+				while @@add_regions.length > 0
+					source = @@add_regions.pop
+
+					$logger.info { "finding regions for #{ source }" }
+					find_regions source 
+					$patterns.fill_map source 
+
+					count += 1
+				end
+
+
+				$logger.info {
+					diff = ( (Time.now - start)*1000 ).to_i
+
+					if longest_diff.nil? or diff > longest_diff
+						longest_diff = diff
+						longest_count = count
+					end
+					str = " Longest: #{ longest_count } regions in #{ longest_diff } msec"
+
+					"added #{ count } regions in #{ diff} msec. #{ str }" 
+				}
+
+			end
+
+			$logger.info "closing down."
+		end rescue $logger.info( "Boom! #{ $! }" )
+		t3.priority = -1
 	end
 
 	def self.add_paths result
@@ -414,7 +483,15 @@ class Region
 
 	def self.add_searches from, to_list, do_shortest = false
 		sq_ants   = Region.ants_to_squares to_list
+		$logger.info { "Adding search #{ from }-#{ sq_ants }, #{ do_shortest }" }
 		@@add_searches << [ from, sq_ants, do_shortest]
+	end
+
+	def self.add_regions source
+		return if source.done_region
+
+		$logger.info { "Adding region search for #{ source }" }
+		@@add_regions << source 
 	end
 
 
@@ -924,6 +1001,9 @@ private
 					result = []
 				end
 			end		
+		elsif not do_search
+			$logger.info "putting search on backburner"
+			Region.add_searches from, [ to ], true
 		end
 
 		result
@@ -952,7 +1032,6 @@ private
 		# Only do search if specified
 		if not result and do_search
 			result = LiaisonSearch.new( @liaison).find_first from_r, to_r
-
 			store_path from_r, to_r, [ result ]
 		end
 
@@ -1082,15 +1161,24 @@ private
 		to_list_r = Region.squares_to_regions sq_ants
 
 		paths = find_paths_cache from_r, to_list_r
-		if paths.length == 0 and do_search
-			found = search_paths from_r, to_list_r, false, 5
+		if paths.length == 0
+			if do_search
+				# TODO: see if we can remove this block
+
+				found = search_paths from_r, to_list_r, false, 5
 	
-			if found and found.length > 0
-				# Add distance information to results
-				# NB: this distance is not used later on
-				found.each do | path |
-					paths << { :path => path, :dist => Pathinfo.path_distance( path ) }
+				if found and found.length > 0
+					# Add distance information to results
+					# NB: this distance is not used later on
+					found.each do | path |
+						paths << { :path => path, :dist => Pathinfo.path_distance( path ) }
+					end
 				end
+			else
+				# Let the backburner thread handle searching the path
+				$logger.info "Sending path query to backburner."
+				Region.add_searches sq, sq_ants, false
+				return []
 			end
 		end
 

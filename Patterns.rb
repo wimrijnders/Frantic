@@ -621,7 +621,7 @@ class Patterns
 		@tests = []
 		Hypothesis.set_ai ai
 
-		Thread.new do
+		t = Thread.new do
 			Thread.current[ :name ] = "Patterns"
 			$logger.info "activated"
 
@@ -664,6 +664,7 @@ class Patterns
 
 			$logger.info "closing down."
 		end
+		t.priority = -1
 	end
 
 
@@ -884,7 +885,9 @@ class Patterns
 		# This is the preliminary fill; afterwards, every new ant step will
 		# fill in symmetrically
 		$logger.info "Fill in rest of map"
+		priority = -2
 		fill_all test 
+		priority = -1
 
 		# Determine new hill locations
 				

@@ -271,10 +271,14 @@ class Order
 		unless @liaison
 			liaison  = $region.path_direction cur_sq, sq
 			if liaison.nil?
-				$logger.info { "ERROR: No liason for order #{ order } to target #{ sq }" }
+				$logger.info { "WARNING: No liason for order #{ order } to target #{ sq }" }
 
-				# Ty to reach final target
-				@liaison = sq
+				# We must have drifted off the path - restart search
+				Region.add_searches sq, [ cur_sq ], true 
+
+				# Don' specify move at this moment
+				return nil
+
 			elsif false === liaison
 				$logger.info "no liaison needed - move directly"
 				# Note that we use the liaison member for the target move
@@ -298,9 +302,6 @@ end
 # useful when you are only interested in viewing
 #
 def closest_ant_view l, ai 
-	
-	$logger.info { "start" }
-
 	ants = ai.my_ants 
 
 	cur_best = nil
@@ -316,7 +317,6 @@ def closest_ant_view l, ai
 		end
 	end
 
-	$logger.info { "end" }
 	cur_best
 end
 

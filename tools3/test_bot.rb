@@ -7,7 +7,7 @@
 live    = true
 bot_num = nil 
 turns   = 1000 
-flags   = "--turntime=5000" # "--nolaunch"
+flags   = "--turntime=1500" # "--nolaunch"
 
 
 #

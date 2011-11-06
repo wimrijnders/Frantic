@@ -321,8 +321,8 @@ module Orders
 
 			# Check if in-range when visible for food
 			if order_order == :FORAGE
-				$logger.info "Check if food still there"
 				sq = order_sq
+				$logger.info "Check if food at #{ sq } still there"
 
 				closest = closest_ant_view [ sq.row, sq.col], @ai
 				unless closest.nil?
@@ -337,7 +337,7 @@ module Orders
 						else
 							$logger.info "Food still there: yes"
 
-							# Very special case; sometimes food appears right next to
+							# Special case; sometimes food appears right next to
 							# ant (eg first turn next to an anthill). For some reason
 							# it does not get consumed immediately
 							if d.dist == 1
@@ -391,7 +391,12 @@ module Orders
 		end
 
 		if $region
-			move_to @orders[0].handle_liaison( self.square, ai )
+			to = @orders[0].handle_liaison( self.square, ai )
+			if to.nil? 
+				return false
+			else
+				move_to to
+			end
 		else
 			move_to sq
 		end

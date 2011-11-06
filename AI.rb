@@ -221,14 +221,18 @@ class FoodList
 
 	def add coord
 		# Check if already present
+
+		# Incredibly, following line returns false positives sometimes
+		# TODO: check out how to handle this
 		index = @list.index coord
+
 		if index
 			$logger.info { "Food at #{ coord } already present" }
 			@list[index].active = true
 		else
 			$logger.info { "New food at #{ coord }" }
 			@list << Food.new( coord )
-			Region.add_searches @ai.map[ coord[0]][ coord[1] ], @ai.my_ants
+			Region.add_searches @ai.map[ coord[0]][ coord[1] ], @ai.my_ants, true
 		end
 	end
 
@@ -541,15 +545,16 @@ class AI
 		# determine all known squares and regions
 		did_blanks = false
 		my_ants.each do |ant|
-			$region.find_regions ant.square
-			did_blanks = true if $patterns.fill_map ant.square
+			Region.add_regions ant.square
 		end unless $region.nil?
 
 		if did_blanks
 			$logger.info "Did fill_map"
 		end
 
+		$timer.start "detect_enemies"
 		detect_enemies new_enemy_ants
+		$timer.end "detect_enemies"
 
 		return ret
 	end

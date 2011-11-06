@@ -129,11 +129,19 @@ class MyAnt < Ant
 	end
 
 	def default
+		
+		return :STAY if stuck?
+
 		best = nil
 		best_dir = nil
 		# Select least visited direction
 		[ :N, :E, :S, :W, :N,:E, :S, :W ][ @next_default_dir, 4].each do |dir|
-		#[ :N, :E, :S, :W, :N,:E, :S, :W ][ rand(4).to_i, 4].each do |dir|
+
+			# Don't enter a cul-de-sac in default move
+			next if @square.neighbor( dir ).hole?
+
+			# Don't bump int walls 
+			next if @square.neighbor( dir ).water?
 		
 			visited = @square.neighbor( dir ).visited
 
@@ -146,7 +154,9 @@ class MyAnt < Ant
 	
 		if best.nil?
 			# Prob never called; never mind
-			@default
+			#@default
+			$logger.info "stuck"
+			:STAY 
 		else
 			best_dir
 		end	
@@ -203,32 +213,61 @@ class MyAnt < Ant
 		square.neighbor(newdir).passable?
 	end
 
-	def move dir
+	#
+	# Check if ant can not move at all
+	#
+	def stuck?
+		count = 0
+		[ :N, :E, :S, :W ].each do |dir|
+			count += 1 if can_pass? dir
+		end
+
+		count == 0
+	end
+
+	def move dir, target = nil
 		str = "move from #{ square.to_s } to #{ dir } - "
 
-		if can_pass? dir
+		if dir == :STAY
+			str +=  "stuck"
+			stay
+		elsif can_pass? dir
 			str +=  "passable"
 			order dir
 		else
-			 path_finder = EvadePathFinder.new( square, dir, @left).move
-			 evade_target = path_finder.straight_path
+			path_finder = EvadePathFinder.new square, dir, @left
 
-			if evade_target.nil?
-				# Follow the regular evasion
-				evade dir
-			else
-				str << "taking shortcut"
-
-				# Take a shortcut to a point on the evasion path
-				set_order evade_target, :EVADE_GOTO
-
-				# Take the first step, since we are already committed
-				# to moving.
-				dir = path_finder.first_dir
-				order dir unless dir.nil?
-
+			do_it = true
+			unless target.nil?
+				best = path_finder.best_direction target
+				if best.nil?
+					str << "Have no path"
+					do_it = false
+				else
+					@left = best
+				end
 			end
 
+			if do_it
+				evade_target = path_finder.move.straight_path
+	
+				if evade_target.nil?
+					# Follow the regular evasion
+					evade dir
+				else
+					str << "taking shortcut"
+	
+					# Take a shortcut to a point on the evasion path
+					set_order evade_target, :EVADE_GOTO
+	
+					# Take the first step, since we are already committed
+					# to moving.
+					dir = path_finder.first_dir
+					if not dir.nil? and square.neighbor(dir).passable?
+						order dir
+					end
+				end
+			end
 		end
 		$logger.info { str }
 	end
@@ -244,7 +283,8 @@ class MyAnt < Ant
 	# Move ant in the direction of the specified square
 	# 
 	def move_to to
-		move_dir Distance.new( @square, to)
+		d = Distance.new( @square, to)
+		move d.dir( @square), to
 	end
 
 	def retreat
@@ -355,7 +395,7 @@ class MyAnt < Ant
 
 
 	def add_enemies enemies
-		@enemies = $region.get_neighbors_sorted self, enemies, true 
+		@enemies = $region.get_neighbors_sorted self, enemies
 	end
 
 

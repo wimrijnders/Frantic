@@ -151,5 +151,17 @@ class Square
 
 		false
 	end
+
+	#
+	# Check if current square has only exit
+	# 
+	def hole?
+		count = 0
+		[ :N, :E, :S, :W ].each do |dir|
+			count += 1 if neighbor(dir).water?
+		end
+
+		count == 3
+	end
 end
 
