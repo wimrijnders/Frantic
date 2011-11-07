@@ -6,36 +6,46 @@ class Logger
 		@start = Time.now
 
 		@f = {}
-		@f[ "Main" ] = File.new( "log.txt", "w") if @log
+		@q = []
 	end
 
-	def info str = nil
+	def q str
 		return unless @log
+
+		@q << str
+	end
+	
+
+	def info str = nil
+		# setting str to boolean value 'true' and passing 
+		# a block forces override of log inhibition.
+		# I use this to output timer info without outputting 
+		# regular traces
+		return unless @log or str === true
 
 		time = (Time.now - @start)*1000
 
-		thread_disp = ""
 		if Thread.current != Thread.main
 			thread = Thread.current[ :name ]
-			thread_disp = "#{ thread } "
-
-			if @f[thread].nil?	
-				filename = thread + "_log.txt"
-
-    			#File.delete( filename ) if File.exist?( filename )
-
-				@f[ thread ] = File.new( filename, "w")
-			end
 		else 
 			thread = "Main"
 		end
 
-		if str
-			out thread, "#{ time.to_i } - #{ thread_disp }#{ caller_method_name}: #{ str }"
+		if @f[thread].nil?	
+			if Thread.current != Thread.main
+				filename = thread + "_log.txt"
+			else 
+				filename = "log.txt"
+			end
+
+			@f[ thread ] = File.new( filename, "w")
 		end
+
 		if block_given?
-			out thread, "#{ time.to_i } - #{ thread_disp }#{ caller_method_name }: #{ yield }"
+			 str = yield
 		end
+
+		out thread, "#{ time.to_i } - #{ caller_method_name}: #{ str }"
 	end
 
 	def log= val
@@ -45,10 +55,12 @@ class Logger
 	private
 
 	def out thread, str
-		if @log 
-			@f[ thread ].write str + "\n"
-			@f[ thread ].flush
+		while qval = @q.pop
+			@f[ thread ].write "queue: #{ qval }\n"
 		end
+
+		@f[ thread ].write str + "\n"
+		@f[ thread ].flush
 
 		#@@ai.stdout.puts str 
 		#@@ai.stdout.flush
@@ -77,17 +89,36 @@ end
 
 
 class Timer
+
 	def initialize
-		@list = {}
+		clear
+		@max = {}
 	end
 
 	def start str
-		@list[ str ] = [ Time.now, nil ]
+		@list[ str ] = [ Time.now, nil, @count ]
+		@count += 1
+
+		if block_given?
+			yield
+			self.end str
+		end
+	end
+
+	def add_max str, value
+		if @max[ str ].nil? or value > @max[str]
+			@max[ str ] = value
+		end
 	end
 
 	def end str
-		if @list[str]
-			@list[str][1] = Time.now
+		v = @list[str]
+		if v 
+			v[1] = Time.now
+
+			value = ( (v[1] - v[0])*1000 ).to_i 
+
+			add_max str, value
 		else
 			$logger.info { "No start time for #{ str } " }
 		end
@@ -95,16 +126,32 @@ class Timer
 
 	def clear
 		@list = {}
+		@count = 0
 	end
 
 	def display
+		#$logger.info (true) {
 		$logger.info {
 			str = "Timer results:\n";
+			max_k = nil
 			@list.each_pair do |k,v|
-				str << "...'#{ k }' took #{ ( (v[1] - v[0])*1000).to_i } msec\n"
+				if max_k.nil? or max_k.length < k.length
+					max_k = k
+				end
 			end
 
-			str
+			lines = []
+			@list.each_pair do |k,v|
+				value = ( (v[1] - v[0])*1000 ).to_i 
+				lines << [ 
+					"   %-#{ max_k.length }s:%5d msec; max%5d msec" % [ k, value, @max[k] ],
+					 v[2]
+				]
+			end
+
+			lines.sort! { |l1, l2| l1[1] <=> l2[1] }
+
+			str + lines.transpose[0].join( "\n" )
 		}
 	end
 

@@ -125,7 +125,14 @@ class EvadePathFinder
 		evade_reset
 		catch :done do
 			evade @dir
-			evading while evading? and has_region?
+			while evading? and has_region?
+				evading
+
+				if @square == @start
+					$logger.info "Evaded back to original square!"
+					break
+				end
+			end
 		end
 		str = (left )? "left" : "right"
 
@@ -145,13 +152,20 @@ class EvadePathFinder
 	# The internal state of self is set to this target
 	#
 	def best_direction target
+		d1 = nil
+		d2 = nil
+
 		find_path true 
-		target1 = @square
-		d1 = Pathinfo.new(target1, target).dist
+		if @square != @start
+			target1 = @square
+			d1 = Pathinfo.new(target1, target).dist
+		end
 
 		find_path false 
-		target2 = @square
-		d2 = Pathinfo.new(target2, target).dist
+		if @square != @start
+			target2 = @square
+			d2 = Pathinfo.new(target2, target).dist
+		end
 
 		# Select known paths over unknown paths
 		if d1.nil? and not d2.nil?

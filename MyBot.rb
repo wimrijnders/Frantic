@@ -103,9 +103,8 @@ class Strategy < BaseStrategy
 	# Handle non-collective ants which are in a conflict situation
 	#
 	def ant_conflict ai
-		$logger.info "=== Conflict Phase ==="
-
 		$logger.info "check if own hills are safe"
+
 		ai.hills.each_friend do |square| 
 			# Find nearest enemies	
 			near_enemies = BaseStrategy.nearby_ants_region square, ai.enemy_ants, true 
@@ -145,8 +144,13 @@ class Strategy < BaseStrategy
 			else
 				near_friends = BaseStrategy.nearby_ants_region square, ai.my_ants, true 
 				if near_friends.length > 0
-					$logger.info "Disbanding defenders"
+					first = true
 					near_friends.each do |ant|
+						if first
+							$logger.info "Disbanding defenders"
+							first = false
+						end
+						
 						ant.clear_order :DEFEND_HILL
 					end
 				end
@@ -162,40 +166,7 @@ class Strategy < BaseStrategy
 	end
 
 
-	def turn ai
-		if ai.throttle?
-			# All ants on top of hills should stay put
-			ai.my_ants.each do |ant|
-				if ai.hills.my_hill? ant.square.to_coord
-					$logger.info { "#{ ant } staying put on hill due to throttle." }
-					ant.stay
-				end
-			end
-		end
-
-		# Determine ant furthest away from first own active hill,
-		# for the pattern matcher
-		ai.hills.each_friend do |sq|
-			furthest = BaseStrategy.nearby_ants_region( sq, ai.my_ants).reverse[0]
-
-			$patterns.add_square furthest.square if furthest
-			break
-		end
-
-		check_attacked ai	
-
-		$logger.info "=== Collective Phase ==="
-		Collective.complete_collectives ai
-		if not ai.kamikaze? 
-			unless enough_collectives ai
-				Collective.create_collectives ai unless ai.kamikaze? 
-			else
-			end
-		end
-		find_food ai
-		ant_conflict ai
-
-		$logger.info "=== Hill Phase ==="
+	def handle_hills ai
 
 		# preliminary test - let all available ants attack an anthill
 		ai.hills.each_enemy do |owner, l|
@@ -229,9 +200,72 @@ class Strategy < BaseStrategy
 			end unless nearby_ants.nil?
 
 		end if $region
+	end
+
+
+	#
+	# Main turn routine
+	#
+	def turn ai
+		$logger.info "=== Init Phase ==="
+		$timer.start "Init Phase"
+
+		if ai.throttle?
+			# All ants on top of hills should stay put
+			ai.my_ants.each do |ant|
+				if ai.hills.my_hill? ant.square.to_coord
+					$logger.info { "#{ ant } staying put on hill due to throttle." }
+					ant.stay
+				end
+			end
+		end
+
+		# Determine ant furthest away from first own active hill,
+		# for the pattern matcher
+		ai.hills.each_friend do |sq|
+			furthest = BaseStrategy.nearby_ants_region( sq, ai.my_ants).reverse[0]
+
+			$patterns.add_square furthest.square if furthest
+			break
+		end
+
+		check_attacked ai	
+
+		$timer.end "Init Phase"
+
+		$logger.info "=== Collective Phase ==="
+		$timer.start "Collective Phase"
+		Collective.complete_collectives ai
+		if not ai.kamikaze? 
+			unless enough_collectives ai
+				Collective.create_collectives ai unless ai.kamikaze? 
+			else
+			end
+		end
+		$timer.end "Collective Phase"
+
+
+		$logger.info "=== Food Phase ==="
+		$timer.start( "Food Phase") {
+			find_food ai
+		}
+
+
+		$logger.info "=== Conflict Phase ==="
+		$timer.start( "Conflict Phase" ) {
+			ant_conflict ai
+		}
+
+		$logger.info "=== Hill Phase ==="
+		$timer.start( "Hill Phase" ) {
+			handle_hills ai
+		}
+
 
 		if ai.kamikaze? and ai.enemy_ants.length > 0
 			$logger.info "=== Kamikaze Phase ==="
+			$timer.start "Kamikaze Phase"
+
 			ai.my_ants.each do |ant|
 				next if ant.orders?
 				next if ant.moved?
@@ -242,9 +276,12 @@ class Strategy < BaseStrategy
 					ant.set_order enemy.square, :ATTACK
 				end
 			end
+
+			$timer.end "Kamikaze Phase"
 		end
 
-		$logger.info "=== Harvester Enlist Phase ==="
+		$logger.info "=== Enlist Phase ==="
+		$timer.start "Enlist Phase"
 		# Don't harvest if	not enough ants
 		if ai.my_ants.length > 10
 			ai.my_ants.each do |ant|
@@ -253,21 +290,46 @@ class Strategy < BaseStrategy
 				next if ant.collective?
 				#next if Trail.follow_trail ant
 
-				# Don't harvest if other ants around
-				next if ant.neighbor_friends( 10).length > 0
-				next if ant.neighbor_enemies( 10).length > 0
+				# NB: disabled due to performance
+				#     This may be false economy, though, because
+				#     these calls, which cache the results, are also 
+				#     called elsewhere
+				#
+				## Don't harvest if other ants around
+				#next if ant.neighbor_friends( 10).length > 0
+				#next if ant.neighbor_enemies( 10).length > 0
+
+				# Don't forage too close to own hills
+				too_close = false
+				ai.hills.each_friend do |sq|
+					d = Distance.new sq, ant.square
+					if d.in_view?
+						too_close = true
+						break
+					end
+				end
+				next if too_close
 
 				# If nothing else to do, turn into a harvester
 				ai.harvesters.enlist ant
 			end
 		end
+		$timer.end "Enlist Phase"
 
 		$logger.info "=== Move Collective Phase ==="
-		Collective.move_collectives ai
+		$timer.start( "Colmove Phase") {
+			Collective.move_collectives ai
+		}
 
-		ant_orders ai
+		$logger.info "=== Order Phase ==="
+		$timer.start( "Order Phase" ) {
+			ant_orders ai
+		}
 
-		super ai, false, false #, ( !ai.kamikaze? ) 
+		$logger.info "=== Super Phase ==="
+		$timer.start( "Super Phase" ) {
+			super ai, false, false #, ( !ai.kamikaze? ) 
+		}
 	end
 end
 

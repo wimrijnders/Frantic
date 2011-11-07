@@ -1,132 +1,6 @@
 #require 'thread'
 #$mutex = Mutex.new
 
-class WorkerThread < Thread
-
-	def initialize name, region, list
-		@region = region
-		@list = list
-
-		super do 
-		begin
-			Thread.current[ :name ] = name 
-
-			$logger.info "activated"
-
-			longest_diff = nil
-			longest_count = nil
-
-			doing = true
-			while doing
-				$logger.info "waiting"
-				sleep 0.2 while list.length == 0
-
-				count = 0
-				start = Time.now
-				init_loop
-				while list.length > 0
-					# Handle next item
-					action list.pop
-
-					count += 1
-				end
-				done_loop
-
-				$logger.info {
-					diff = ( (Time.now - start)*1000 ).to_i
-
-					if longest_diff.nil? or diff > longest_diff
-						longest_diff = diff
-						longest_count = count
-
-					end
-
-					str = " Longest: #{ longest_count } in #{ longest_diff } msec"
-
-					"added #{ count } results in #{ diff} msec. #{ str }" 
-				}
-
-			end
-
-			$logger.info "closing down."
-		end rescue $logger.info( "Boom! #{ $! }" )
-		end
-	end
-
-	def list
-		@list
-	end
-
-
-	def init_loop
-	end
-
-
-	def done_loop
-	end
-end
-
-
-class Thread1 < WorkerThread
-	def initialize region, list
-		super("Thread1", region, list)
-	end
-
-	def init_loop
-		@new_count, @known_count, @replaced_count = 0, 0, 0 
-	end
-
-	def action path
-		return if path.length == 0
-
-		$logger.info { "saving path: #{ path }" }
-		# Cache the result
-		new_tmp, known_tmp, replaced_tmp = @region.set_path path
-		@new_count      += new_tmp
-		@known_count    += known_tmp
-		@replaced_count += replaced_tmp
-
-		new_tmp, known_tmp, replaced_tmp = @region.set_path path.reverse
-		@new_count      += new_tmp
-		@known_count    += known_tmp
-		@replaced_count += replaced_tmp
-	end
-
-	def done_loop
-		$logger.info {
-			"new: #{ @new_count}, known: #{ @known_count }, replaced: #{ @replaced_count }"
-		}
-	end
-end
-
-class Thread2 < WorkerThread
-	def initialize region, list
-		super("Thread2", region, list)
-	end
-
-	def action item
-		from, to_list, do_shortest = item 
-
-		$logger.info { "searching #{ from }-#{ to_list }" }
-
-		# Results will be cached within this call
-		@region.find_paths from, to_list, do_shortest
-	end
-end
-
-
-class RegionsThread < WorkerThread
-	def initialize region, list
-		super("FindRegions", region, list)
-	end
-
-	def action source
-		$logger.info { "finding regions for #{ source }" }
-		@region.find_regions source 
-		$patterns.fill_map source 
-	end
-end
-
 
 class Pathinfo
 	@@region = nil
@@ -258,8 +132,8 @@ end
 class LiaisonSearch
 
 	NO_MAX_LENGTH      = -1
-	DEFAULT_MAX_LENGTH = 15
-	MAX_COUNT          = 4000
+	DEFAULT_MAX_LENGTH = 10
+	MAX_COUNT          = 5000
 
 	def initialize cache, find_shortest = false, max_length = nil
 		@liaison = cache
@@ -468,6 +342,7 @@ class LiaisonSearch
 		sleep 0.02
 		Thread.pass
 
+
 		results
 	end
 end
@@ -485,14 +360,20 @@ class Region
 	private 
 
 	def do_thread
-		t = Thread1.new self, @@add_paths
-		t.priority = -2
+		t1 = Thread1.new self, @@add_paths
+		t1.priority = -2
 
-		t = Thread2.new self, @@add_searches
-		t.priority = -1
-		t = RegionsThread.new self, @@add_regions
-		t.priority = -2
+		t2 = Thread2.new self, @@add_searches
+		t2.priority = -1
 
+		t3 = RegionsThread.new self, @@add_regions
+		t3.priority = -2
+
+		# Thread.pass does NOT work!
+		sleep 0.1	
+		t1.run
+		t2.run
+		t3.run
 	end
 
 	def self.add_paths result

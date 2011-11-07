@@ -11,6 +11,8 @@ require 'Distance.rb'
 require 'MoveHistory.rb'
 require 'Collective.rb'
 require 'Harvesters.rb'
+require 'Food.rb'
+require 'Threads.rb'
 require 'Region.rb'
 require 'Patterns.rb'
 require 'Ant.rb'
@@ -105,172 +107,6 @@ class Hills
 	end
 end
 
-class Food
-	attr_accessor :coord, :active
-
-	COUNTER_LIMIT = 20
-
-	def initialize coord
-		@coord = coord
-		@active = true
-		@ants = []
-		@counter = 0
-	end
-
-	def == coord
-		@coord[0] == @coord[0] and @coord[1] == coord[1]
-	end
-
-	def row
-		@coord[0]
-	end
-
-	def col
-		@coord[1]
-	end
-
-	def add_ant ant
-		unless @ants.include? ant
-			@ants << ant
-			$logger.info { "Added ant #{ ant } to food." }
-		else
-			$logger.info { "Ant #{ ant } already present in food." }
-		end
-	end
-
-	def remove_ant ant
-		index = @ants.index ant
-
-		if index
-			@ants.delete ant
-			$logger.info { "Removed ant #{ ant } from food." }
-		#else
-		#	$logger.info { "Ant #{ ant } not present in food." }
-		end
-	end
-
-
-	def clear_orders
-		@ants.each do |ant|
-			ant.remove_target_from_order ant.ai.map[ row ][ col]
-		end
-	end
-
-	#
-	#
-	def should_forage?
-		# Only forage active food
-		return false unless active
-
-		if @counter > COUNTER_LIMIT	
-			$logger.info "Finding food taking too long. Forcing search."
-			@counter = 0
-			return true
-		else
-			@counter += 1
-		end
-
-		# Make a list of all the current orders for foraging.
-		# Keep track of the forage order sequence.
-		forages = {}
-		sq_search = nil
-		@ants.each do | ant |
-			# Note that this is square of food
-			sq_search = ant.ai.map[ row ][ col] if sq_search.nil?
-
-			$logger.info "Testing #{ ant }"
-
-			list = ant.find_orders :FORAGE, sq_search
-
-			list.each_pair do |sq,v|
-				k = sq.row.to_s + "_" + sq.col.to_s
-				if forages[k].nil? or forages[k] > v
-					forages[k] = v
-				end
-			end
-		end
-
-		$logger.info {
-			str =""
-			forages.each_pair do |k,v|
-				str << "    #{ k }: #{v}\n"
-			end
-
-			"Food #{ @coord}, found following foraging actions:\n#{ str }"
-		}
-
-		# Check score of current food
-		k = @coord[0].to_s + "_" + @coord[1].to_s
-
-		forages[ k ].nil? or forages[ k ] >= 2
-	end
-end
-
-
-class FoodList
-	@ai = nil
-
-	def initialize ai
-		@ai = ai unless @ai
-		@list = []
-	end
-
-	def start_turn
-		@list.each { |f| f.active = false }
-	end
-
-	def add coord
-		# Check if already present
-
-		# Incredibly, following line returns false positives sometimes
-		# TODO: check out how to handle this
-		index = @list.index coord
-
-		if index
-			$logger.info { "Food at #{ coord } already present" }
-			@list[index].active = true
-		else
-			$logger.info { "New food at #{ coord }" }
-			@list << Food.new( coord )
-			Region.add_searches @ai.map[ coord[0]][ coord[1] ], @ai.my_ants, true
-		end
-	end
-
-	def remove coord
-		index = @list.index coord
-		if index
-			if @list[index].active
-				$logger.info { "Food for deletion at #{ coord } still active!" }
-			end
-
-			# Tell all ants not to search for this food
-			@list[index].clear_orders
-
-			@list.delete_at index
-		else
-			$logger.info { "Food for deletion at #{ coord } not present!" }
-		end
-	end
-
-	def each
-		@list.each {|l| yield l if l.active }
-	end
-
-	def remove_ant ant, coord = nil
-		if coord
-			index = @list.index coord
-			if index
-				@list[index].remove_ant ant
-			else
-				$logger.info { "Food at #{ coord } not present" }
-			end
-		else
-			# Remove ant from all coords
-			@list.each {|l| l.remove_ant ant }
-		end
-	end
-end
-
 
 class AI
 	def defensive?
@@ -355,7 +191,7 @@ class AI
 	def set_throttle
 		val = $timer.get "turn"
 
-		if not val.nil? and val >= @turntime*0.75
+		if not val.nil? and val >= @turntime*0.60
 			@do_throttle = true 
 		else
 			@do_throttle = false
@@ -383,8 +219,10 @@ class AI
 
 				set_throttle
 
-				$timer.start "turn"
+				$timer.start "total"
+
 Thread.exclusive {
+
 				$timer.start "read"
 				over = read_turn
 				$timer.end "read"
@@ -395,11 +233,13 @@ Thread.exclusive {
 				@stdout.puts 'go'
 				@stdout.flush
 }
-
 				$timer.end "turn"
+				$timer.end "total"
+
 				$timer.display
 				turn_count += 1
 			end
+			$logger.info "Exited game loop - goodbye"
 		rescue => e
 			puts "Exception - SystemStackError?"
 			print e.backtrace.join("\n")
@@ -438,8 +278,13 @@ Thread.exclusive {
 	# Internal; reads turn input (map state).
 	def read_turn
 		ret=false
-		rd=@stdin.gets.strip
-		
+		rd = nil
+		$timer.start( "gets.strip" ) {
+			rd=@stdin.gets.strip
+		}
+	
+		$timer.start "turn_init"
+	
 		if rd=='end'
 			@turn_number=:game_over
 			
@@ -472,9 +317,13 @@ Thread.exclusive {
 		new_enemy_ants=[]
 		@food.start_turn
 
+		$timer.end "turn_init"
+
 		$timer.start "loop"
 
 		until((rd=@stdin.gets.strip)=='go')
+			$timer.start "loop_intern"
+
 			_, type, row, col, owner = *rd.match(/(w|f|a|d|h) (\d+) (\d+)(?: (\d+)|)/)
 			row, col = row.to_i, col.to_i
 			owner = owner.to_i if owner
@@ -548,8 +397,15 @@ Thread.exclusive {
 			else
 				warn "unexpected: #{rd}"
 			end
+
+			$timer.end "loop_intern"
 		end
 		$timer.end "loop"
+
+		# Actual turn time starts here, after 'go' has been received
+		$timer.start "turn"
+
+		$timer.start "turn_end"
 
 		# reset the moved ants 
 		@map.each do |row|
@@ -579,6 +435,7 @@ Thread.exclusive {
 		$timer.start "detect_enemies"
 		detect_enemies new_enemy_ants
 		$timer.end "detect_enemies"
+		$timer.end "turn_end"
 
 		return ret
 	end
@@ -818,3 +675,29 @@ $ai.setup do |ai|
 	$patterns = Patterns.new ai
 end
 
+if false
+# Tryouts with exit handlers
+
+at_exit { 
+	#puts "AAARGH! I'm dead!" 
+	$logger.info "I'm dead!"
+}
+
+Signal.trap("HUP") { 
+	$logger.info "Ouch!"
+}
+
+Signal.list.keys.each do |k|
+	if [ "VTALRM", "CONT" ].include? k
+		#Signal.trap( k, proc {
+		#	$logger.q "I just trapped #{ k }"
+		#} )
+	else
+		Signal.trap( k, proc {
+			puts "I just trapped #{ k }"
+			$logger.info "I just trapped #{ k }"
+		} )
+	end
+end
+
+end

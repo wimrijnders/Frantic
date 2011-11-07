@@ -621,50 +621,7 @@ class Patterns
 		@tests = []
 		Hypothesis.set_ai ai
 
-		t = Thread.new do
-			Thread.current[ :name ] = "Patterns"
-			$logger.info "activated"
-
-			@radius = ( ai.viewradius/Math.sqrt(2) ).to_i
-
-			$logger.info "viewradius2: #{ ai.viewradius2 }"
-			$logger.info "radius: #{ @radius }"
-
-			init_tasks
-
-			doing = true
-			while doing
-				$logger.info "waiting"
-				sleep 0.2 while @add_squares.length == 0
-
-				# Only handle last square added
-				square = @add_squares.pop
-				@add_squares.clear
-
-				$logger.info { "Got square #{ square}" }
-				show_field square
-
-				match_tests square
-
-
-				# Loop exit condition; no more tests to do.
-
-				all_confirmed = true 
-				@tests.each do |t|
-					unless t.confirmed
-						all_confirmed = false
-						break
-					end
-				end
-				if all_confirmed
-					$logger.info "No more open tests; yay, we're done!"
-					doing = false
-				end
-			end rescue $logger.info "Boom! #{ $! }"
-
-			$logger.info "closing down."
-		end
-		t.priority = -3
+		patterns_thread
 	end
 
 
