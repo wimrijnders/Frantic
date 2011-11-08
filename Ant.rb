@@ -117,10 +117,11 @@ class MyAnt < Ant
 		@attack_distance = nil
 		@enemies = [] 
 
+		@default_i = @@default_index
 		@default = [ :N, :E, :S, :W ][ @@default_index ]
 		@@default_index = ( @@default_index + 1 ) % 4
 
-		@next_default_dir = 0
+		#@next_default_dir = 0
 
 		evade_init
 		orders_init
@@ -135,7 +136,8 @@ class MyAnt < Ant
 		best = nil
 		best_dir = nil
 		# Select least visited direction
-		[ :N, :E, :S, :W, :N,:E, :S, :W ][ @next_default_dir, 4].each do |dir|
+		#[ :N, :E, :S, :W, :N,:E, :S, :W ][ @next_default_dir, 4].each do |dir|
+		[ :N, :E, :S, :W, :N,:E, :S, :W ][ @default_i, 4].each do |dir|
 
 			# Don't enter a cul-de-sac in default move
 			next if @square.neighbor( dir ).hole?
@@ -150,7 +152,7 @@ class MyAnt < Ant
 				best_dir = dir
 			end
 		end
-		@next_default_dir = ( @next_default_dir +1 ) % 4 
+		#@next_default_dir = ( @next_default_dir +1 ) % 4 
 	
 		if best.nil?
 			# Prob never called; never mind

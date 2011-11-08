@@ -193,7 +193,7 @@ class Strategy < BaseStrategy
 				available_ants << ant
 			end
 
-			nearby_ants = BaseStrategy.nearby_ants_region sq, available_ants, true
+			nearby_ants = BaseStrategy.nearby_ants_region sq, available_ants, true, -1
 
 			nearby_ants.each do |ant|
 				ant.set_order sq, :RAZE
@@ -270,9 +270,10 @@ class Strategy < BaseStrategy
 				next if ant.orders?
 				next if ant.moved?
 
-				# if not doing anything else, move towards a random enemy
+				# if not doing anything else, move towards  the nearest enemy
 				if ant.enemies and ant.enemies.length > 0
-					enemy = ant.enemies[ Random.rand( ant.enemies.length ) ][0]
+					#enemy = ant.enemies[ Random.rand( ant.enemies.length ) ][0]
+					enemy = ant.enemies[ 0 ][0]
 					ant.set_order enemy.square, :ATTACK
 				end
 			end

@@ -652,7 +652,9 @@ Thread.exclusive {
 
 		@enemy_ants = new_enemy_ants
 
-		@my_ants.each { |b| b.add_enemies @enemy_ants }
+		$timer.start( "sort enemies" ) {
+			@my_ants.each { |b| b.add_enemies @enemy_ants }
+		}
 	end
 end
 

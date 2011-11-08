@@ -34,7 +34,7 @@ class BaseStrategy
 	# Determine which ants are within a reasonable
 	# striking distance of given square
 	#
-	def self.nearby_ants_region sq, ants, all_ants = false
+	def self.nearby_ants_region sq, ants, all_ants = false, max_length = nil
 		$logger.info "called"
 
 		sq_ants = Region.ants_to_squares ants
@@ -47,7 +47,7 @@ class BaseStrategy
 		#if all_ants
 			# Do a cache search only - we rely on the backburner thread
 			# to find the paths for us. 
-			result = $region.get_neighbors_sorted sq, ants
+			result = $region.get_neighbors_sorted sq, ants, false, max_length
 
 			if result.length > 0
 				# Remove distance info
@@ -115,11 +115,65 @@ class BaseStrategy
 	end
 	
 
-	def ant_orders ai
-		ai.my_ants.each do |ant|
-			#next if ant.collective_leader?
-			ant.handle_orders
+	def ant_orders1 ai
+		# WRI try
+		count = 0
+		$timer.start "ant_orders"
+		begin
+			count += 1
+			stuck_count= 0
+			moved = false
+			ai.my_ants.each do |ant|
+				if not ant.moved? and ant.stuck?
+					$logger.info { "turn #{ ai.turn_number }: #{ ant } is stuck" }
+					stuck_count += 1
+				else
+					moved = true if ant.handle_orders
+				end
+			end
+			if count > 1
+				$logger.info { "Iteration #{ count }" }
+			end
+		end while moved and stuck_count > 0 and count < 10
+
+		if count > 1
+			#$timer.end "ant_orders"
+			$logger.info { "Did #{ count } iterations, #{ $timer.current("ant_orders") }" }
 		end
+	end
+
+	def move_neighbors list
+		ant = list[-1]
+
+		if not ant.moved? and not ant.stuck?
+			ant.handle_orders
+			return true 
+		end
+
+		[ :N, :E, :S, :W ].each do |dir|
+			ant2 = ant.square.neighbor( dir ).ant
+			if ant2 and
+			   ant2.mine? and
+			   ant2.moved? and
+			   not list.include? ant2
+			
+				if move_neighbors list + [ ant2 ]	
+					ant.handle_orders
+					return true
+				end
+			end
+		end
+
+		false
+	end
+
+	def ant_orders ai
+		# WRI try
+		$timer.start "ant_orders"
+		ai.my_ants.each do |ant|
+			move_neighbors [ant]
+		end
+		$timer.end "ant_orders"
 	end
 
 

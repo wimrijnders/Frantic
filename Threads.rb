@@ -129,19 +129,54 @@ class Thread1 < WorkerThread
 end
 
 
-class Thread2 < WorkerThread
+class BigSearchThread < WorkerThread
 	def initialize region, list
-		super("Thread2", region, list)
+		$logger.info "Initializing BigSearchThread"
+		super("BigSearchThread", region, list)
 	end
 
 	def action item
 
-		from, to_list, do_shortest = item 
+		from, to_list, do_shortest, max_length = item 
 
 		$logger.info { "searching #{ from }-#{ to_list }" }
 
 		# Results will be cached within this call
-		@region.find_paths from, to_list, do_shortest
+		@region.find_paths from, to_list, do_shortest, max_length
+
+		#WorkerThread.start_next "Patterns"
+	end
+end
+
+
+class Thread2 < WorkerThread
+	def initialize region, list
+		super("Thread2", region, list)
+		@add_search = []
+	end
+
+	def my_list
+		@add_search
+	end
+
+	def action item
+
+		from, to_list, do_shortest, max_length = item 
+
+		if not max_length.nil? and max_length ==-1
+			$logger.info "Offloading big search"
+			if @add_search.length > 0
+				$logger.info "Already have big search in queue, skipping"
+			else
+				@add_search << item
+			end
+			return
+		end
+
+		$logger.info { "searching #{ from }-#{ to_list }" }
+
+		# Results will be cached within this call
+		@region.find_paths from, to_list, do_shortest, max_length
 
 		#WorkerThread.start_next "Patterns"
 	end

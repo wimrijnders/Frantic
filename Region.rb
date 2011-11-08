@@ -12,32 +12,32 @@ class Pathinfo
 	def initialize from, to, path = nil
 		@from, @to = from, to
 
+		unless path
+			path = $region.find_path from, to, false
+		end
+
 		if path
 			@path = path
 			@path_dist = Pathinfo.path_distance path
-		else
-			# NOTE: from and to are squares here
-			path = $region.find_path from, to, false
-			if path
-				item = $region.get_path_basic path[0], path[-1]
-				$logger.info { "get_path_basic returned nil: #{ item.nil? }" }
-				unless item.nil?
-					@path = item[:path]
-					@path_dist = item[:dist]
-				else
-					@path = path
-					@path_dist = Pathinfo.path_distance path
-				end
-			end
+			@distance = calc_distance
 		end
-
-		@distance = calc_distance if @path
 
 		self
 	end
 
+
 	def self.path_distance path
 		return 0 if path.length <= 2
+		$logger.info "entered"
+
+		# Consult the cache first
+		item = $region.get_path_basic path[0], path[-1]
+		unless item.nil?
+			return item[:dist]
+		end
+
+		# Not in cache; do the calculation
+		$logger.info "path not in cache"
 
 		prev = nil
 		total = 0
@@ -51,6 +51,10 @@ class Pathinfo
 
 			prev = cur
 		end
+
+		# Perhaps TODO: store value into cache
+		#               In that case, consult all other places where distance
+		#               is calculated and stored to cache
 
 		#$logger.info {
 		#	path_length = path.length() - 1
@@ -133,7 +137,7 @@ class LiaisonSearch
 
 	NO_MAX_LENGTH      = -1
 	DEFAULT_MAX_LENGTH = 10
-	MAX_COUNT          = 5000
+	MAX_COUNT          = 8000
 
 	def initialize cache, find_shortest = false, max_length = nil
 		@liaison = cache
@@ -338,10 +342,11 @@ class LiaisonSearch
 			end
 		end
 
+if false
 		$logger.info "Pausing for a breather"
 		sleep 0.02
 		Thread.pass
-
+end
 
 		results
 	end
@@ -366,6 +371,9 @@ class Region
 		t2 = Thread2.new self, @@add_searches
 		t2.priority = -1
 
+		t4 = BigSearchThread.new self, t2.my_list 
+		t4.run
+
 		t3 = RegionsThread.new self, @@add_regions
 		t3.priority = -2
 
@@ -374,6 +382,7 @@ class Region
 		t1.run
 		t2.run
 		t3.run
+		t4.run
 	end
 
 	def self.add_paths result
@@ -383,10 +392,10 @@ class Region
 
 	public 
 
-	def self.add_searches from, to_list, do_shortest = false
+	def self.add_searches from, to_list, do_shortest = false, max_length = nil
 		sq_ants   = Region.ants_to_squares to_list
-		$logger.info { "Adding search #{ from }-#{ sq_ants }, #{ do_shortest }" }
-		@@add_searches << [ from, sq_ants, do_shortest]
+		$logger.info { "Adding search #{ from }-#{ sq_ants }, #{ do_shortest }, #{max_length}" }
+		@@add_searches << [ from, sq_ants, do_shortest, max_length]
 	end
 
 	def self.add_regions source
@@ -784,7 +793,7 @@ private
 	# In the case of searching for shortest path, it is still
 	# possible that multiple paths are returned, ie. best interim results.
 	#	
-	def find_paths from, to_list, do_shortest = false
+	def find_paths from, to_list, do_shortest = false, max_length = nil
 		$logger.info { "searching from #{ from } for #{ to_list.length } destinations" }
 		return nil if to_list.nil? or to_list.length == 0
 
@@ -800,7 +809,7 @@ private
 
 		# if nothing found, perform a search on all values at the same time
 		if results.length == 0
-			results = search_paths from_r, to_list_r, do_shortest
+			results = search_paths from_r, to_list_r, do_shortest, max_length
 		else
 			# remove distance info from results
 			paths = []
@@ -1055,7 +1064,7 @@ private
 	# Make a sorted list of neighbouring ants from given input.
 	# if do_search is false, only the cache is consulted.
 	#
-	def get_neighbors_sorted ant, in_ants, do_search = false
+	def get_neighbors_sorted ant, in_ants, do_search = false, max_length = nil
 		# First param may be an ant or a square
 		if ant.respond_to? :square
 			sq = ant.square
@@ -1097,7 +1106,7 @@ private
 			else
 				# Let the backburner thread handle searching the path
 				$logger.info "Sending path query to backburner."
-				Region.add_searches sq, sq_ants, false
+				Region.add_searches sq, sq_ants, false, max_length
 				return []
 			end
 		end

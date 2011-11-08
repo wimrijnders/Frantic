@@ -129,10 +129,26 @@ class Timer
 		@count = 0
 	end
 
+
+	def current str
+		v = @list[str]
+		value = nil
+		if v 
+			if v[1]
+				value = ( ( v[1] - v[0])*1000 ).to_i 
+			else
+				value = ( ( Time.now - v[0])*1000 ).to_i 
+			end
+		end
+
+		"Timer #{str}: #{value} msec"
+	end
+
+
 	def display
 		#$logger.info (true) {
 		$logger.info {
-			str = "Timer results:\n";
+			str = "Timer results (msec):\n";
 			max_k = nil
 			@list.each_pair do |k,v|
 				if max_k.nil? or max_k.length < k.length
@@ -141,17 +157,32 @@ class Timer
 			end
 
 			lines = []
+			uncomplete = []
 			@list.each_pair do |k,v|
+				if v[1].nil?
+					uncomplete << k
+					next
+				end
+
 				value = ( (v[1] - v[0])*1000 ).to_i 
 				lines << [ 
-					"   %-#{ max_k.length }s:%5d msec; max%5d msec" % [ k, value, @max[k] ],
+					"   %-#{ max_k.length }s %5d %5d" % [ k, value, @max[k] ],
 					 v[2]
 				]
 			end
 
 			lines.sort! { |l1, l2| l1[1] <=> l2[1] }
 
-			str + lines.transpose[0].join( "\n" )
+			str <<
+				"   %-#{ max_k.length }s %5s %5s\n" % [ "Label", "Value", "Max" ] <<
+				"   %-#{ max_k.length }s %5s %5s\n" % [ "=" * max_k.length , "=" * 5, "=" * 5 ] <<
+				lines.transpose[0].join( "\n" ) 
+
+			if uncomplete.length > 0
+				str << "\nDid not complete: " + uncomplete.join( ", ")
+			end
+
+			str
 		}
 	end
 
@@ -247,111 +278,6 @@ class Coord
 end
 
 	
-
-class Order
-	attr_accessor :order, :offset
-
-	def initialize square, order, offset = nil
-		@square = square
-		@order = order
-		@offset = offset
-		@liaison = nil
-	end
-
-	#
-	# NOTE: square actually returns a coord!
-	#
-	def square
-		if @square.respond_to? :square
-			sq = Coord.new @square.square
-		else
-			sq = Coord.new @square
-		end
-
-		if !@offset.nil?
-			sq.row += @offset[0]
-			sq.col += @offset[1]
-		end
-
-		sq
-	end
-
-	def to_s
-		"Order #{ order }, #{ @square }, offset #{ @offset }"
-	end
-
-	def square= v
-		@square = v
-	end
-
-	def sq_int
-		@square
-	end
-
-	def target? t
-		@square == t
-	end
-
-	def == a
-		sq_int.class ==a.sq_int.class and 	# target square can have differing classes
-		sq_int.row == a.sq_int.row and		
-		sq_int.col == a.sq_int.col and
-		order == a.order and
-		( ( offset.nil? and a.offset.nil? ) or
-		  (	offset[0] == a.offset[0] and offset[1] == a.offset[1] )
-		)
-	end
-
-	def add_offset offs
-		if @offset.nil?
-			@offset = offs
-		else
-			@offset[0] += offs[0]
-			@offset[1] += offs[1]
-		end
-	end
-
-	def clear_liaison
-		@liaison = nil
-	end
-
-	def handle_liaison cur_sq, ai
-		sq = ai.map[ square.row][ square.col ]
-		return sq unless $region 
-
-		if @liaison
-			# First condition is to keep on moving to final target, 
-			# when all liaisons are passed.
-			if @liaison != sq and ( @liaison == cur_sq or $region.clear_path(cur_sq, @liaison ) )
-				$logger.info { "Order #{ order } clear path to liaison #{ @liaison }" }
-				@liaison = nil
-			end
-		end
-
-		unless @liaison
-			liaison  = $region.path_direction cur_sq, sq
-			if liaison.nil?
-				$logger.info { "WARNING: No liason for order #{ order } to target #{ sq }" }
-
-				# We must have drifted off the path - restart search
-				Region.add_searches sq, [ cur_sq ], true 
-
-				# Don' specify move at this moment
-				return nil
-
-			elsif false === liaison
-				$logger.info "no liaison needed - move directly"
-				# Note that we use the liaison member for the target move
-				@liaison = sq
-			else
-				@liaison = liaison
-			end
-		end
-
-		$logger.info { "handle_liaison current #{ cur_sq } moving to #{ @liaison }" }
-		ai.map[ @liaison.row][ @liaison.col ]
-	end
-end
 
 
 
