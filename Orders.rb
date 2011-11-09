@@ -24,7 +24,7 @@ class Order
 			sq.col += @offset[1]
 		end
 
-		sq
+		$ai.map[ sq.row][ sq.col ]
 	end
 
 	def to_s
@@ -203,6 +203,7 @@ module Orders
 
 		$logger.info { "Setting order #{ what } on square #{ square.to_s } for #{ self.to_s }" }
 
+if false
 		if $region
 			liaison  = $region.path_direction self.square, square
 			if liaison.nil?
@@ -217,6 +218,7 @@ module Orders
 				end
 			end
 		end
+end
 
 		# ASSEMBLE overrides the rest of the orders
 		clear_orders if what == :ASSEMBLE
@@ -501,15 +503,17 @@ module Orders
 			end
 		end
 
-		if $region
-			to = @orders[0].handle_liaison( self.square, ai )
-			if to.nil? 
-				return false
-			else
-				move_to to
-			end
+		#to = @orders[0].handle_liaison( self.square, ai )
+		#if to.nil? 
+		#	return false
+		#else
+		#	move_to to
+		#end
+		to_dir = $pointcache.direction self.square, @orders[0].square
+		if to_dir.nil?
+			return false
 		else
-			move_to sq
+			move to_dir, @orders[0].square
 		end
 
 		true

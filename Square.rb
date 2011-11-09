@@ -107,7 +107,7 @@ class Square
 		when :STAY
 			row, col = @row, @col
 		else
-			raise 'incorrect direction'
+			raise "incorrect direction '#{ direction}'"
 		end
 		
 		return @@ai.map[row][col]

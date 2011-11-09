@@ -158,13 +158,15 @@ class EvadePathFinder
 		find_path true 
 		if @square != @start
 			target1 = @square
-			d1 = Pathinfo.new(target1, target).dist
+			#d1 = Pathinfo.new(target1, target).dist
+			d1 = $pointcache.distance target1, target
 		end
 
 		find_path false 
 		if @square != @start
 			target2 = @square
-			d2 = Pathinfo.new(target2, target).dist
+			#d2 = Pathinfo.new(target2, target).dist
+			d2 = $pointcache.distance target2, target
 		end
 
 		# Select known paths over unknown paths

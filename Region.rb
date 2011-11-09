@@ -1,8 +1,243 @@
 #require 'thread'
 #$mutex = Mutex.new
 
+class PointCache
+
+	def initialize ai
+		@cache = {}
+
+		@hits = 0
+		@misses = 0
+		@replaces = 0
+		@sets = 0
+		@known = 0
+		@invalidate_times = 0
+		@invalidate_num = 0 
+
+		@nil_pathitem = [ nil, 0 ]
+
+		@add_points = []
+
+		t = PointsThread.new self, @add_points		
+		t.priority = -1
+
+		# Thread.pass does NOT work!
+		sleep 0.1	
+		t.run
+	end
+
+
+	def get from, to, check_invalid = false
+		raise "#{from} not a square" if not from.is_a? Square
+		raise "#{to} not a square" if not to.is_a? Square
+
+		f = @cache[ from ]
+		unless f.nil?
+			unless f[ to ].nil?
+				if not f[to][3]
+					$logger.info "hit"
+					@hits += 1
+					return f[to]
+				end
+			end
+		end
+
+		@misses += 1
+	
+		if check_invalid	
+			nil
+		else
+			# initiate search here
+			@add_points << [ from, to ]
+
+			set from, to, nil, nil, true
+		end
+	end
+
+
+	def	determine_move from, to
+		next_sq = $region.path_direction from, to
+
+		if false === next_sq
+			# Move directly
+			next_sq = to
+		elsif next_sq.nil?
+			# Can't be determined
+			$logger.info "Move dir can not be determined."
+			return nil
+		end
+
+		d = Distance.new( from, next_sq)
+		move = d.dir from, true
+
+		$logger.info "Determined move #{ move }"
+		move
+	end
+
+
+	def get_line sq
+		@cache[sq]
+	end
+
+	def set_line sq, line
+		@cache[sq] = line.clone
+	end
+
+
+	def set from, to, distance, item, invalid = false
+		raise "#{from} not a square" if not from.is_a? Square
+		raise "#{to} not a square" if not to.is_a? Square
+
+		if item.nil?
+			item = @nil_pathitem
+		end
+
+		#$logger.info "Adding #{ from }, #{ to }"
+
+		f = @cache[ from ]
+		if f.nil?
+			@cache[from] = {}
+			f = @cache[from]
+		end
+
+		if f[to].nil?
+			#$logger.info "set"
+			@sets += 1
+
+			if invalid
+				d = Distance.new from, to
+				distance = d.dist
+				move = d.dir
+			else
+				move = determine_move from, to
+			end
+
+			f[to] = [distance, item, move, invalid ]
+		else
+			t = f[to]
+
+			if t[3]  or t[0] > distance
+				$logger.info "new item is better"
+				@replaces += 1 
+				move = determine_move from, to
+				f[to] = [distance, item, move, false ]
+			else
+				@known += 1
+			end
+
+		end
+
+		f[to]
+	end
+
+
+	def invalidate pathitem
+		count = 0
+
+		@cache.clone.each_pair do |k,v|
+			v.clone.each_pair do |k2, v2|
+				if v2[1] == pathitem
+					v.delete k2
+					count += 1
+				end
+			end
+
+			if v.length == 0
+				@cache.delete k
+			end
+		end
+
+		$logger.info "Invalidated #{ count } items."
+		@invalidate_times += 1
+		@invalidate_num += count 
+	end
+
+
+	def status
+		"pointcache status:
+   hits      :%9d 
+   misses    :%9d
+   replaces  :%9d
+   sets      :%9d
+   known     :%9d
+   invalidate: #{ @invalidate_times } times, #{ @invalidate_num } items
+" % [ @hits, @misses, @replaces, @sets, @known  ]
+
+	end
+
+	def retrieve_item from, to, in_path = nil, check_invalid = false
+
+		# Note that param in_path is ignored if we get a cache hit
+		item = get from, to, check_invalid
+
+		if item.nil?
+			# Following to determine path
+			p = Pathinfo.new from, to, in_path
+			path = p.path
+			$logger.info "path #{ path }"
+		
+			newitem = nil	
+			unless path.nil?
+				# Hit the path cache - TODO: this is slightly inefficient,
+				# since it also happens in Pathinfo
+				if path.length > 2
+					pathitem = $region.get_path_basic path[0], path[-1]
+
+					unless pathitem.nil?
+						newitem = set from, to, p.dist, pathitem
+					end
+				else
+					newitem = set from, to, p.dist, @nil_pathitem 
+				end
+
+			end
+
+			newitem
+		else
+			item
+		end
+	end
+
+
+	def distance from, to, in_path = nil
+		item = get from, to
+		#item = retrieve_item from, to, in_path
+		return nil if item.nil?
+		item[0]
+	end
+
+
+	def direction from, to
+		item = get from, to
+		#item = retrieve_item from, to
+
+		return nil if item.nil?
+
+		item[2]
+	end
+
+
+	# item - pathitem from path cache
+	def set_regions from, to, item
+		$logger.info "entered"
+
+		path = item[ :path ]
+
+		if path.length > 2
+			liaison1 = $region.get_liaison path[0], path[1]
+			liaison2 = $region.get_liaison path[-2], path[-1]
+
+			raise "#{liaison1} not a square" if not liaison1.is_a? Square
+			raise "#{liaison2} not a square" if not liaison2.is_a? Square
+
+			set liaison1, liaison2, item[:dist], item 
+		end
+	end
+end
+
 
 class Pathinfo
+
 	@@region = nil
 
 	def self.set_region region
@@ -94,6 +329,14 @@ class Pathinfo
 
 	def path?
 		!@path.nil?
+	end
+
+	def path
+		@path
+	end
+
+	def path_dist
+		@path_dist
 	end
 
 	def dist
@@ -372,7 +615,6 @@ class Region
 		t2.priority = -1
 
 		t4 = BigSearchThread.new self, t2.my_list 
-		t4.run
 
 		t3 = RegionsThread.new self, @@add_regions
 		t3.priority = -2
@@ -468,12 +710,14 @@ class Region
 				sq = square.rel [ row, col ]
 
 				if sq.region
-					if sq.region < 10
-						r = "__" + sq.region.to_s
-					elsif sq.region < 100
-						r = "_" + sq.region.to_s
+					region = sq.region % 1000
+
+					if region < 10
+						r = "__" + region.to_s
+					elsif region < 100
+						r = "_" + region.to_s
 					else
-						r = sq.region.to_s
+						r = region.to_s
 					end
 					str << r 
 				else
@@ -541,9 +785,39 @@ class Region
 
 
 	def set_path_basic from, to, path, dist = nil
+		ret = :new
+		change = true
+
 		if dist.nil?
 			dist = Pathinfo.path_distance path
 		end
+
+		# path already present?
+		prev_item = get_path_basic from, to 
+		unless prev_item.nil?
+			# Check if newer item better
+
+			prev_path = prev_item[ :path ]
+			prev_dist = prev_item[ :dist ]
+
+			# Skip if these are the same solutions
+			if path == prev_path
+				return :known
+			end
+
+			if dist < prev_dist
+				$logger.info { "Found shorter path for #{ from }-#{ to }: #{ path }; prev_dist: #{ prev_dist }, new_dist: #{ dist }" }
+				ret = :replaced
+				
+				# Invalidate the point cache for this new path
+				$pointcache.invalidate prev_item
+				
+			else
+				change = false
+			end
+		end
+
+		return :known if not change
 
 		item = {
 			:path => path,
@@ -555,6 +829,10 @@ class Region
 		else
 			@paths[from][ to ] = item
 		end
+
+		$pointcache.set_regions from, to, item
+
+		ret
 	end
 
 public
@@ -572,35 +850,17 @@ public
 				from = path[i]
 				to   = path[j]
 				new_path = path[i..j]
-				prev_item = get_path_basic from, to 
 
-				if prev_item.nil?
-					set_path_basic from, to, new_path 
+				case set_path_basic from, to, new_path 
+				when :new
 					new_count += 1
-					changed = true
-				else
-					prev_path = prev_item[ :path ]
-					prev_dist = prev_item[ :dist ]
-
-					# Skip if these are the same solutions
-					if new_path != prev_path
-
-						new_dist  = Pathinfo.path_distance new_path 
-
-						if new_dist < prev_dist
-							$logger.info { "Found shorter path for #{ from }-#{ to }: #{ new_path }; prev_dist: #{ prev_dist }, new_dist: #{ new_dist }" }
-							set_path_basic from, to, new_path, new_dist 
-							changed = true
-							replaced_count += 1
-						end
-					end
-				end
-
-				if not changed
+				when :known
 					# This path was known; so all sub-paths are also known.
 					# No need to check these
 					known_count += 1
 					break
+				when :replaced
+					replaced_count += 1
 				end
 			end
 		end
@@ -654,6 +914,7 @@ private
 	#
 	def set_region square, x, y
 		sq = square.rel [ x, y ]
+
 		if sq.region.nil?
 			if sq.water?
 				# Set water so that we know it has been scanned
@@ -670,6 +931,7 @@ private
 
 			if regions.length > 0
 				regions.each do |region|
+
 					unless sq.region
 						# First region we encounter, we use for current square
 						sq.region = region
@@ -715,8 +977,14 @@ private
 
 	public
 
-	def assign_region sq
-		sq.region = @@counter
+	def assign_region sq, prefix = nil
+		if prefix.nil?
+			pref_row = sq.row/10 
+			pref_col = sq.col/10 
+			prefix = (pref_row*100 + pref_col)*1000
+		end
+
+		sq.region = prefix + @@counter
 		@@counter += 1
 	end
 
@@ -767,7 +1035,7 @@ private
 	#         nil    if path can not be determined
 	#
 	def path_direction from, to
-		path = $region.find_path from, to, false
+		path = find_path from, to, false
 
 		return nil if path.nil?
 		return false if path.length < 2 
@@ -808,7 +1076,7 @@ private
 		results = find_paths_cache from_r, to_list_r
 
 		# if nothing found, perform a search on all values at the same time
-		if results.length == 0
+		if results.nil? or results.length == 0
 			results = search_paths from_r, to_list_r, do_shortest, max_length
 		else
 			# remove distance info from results
@@ -819,7 +1087,37 @@ private
 			results = paths
 		end
 
+		# Apparently, following is pointless
+		#store_points from, to_list, results
+
 		results
+	end
+
+	def store_points from, to_list, results
+		return if results.nil? or results.length == 0
+		$logger.info "entered"
+
+		to_list.each do |to |
+			from_r = from.region
+			to_r   = to.region
+
+			this_path = nil
+			if from_r == to_r
+				this_path = []
+			else
+				results.each do |path|
+					if path[0] == from_r and path[-1] == to_r
+						this_path = path
+						break
+					end
+				end
+			end
+
+			unless this_path.nil?
+				$logger.info "Adding #{from}-#{ to }: #{ this_path } to pointcache"
+				$pointcache.retrieve_item from, to, this_path
+			end
+		end
 	end
 
 
@@ -1072,18 +1370,28 @@ private
 			sq = ant
 		end
 
-		ants = in_ants.clone
+		$logger.info { "from: #{ ant } to #{ in_ants.length } ants." }
 
-		if ant.respond_to? :square
-			# Remove from-ant from list.
-			ants.delete ant
+		ants_with_distance = []
+		in_ants.each do |to_ant|
+			next if ant.respond_to? :square and to_ant == ant
+
+			distance = $pointcache.distance sq, to_ant.square
+			next if distance.nil?
+
+			# Don't bother with too large distances
+			next if distance > 50
+
+			ants_with_distance << [ to_ant, distance ]
 		end
-		return [] if ants.length == 0
 
-		$logger.info { "from: #{ ant } to #{ ants.length } ants." }
-		#$logger.info { "Ants : #{ ants }" }
 
-		sq_ants   = Region.ants_to_squares ants
+		# Let the backburner thread handle searching the path
+		sq_ants   = Region.ants_to_squares in_ants
+		Region.add_searches sq, sq_ants, false, max_length
+
+if false
+		sq_ants   = Region.ants_to_squares in_ants
 		#$logger.info { "Ant squares: #{ sq_ants }" }
 
 		from_r = sq.region
@@ -1113,28 +1421,33 @@ private
 
 		# Connect ants to the found paths and determine total distance
 		ants_with_distance = []
-		ants.each do |a|
+		in_ants.each do |a|
+			next if ant.respond_to? :square and a == ant
+
 			region = a.square.region
 			paths.each do |l|
 				# First part for same region
 				if ( l[:path].length == 0 and region == from_r ) or l[:path][-1] == region
-					ants_with_distance << [ a, Pathinfo.new( sq, a.square, l[:path]).dist ]
+
+					#ants_with_distance << [ a, Pathinfo.new( sq, a.square, l[:path]).dist ]
+					ants_with_distance << [ a, $pointcache.distance( sq, a.square, l[:path] ) ]
 					break
 				end
 			end
 		end
+end
 
 		# Sort the list
-		ants_with_distance.sort! { |a,b| a[1] <=> b[1] }
+		ants_with_distance = ants_with_distance.sort { |a,b| a[1] <=> b[1] }
 
-		$logger.info {
-			str = "neighbor ants after sort:\n"
-			ants_with_distance.each do |result|
-				str << "#{ result }\n"
-			end
-
-			str
-		}
+		#$logger.info {
+		#	str = "neighbor ants after sort:\n"
+		#	ants_with_distance.each do |result|
+		#		str << "#{ result }\n"
+		#	end
+#
+#			str
+#		}
 
 		ants_with_distance
 	end

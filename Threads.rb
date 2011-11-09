@@ -150,6 +150,7 @@ end
 
 
 class Thread2 < WorkerThread
+
 	def initialize region, list
 		super("Thread2", region, list)
 		@add_search = []
@@ -198,12 +199,23 @@ class RegionsThread < WorkerThread
 end
 
 
+class PointsThread < WorkerThread
+	# Region is a misnomer; here it is actually the PointCache instance
+	def initialize region, list
+		super("Points", region, list)
+	end
 
-#
-# Following definitions used in Patterns
-#
-# Note that this thread relies heavily on the Patterns context
-#
+	def action source
+		pointcache = @region
+
+		from = source[0]
+		to = source[1]
+	
+		pointcache.retrieve_item from, to, nil, true
+	end
+end
+
+
 def patterns_thread
 		t = Thread.new do
 			#Thread.stop

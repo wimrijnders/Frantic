@@ -179,12 +179,13 @@ class AI
 	# Zero-turn logic. 
 	def setup 
 		read_intro
+		@map=Array.new(@rows){|row| Array.new(@cols){|col| Square.new false, false, nil, row, col, self } }
+
 		yield self if block_given?
 		
 		@stdout.puts 'go'
 		@stdout.flush
 		
-		@map=Array.new(@rows){|row| Array.new(@cols){|col| Square.new false, false, nil, row, col, self } }
 		@did_setup=true
 	end
 
@@ -237,6 +238,9 @@ Thread.exclusive {
 				$timer.end "total"
 
 				$timer.display
+
+				$logger.info { $pointcache.status }
+
 				turn_count += 1
 			end
 			$logger.info "Exited game loop - goodbye"
@@ -656,6 +660,14 @@ Thread.exclusive {
 			@my_ants.each { |b| b.add_enemies @enemy_ants }
 		}
 	end
+
+	def all_squares
+		@map.each do |row|
+			row.each do |square|
+				yield square 
+			end
+		end
+	end
 end
 
 
@@ -675,6 +687,7 @@ $ai.setup do |ai|
 	$region = Region.new ai
 	Pathinfo.set_region $region
 	$patterns = Patterns.new ai
+	$pointcache = PointCache.new ai
 end
 
 if false

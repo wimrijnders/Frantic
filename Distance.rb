@@ -92,7 +92,7 @@ class Distance
 	#
 	# Convert distance into compass direction
 	#
-	def dir square = nil
+	def dir square = nil, land_only = false
 		ret_dir = nil
 	
 		rdif = @row
@@ -121,19 +121,34 @@ class Distance
 			#$logger.info "Going to #{ ret_dir }"
 			return ret_dir
 		end
-	
+
+		# TODO: Note that following block does not take into 
+		#       account if both ways are blocked!!!!	
 
 		# If specified, take passability from square into account
 		unless square.nil?	
-			# If one of the directions is blocked,
-			# and the other isn't, choose the other one
-			if !square.neighbor(rowdir).passable?
-				if square.neighbor(coldir).passable?
-					ret_dir = coldir
+			unless land_only 
+				# If one of the directions is blocked,
+				# and the other isn't, choose the other one
+				if !square.neighbor(rowdir).passable?
+					if square.neighbor(coldir).passable?
+						ret_dir = coldir
+					end
+				elsif !square.neighbor(coldir).passable?
+					if square.neighbor(rowdir).passable?
+						ret_dir = rowdir
+					end
 				end
-			elsif !square.neighbor(coldir).passable?
-				if square.neighbor(rowdir).passable?
-					ret_dir = rowdir
+			else
+				# Otherwise, only check for water
+				if !square.neighbor(rowdir).land?
+					if square.neighbor(coldir).land?
+						ret_dir = coldir
+					end
+				elsif !square.neighbor(coldir).land?
+					if square.neighbor(rowdir).land?
+						ret_dir = rowdir
+					end
 				end
 			end
 		end
