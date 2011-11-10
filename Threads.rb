@@ -174,6 +174,11 @@ class Thread2 < WorkerThread
 			return
 		end
 
+		if from.nil?
+			$logger.info "ERROR from item is nil; skipping"
+			return
+		end
+
 		$logger.info { "searching #{ from }-#{ to_list }" }
 
 		# Results will be cached within this call
@@ -210,6 +215,7 @@ class PointsThread < WorkerThread
 
 		from = source[0]
 		to = source[1]
+		$logger.info "Handling #{from}-#{to}"
 	
 		pointcache.retrieve_item from, to, nil, true
 	end

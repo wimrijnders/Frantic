@@ -281,6 +281,7 @@ class Strategy < BaseStrategy
 			$timer.end "Kamikaze Phase"
 		end
 
+if false
 		$logger.info "=== Enlist Phase ==="
 		$timer.start "Enlist Phase"
 		# Don't harvest if	not enough ants
@@ -300,7 +301,7 @@ class Strategy < BaseStrategy
 				#next if ant.neighbor_friends( 10).length > 0
 				#next if ant.neighbor_enemies( 10).length > 0
 
-				# Don't forage too close to own hills
+				# Don't harvest too close to own hills
 				too_close = false
 				ai.hills.each_friend do |sq|
 					d = Distance.new sq, ant.square
@@ -316,6 +317,7 @@ class Strategy < BaseStrategy
 			end
 		end
 		$timer.end "Enlist Phase"
+end
 
 		$logger.info "=== Move Collective Phase ==="
 		$timer.start( "Colmove Phase") {

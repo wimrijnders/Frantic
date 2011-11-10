@@ -50,6 +50,10 @@ class Food
 		end
 	end
 
+	def reset
+		@counter = COUNTER_LIMIT
+	end
+
 	#
 	#
 	def should_forage?
@@ -58,7 +62,6 @@ class Food
 
 		if @counter <= 0 
 			$logger.info "Food #{ coord } counter ran out, signal to be found."
-			@counter = COUNTER_LIMIT 
 			return true
 		else
 			@counter -= 1

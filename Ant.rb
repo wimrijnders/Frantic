@@ -133,6 +133,8 @@ class MyAnt < Ant
 		
 		return :STAY if stuck?
 
+		$logger.info "default_i: #{ @default_i }"
+
 		best = nil
 		best_dir = nil
 		# Select least visited direction
@@ -144,7 +146,12 @@ class MyAnt < Ant
 
 			# Don't bump int walls 
 			next if @square.neighbor( dir ).water?
-		
+
+			best = true
+			best_dir = dir
+			break	
+			# ignore following for the time being	
+
 			visited = @square.neighbor( dir ).visited
 
 			if best.nil? or best > visited
@@ -228,12 +235,18 @@ class MyAnt < Ant
 	end
 
 	def move dir, target = nil
-		str = "move from #{ square.to_s } to #{ dir } - "
+		str = "move from #{ square.to_s } to #{ dir } => #{ target } - "
+
+		next_sq = square.neighbor(dir)
+
+		$logger.info { "next_sq: #{ next_sq }, hole: #{ next_sq.hole?}" }
 
 		if dir == :STAY
 			str +=  "stuck"
 			stay
-		elsif can_pass? dir
+
+		# If next square is a hole and not our target, we dont want to go there
+		elsif can_pass? dir and not ( next_sq.hole? and not target.nil? and next_sq != target )
 			str +=  "passable"
 			order dir
 		else
@@ -257,7 +270,6 @@ class MyAnt < Ant
 					# Follow the regular evasion
 					evade dir
 				else
-					str << "taking shortcut"
 	
 					# Take a shortcut to a point on the evasion path
 					set_order evade_target, :EVADE_GOTO
@@ -268,6 +280,7 @@ class MyAnt < Ant
 					if not dir.nil? and square.neighbor(dir).passable?
 						order dir
 					end
+					str << "taking shortcut through #{ dir }"
 				end
 			end
 		end

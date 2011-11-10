@@ -114,12 +114,12 @@ module Orders
 	private
 
 	Order_priority = [
+		:EVADE_GOTO,
 		:FORAGE,
 		:ATTACK,
 		:ASSEMBLE,
 		:DEFEND_HILL,
 		:RAZE,
-		:EVADE_GOTO,
 		:HARVEST
 	]
 
@@ -136,13 +136,30 @@ module Orders
 		@orders.sort! do |a,b|
 			# Food goes before rest
 			if a.order == :FORAGE and b.order == :FORAGE
-				# TODO: use regions here instead
 
 				# Nearest food first
-				adist = Distance.new( self.pos, a.square)
-				bdist = Distance.new( self.pos, b.square)
+				#adist = Distance.new( self.pos, a.square)
+				#bdist = Distance.new( self.pos, b.square)
+				#adist.dist <=> bdist.dist
 
-				adist.dist <=> bdist.dist
+				itema = $pointcache.get self.pos, a.square
+				itemb = $pointcache.get self.pos, b.square
+
+				# valid items first
+				if itema.nil? and not itemb.nil?
+					1
+				elsif not itema.nil? and itemb.nil?
+					-1
+				elsif itema.nil? and itemb.nil?
+					0	
+				elsif itema[3] and not itemb[3]
+					1
+				elsif not itema[3] and itemb[3]
+					-1
+				else
+					itema[0] <=> itemb[0]
+				end
+
 			else
 				index_a = Order_priority.index a.order
 				index_a = Order_priority.length if index_a.nil?
@@ -417,7 +434,7 @@ end
 						# Keep the order in the list, don't remove
 						return true
 					else
-						clear_first_order
+						clear_first_order ( order_order == :FORAGE )
 					end
 				end
 
@@ -435,7 +452,7 @@ end
 			# Check if in-range when visible for food
 			if order_order == :FORAGE
 				sq = order_sq
-				$logger.info "Check if food at #{ sq } still there"
+				str = ""
 
 				closest = closest_ant_view [ sq.row, sq.col], @ai
 				unless closest.nil?
@@ -445,22 +462,26 @@ end
 						if !@ai.map[ sq.row ][sq.col].food?
 							# food is already gone. Skip order
 							clear_first_order true
-							$logger.info "Food still there: no"
+							str << "no"
 							next
 						else
-							$logger.info "Food still there: yes"
+							str << "yes"
 
 							# Special case; sometimes food appears right next to
 							# ant (eg first turn next to an anthill). For some reason
 							# it does not get consumed immediately
 							if d.dist == 1
-								$logger.info "Right next to food"
+								str << ", right next to it"
 								stay
 								return
 							end
 						end
+					else
+						str << "can't tell, out of view"
 					end
 				end
+
+				$logger.info { "Food #{ sq } still there: #{ str}" }
 			end
 
 			# check if harvest target is water
@@ -498,8 +519,6 @@ end
 		if @orders[0].order == :ASSEMBLE
 			if collective and collective.assemble
 				stay
-			else
-				$logger.info { "#{ to_s } moving to #{ @orders[0].square.to_s }" }
 			end
 		end
 
@@ -510,10 +529,11 @@ end
 		#	move_to to
 		#end
 		to_dir = $pointcache.direction self.square, @orders[0].square
+		$logger.info { "#{ to_s } order #{ order_order } to #{ order_sq }, dir #{ to_dir }" }
 		if to_dir.nil?
 			return false
 		else
-			move to_dir, @orders[0].square
+			move to_dir, order_sq
 		end
 
 		true

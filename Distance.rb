@@ -194,6 +194,49 @@ class Distance
 		#true
 	end
 
+	#
+	# Make a shortest path between the two points.
+	# If water is encountered, return path up till the water
+	#
+	# first item is from 
+	# If full path has been made, last item is to
+	#
+	def self.get_walk from, to
+		raise "from and to are equal: #{ from }-#{to}" if from == to
+
+		d = Distance.new from, to
+		sq = from
+
+		result = []
+		while d.dist > 0
+			dir = d.dir
+
+			next_sq = sq.neighbor( dir)
+			break if next_sq.water?
+
+			result << [ sq, dir, d.dist ]
+
+			sq = next_sq 
+			case dir
+			when :N
+				d.row += 1
+			when :E
+				d.col -= 1
+			when :S
+				d.row -= 1
+			when :W
+				d.col += 1
+			end
+		end
+
+		if d.dist == 0
+			result << [ sq, :STAY, 0 ]
+		end
+
+		$logger.info { "made path: #{ result }" }
+
+		result
+	end
 
 	#
 	# Following is a good approach if the ant attacking has buddies.

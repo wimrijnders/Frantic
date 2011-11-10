@@ -23,6 +23,9 @@ class Logger
 		# regular traces
 		return unless @log or str === true
 
+		# don't bother with empty input
+		return if not str.nil? and str.length == 0
+
 		time = (Time.now - @start)*1000
 
 		if Thread.current != Thread.main
@@ -43,6 +46,7 @@ class Logger
 
 		if block_given?
 			 str = yield
+			return if str.nil? or str.length == 0
 		end
 
 		out thread, "#{ time.to_i } - #{ caller_method_name}: #{ str }"

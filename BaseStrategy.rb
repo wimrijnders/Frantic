@@ -81,6 +81,7 @@ class BaseStrategy
 
 	def find_food ai
 
+		count = 0
 		ai.food.each do |l|
 			sq = ai.map[ l.row ][ l.col ]
 
@@ -88,6 +89,14 @@ class BaseStrategy
 				$logger.info { "Skipping food search for #{ sq.to_s }" }
 				next
 			end
+
+			count += 1
+			if count > AntConfig::FOOD_LIMIT
+				$logger.info { "Hit limit for foraging; did #{ count - 1 }" }
+				break
+			end
+
+			l.reset
 	
 			if $region
 				$timer.start "closest_ant_region"

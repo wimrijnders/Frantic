@@ -14,6 +14,9 @@ module AntConfig
 							# timeout. Take extreme measures to bring down the population 
 							# -1 for no limit
 
+	FOOD_LIMIT      = 5     # Max number of food items per turn
+							# for which to do path searches
+
 	# Stuff for collectives
 
 	ASSEMBLE_LIMIT = 10		# Number of ants in game before we 
