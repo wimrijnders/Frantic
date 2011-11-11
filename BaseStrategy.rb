@@ -110,33 +110,6 @@ class BaseStrategy
 	end
 	
 
-	def ant_orders1 ai
-		# WRI try
-		count = 0
-		$timer.start "ant_orders"
-		begin
-			count += 1
-			stuck_count= 0
-			moved = false
-			ai.my_ants.each do |ant|
-				if not ant.moved? and ant.stuck?
-					$logger.info { "turn #{ ai.turn_number }: #{ ant } is stuck" }
-					stuck_count += 1
-				else
-					moved = true if ant.handle_orders
-				end
-			end
-			if count > 1
-				$logger.info { "Iteration #{ count }" }
-			end
-		end while moved and stuck_count > 0 and count < 10
-
-		if count > 1
-			#$timer.end "ant_orders"
-			$logger.info { "Did #{ count } iterations, #{ $timer.current("ant_orders") }" }
-		end
-	end
-
 	def move_neighbors list
 		ant = list[-1]
 
@@ -163,7 +136,6 @@ class BaseStrategy
 	end
 
 	def ant_orders ai
-		# WRI try
 		$timer.start "ant_orders"
 		ai.my_ants.each do |ant|
 			move_neighbors [ant]

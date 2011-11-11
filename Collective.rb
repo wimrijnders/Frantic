@@ -504,6 +504,10 @@ class Collective
 
 			a.move dir
 		end
+
+		# Actually, you would have to check if ants orders
+		# were accepted. So following line is a little lie.
+		true
 	end
 
 

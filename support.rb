@@ -1,99 +1,4 @@
 
-class Logger
-	def initialize ai
-		@log = AntConfig::LOG_OUTPUT
-		@@ai = ai
-		@start = Time.now
-
-		@f = {}
-		@q = []
-	end
-
-	def q str
-		return unless @log
-
-		@q << str
-	end
-	
-
-	def info str = nil
-		# setting str to boolean value 'true' and passing 
-		# a block forces override of log inhibition.
-		# I use this to output timer info without outputting 
-		# regular traces
-		return unless @log or str === true
-
-		# don't bother with empty input
-		if not str === true 
-			return if ( not str.nil? and str.length == 0 )
-		end
-
-		time = (Time.now - @start)*1000
-
-		if Thread.current != Thread.main
-			thread = Thread.current[ :name ]
-		else 
-			thread = "Main"
-		end
-
-		if @f[thread].nil?	
-			if Thread.current != Thread.main
-				filename = thread + "_log.txt"
-			else 
-				filename = "log.txt"
-			end
-
-			@f[ thread ] = File.new( filename, "w")
-		end
-
-		if block_given?
-			 str = yield
-			return if str.nil? or str.length == 0
-		end
-
-		out thread, "#{ time.to_i } - #{ caller_method_name}: #{ str }"
-	end
-
-	def log= val
-		@log = val
-	end
-
-	private
-
-	def out thread, str
-		while qval = @q.pop
-			@f[ thread ].write "queue: #{ qval }\n"
-		end
-
-		@f[ thread ].write str + "\n"
-		@f[ thread ].flush
-
-		#@@ai.stdout.puts str 
-		#@@ai.stdout.flush
-	end
-
-
-	# Source: http://snippets.dzone.com/posts/show/2787
-	def caller_method_name
-    	parse_caller(caller(2).first).last
-	end
-
-	def parse_caller(at)
-	    if /^(.+?):(\d+)(?::in `(.*)')?/ =~ at
-	        file = Regexp.last_match[1]
-			line = Regexp.last_match[2].to_i
-			method = Regexp.last_match[3]
-
-		    if /^block.* in (.*)/ =~ method
-				method = Regexp.last_match[1]
-			end
-
-			[file, line, method]
-		end
-	end
-end
-
-
 class Timer
 
 	def initialize
@@ -152,44 +57,41 @@ class Timer
 
 
 	def display
-		$logger.info (true) {
-		#$logger.info {
-			str = "Timer results (msec):\n";
-			max_k = nil
-			@list.each_pair do |k,v|
-				if max_k.nil? or max_k.length < k.length
-					max_k = k
-				end
+		str = "Timer results (msec):\n";
+		max_k = nil
+		@list.each_pair do |k,v|
+			if max_k.nil? or max_k.length < k.length
+				max_k = k
+			end
+		end
+
+		lines = []
+		uncomplete = []
+		@list.each_pair do |k,v|
+			if v[1].nil?
+				uncomplete << k
+				next
 			end
 
-			lines = []
-			uncomplete = []
-			@list.each_pair do |k,v|
-				if v[1].nil?
-					uncomplete << k
-					next
-				end
+			value = ( (v[1] - v[0])*1000 ).to_i 
+			lines << [ 
+				"   %-#{ max_k.length }s %5d %5d" % [ k, value, @max[k] ],
+				 v[2]
+			]
+		end
 
-				value = ( (v[1] - v[0])*1000 ).to_i 
-				lines << [ 
-					"   %-#{ max_k.length }s %5d %5d" % [ k, value, @max[k] ],
-					 v[2]
-				]
-			end
+		lines.sort! { |l1, l2| l1[1] <=> l2[1] }
 
-			lines.sort! { |l1, l2| l1[1] <=> l2[1] }
+		str <<
+			"   %-#{ max_k.length }s %5s %5s\n" % [ "Label", "Value", "Max" ] <<
+			"   %-#{ max_k.length }s %5s %5s\n" % [ "=" * max_k.length , "=" * 5, "=" * 5 ] <<
+			lines.transpose[0].join( "\n" ) 
 
-			str <<
-				"   %-#{ max_k.length }s %5s %5s\n" % [ "Label", "Value", "Max" ] <<
-				"   %-#{ max_k.length }s %5s %5s\n" % [ "=" * max_k.length , "=" * 5, "=" * 5 ] <<
-				lines.transpose[0].join( "\n" ) 
+		if uncomplete.length > 0
+			str << "\nDid not complete: " + uncomplete.join( ", ")
+		end
 
-			if uncomplete.length > 0
-				str << "\nDid not complete: " + uncomplete.join( ", ")
-			end
-
-			str
-		}
+		str
 	end
 
 

@@ -32,9 +32,6 @@ class WorkerThread < Thread
 
 		super do 
 		begin
-			# Note the explicit stop here, strictly
-			# speaking not necessary but added for start/stop test.
-			# threads must be started on creation
 			Thread.current[ :name ] = name 
 
 			$logger.info "activated"
@@ -350,3 +347,75 @@ def liaisons_thread
 		end
 		t.priority = -3
 end
+
+
+
+class TurnThread < Thread
+
+	def initialize turntime, stdout
+		# Take off 10msec for the turntime
+		@turntime = 1.0*(turntime - 10)/1000
+		@stdout = stdout
+
+		@open = false
+		@str =  ""
+	
+		# First time send	
+		@stdout.puts 'go'
+		@stdout.flush
+ 
+		super do 
+		begin
+			Thread.current[ :name ] = "Turn" 
+
+			$logger.info "activated"
+
+			doing = true
+			while doing
+				$logger.info "waiting"
+				while not @open 
+					sleep 0.001
+				end
+
+				$logger.info "Counting"
+				sleep @turntime
+
+				if @open
+					$logger.info "Maxed out!"
+					go
+				else
+					$logger.info "sent in time"
+				end
+			end
+
+			$logger.info "closing down."
+		end rescue $logger.info( "Boom! #{ $! }" )
+		end
+	end
+
+	def go
+		@open = false
+		
+		@stdout.puts @str
+		@stdout.puts "go"
+		@stdout.flush
+
+		@str = ""
+	end
+
+	def start
+		$logger.info "output open"
+		@open = true
+	end
+
+	def send str
+		if @open
+			@str << str + "\n"
+			true
+		else
+			$logger.info "output closed!"
+			false
+		end
+	end
+end
+

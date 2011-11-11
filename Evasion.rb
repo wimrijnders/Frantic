@@ -88,8 +88,9 @@ module Evasion
 					@next_dir = nil
 					@want_dir = nil
 				else
-					order @next_dir
-					@next_dir = evade2_dir @next_dir
+					if order @next_dir
+						@next_dir = evade2_dir @next_dir
+					end
 				end
 			else 
 				evade @next_dir
@@ -279,6 +280,7 @@ class EvadePathFinder
 	def order dir
 		@history << dir
 		@square = @square.neighbor dir
+		true
 	end
 
 	def square

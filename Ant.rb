@@ -242,17 +242,23 @@ end
 		if moved?
 			$logger.info "ERROR - duplicate move detected"
 			# Original is retained
-			return
+			return false
 		end
 
-		@square.neighbor( direction ).moved_here = self
-		@moved= true
-		@moved_to= direction
+		if @ai.order self, direction
+			# order accepted - change state of ant now.
+			@square.neighbor( direction ).moved_here = self
+			@moved= true
+			@moved_to= direction
 
-		#@trail.add direction, @square
-
-		@ai.order self, direction
+			#@trail.add direction, @square
+			true
+		else
+			$logger.info { "#{ self } move #{ direction } blocked on output" }
+			false
+		end
 	end
+
 
 	def stay
 		$logger.info { "Ant stays at #{ @square.to_s }." }

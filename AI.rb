@@ -2,6 +2,7 @@
 # by Matma Rex (matma.rex@gmail.com)
 # Released under CC-BY 3.0 license
 require 'Config.rb'
+require 'Logger.rb'
 require 'support.rb'
 require 'Square.rb'
 require 'Evasion.rb'
@@ -156,23 +157,24 @@ class AI
 		@did_setup=false
 		@hills = Hills.new 
 		@do_throttle = false
+
 	end
 	
 	# Returns a read-only hash of all settings.
 	def settings
 		{
-			:loadtime => @loadtime,
-			:turntime => @turntime,
-			:rows => @rows,
-			:cols => @cols,
-			:turns => @turns,
-			:viewradius2 => @viewradius2,
+			:loadtime      => @loadtime,
+			:turntime      => @turntime,
+			:rows          => @rows,
+			:cols          => @cols,
+			:turns         => @turns,
+			:viewradius2   => @viewradius2,
 			:attackradius2 => @attackradius2,
-			:spawnradius2 => @spawnradius2,
-			:viewradius => @viewradius,
-			:attackradius => @attackradius,
-			:spawnradius => @spawnradius,
-			:seed => @seed
+			:spawnradius2  => @spawnradius2,
+			:viewradius    => @viewradius,
+			:attackradius  => @attackradius,
+			:spawnradius   => @spawnradius,
+			:seed          => @seed
 		}.freeze
 	end
 	
@@ -183,8 +185,7 @@ class AI
 
 		yield self if block_given?
 		
-		@stdout.puts 'go'
-		@stdout.flush
+		@turn = TurnThread.new  @turntime, @stdout
 		
 		@did_setup=true
 	end
@@ -216,7 +217,7 @@ class AI
 			turn_count = 1	
 			over=false
 			until over
-				$logger.info { "turn #{ turn_count }" }
+				$logger.all { "turn #{ turn_count }" }
 
 				set_throttle
 
@@ -228,16 +229,24 @@ class AI
 				$timer.start "yield"
 				yield self
 				$timer.end "yield"
-			
-				@stdout.puts 'go'
-				@stdout.flush
+		
+				@turn.go	
 
 				$timer.end "turn"
 				$timer.end "total"
 
-				$timer.display
+				$logger.stats(true) { 
+					str = ""
 
-				$logger.info(true) { $pointcache.status }
+					# Don't display double when logging is on
+					unless $logger.log? 
+						str << "turn #{ turn_count }\n"
+					end
+
+					str +
+					$timer.display + "\n" + 
+					$pointcache.status
+				}
 
 				turn_count += 1
 			end
@@ -407,6 +416,7 @@ class AI
 
 		# Actual turn time starts here, after 'go' has been received
 		$timer.start "turn"
+		@turn.start
 
 		$timer.start "turn_end"
 
@@ -450,14 +460,16 @@ class AI
 	#   order(ant, direction)
 	#   order(row, col, direction)
 	#
-	# Give orders to an ant, or to whatever happens to be in the given square (and it better be an ant).
+	# Give orders to an ant, or to whatever happens to be
+	# in the given square (and it better be an ant).
+	#
 	def order a, b, c=nil
 		if !c # assume two-argument form: ant, direction
 			ant, direction = a, b
-			@stdout.puts "o #{ant.row} #{ant.col} #{direction.to_s.upcase}"
+			@turn.send "o #{ant.row} #{ant.col} #{direction.to_s.upcase}"
 		else # assume three-argument form: row, col, direction
 			col, row, direction = a, b, c
-			@stdout.puts "o #{row} #{col} #{direction.to_s.upcase}"
+			@turn.send "o #{row} #{col} #{direction.to_s.upcase}"
 		end
 	end
 	

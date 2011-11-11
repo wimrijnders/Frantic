@@ -325,9 +325,9 @@ Thread.exclusive {
 		end
 
 		# randomize the input list a put a cap on it
-		if to.length > 100
+		if to.length > 80
 			$logger.info "Maxing and randomizing to-list"
-			to = ( to.sort { rand} )[0,100]
+			to = ( to.sort { rand} )[0,80]
 		end
 
 		list = []
