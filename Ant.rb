@@ -1,6 +1,8 @@
 
 # Represents a single ant.
 class Ant
+	@@id_counter = 0
+
 	# Owner of this ant. If it's 0, it's your ant.
 	attr_accessor :owner
 
@@ -11,8 +13,12 @@ class Ant
 
 	def initialize alive, owner, square, ai
 		@alive, @owner, @square, @ai = alive, owner, square, ai
+
+		@id = @@id_counter
+		@@id_counter += 1
 	end
 
+	def id; @id; end
 	def alive?; @alive; end
 	def dead?; !@alive; end
 	def mine?; owner==0; end
@@ -29,7 +35,7 @@ class Ant
 	end
 
 	def to_s
-		"ant" + square.to_s
+		"ant_#{id}" + square.to_s
 	end
 end
 
@@ -61,7 +67,7 @@ class EnemyAnt < Ant
 	end
 
 	def to_s
-		"enemy#{ square }; " +  @state.to_s
+		"enemy_#{id}#{ square }; " +  @state.to_s
 	end
 
 	def advancing? pos
@@ -99,7 +105,7 @@ class MyAnt < Ant
 
 
 	# Square this ant sits on.
-	attr_accessor :moved_to, 
+	attr_accessor :moved_to, :prev_move, 
 		:abspos # absolute position relative to leader, if part of collective
 	
 	attr_accessor :collective, :friends, :enemies
@@ -129,12 +135,61 @@ class MyAnt < Ant
 		#@trail = MoveHistoryFriendly.new 
 	end
 
+
 	def default
 		
 		return :STAY if stuck?
 
-		$logger.info "default_i: #{ @default_i }"
 
+		# if next to a wall, run into it on purpose
+		[ :N, :E, :S, :W ].each do |dir|
+			if square.neighbor( dir).water?
+				# Also reset the default direction, otherwise ant might backtrack
+				#@default = nil
+				@default = dir
+				return dir
+			end
+		end
+
+if @default.nil?
+		# Pick a random next move - not the move back if you can help it
+		best = nil
+		best_dir = nil
+
+		# Select least visited direction
+		tmp = prev_move
+		if tmp == :STAY or tmp.nil?
+			tmp = [ :N, :E, :S, :W  ][rand(4)]
+		else
+			tmp = reverse tmp
+		end
+		index = [ :N, :E, :S, :W ].index tmp
+
+		[ :N, :E, :S, :W, :N,:E, :S, :W ][ index + 1 + rand(3), 4].each do |dir|
+
+			# Don't enter a cul-de-sac in default move
+			next if @square.neighbor( dir ).hole?
+
+			# Don't bump into walls 
+			next if @square.neighbor( dir ).water?
+
+			best = true
+			best_dir = dir
+		end
+
+		unless best
+			@default = best_dir
+		else
+			@default = [ :N, :E, :S, :W  ][rand(4)]
+		end
+		@default_i = [ :N, :E, :S, :W  ].index @default
+else
+		best = true
+		best_dir = @default 
+end
+	
+
+if false
 		best = nil
 		best_dir = nil
 		# Select least visited direction
@@ -147,11 +202,6 @@ class MyAnt < Ant
 			# Don't bump int walls 
 			next if @square.neighbor( dir ).water?
 
-			best = true
-			best_dir = dir
-			break	
-			# ignore following for the time being	
-
 			visited = @square.neighbor( dir ).visited
 
 			if best.nil? or best > visited
@@ -160,6 +210,8 @@ class MyAnt < Ant
 			end
 		end
 		#@next_default_dir = ( @next_default_dir +1 ) % 4 
+
+end
 	
 		if best.nil?
 			# Prob never called; never mind
@@ -235,7 +287,7 @@ class MyAnt < Ant
 	end
 
 	def move dir, target = nil
-		str = "move from #{ square.to_s } to #{ dir } => #{ target } - "
+		str = "#{ self } to #{ dir } => #{ target } - "
 
 		next_sq = square.neighbor(dir)
 
@@ -272,15 +324,19 @@ class MyAnt < Ant
 				else
 	
 					# Take a shortcut to a point on the evasion path
-					set_order evade_target, :EVADE_GOTO
+					if set_order evade_target, :EVADE_GOTO
 	
-					# Take the first step, since we are already committed
-					# to moving.
-					dir = path_finder.first_dir
-					if not dir.nil? and square.neighbor(dir).passable?
-						order dir
+						# Take the first step, since we are already committed
+						# to moving.
+						dir = path_finder.first_dir
+						if not dir.nil? and square.neighbor(dir).passable?
+							order dir
+						end
+						str << "taking shortcut through #{ dir }"
+					else
+						# Fall back to regular evasion
+						evade dir
 					end
-					str << "taking shortcut through #{ dir }"
 				end
 			end
 		end

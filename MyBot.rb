@@ -225,7 +225,10 @@ class Strategy < BaseStrategy
 		ai.hills.each_friend do |sq|
 			furthest = BaseStrategy.nearby_ants_region( sq, ai.my_ants).reverse[0]
 
-			$patterns.add_square furthest.square if furthest
+			if furthest
+				$logger.info "furthest #{ furthest }."
+				$patterns.add_square furthest.square
+			end
 			break
 		end
 

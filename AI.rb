@@ -222,8 +222,6 @@ class AI
 
 				$timer.start "total"
 
-Thread.exclusive {
-
 				$timer.start "read"
 				over = read_turn
 				$timer.end "read"
@@ -233,13 +231,13 @@ Thread.exclusive {
 			
 				@stdout.puts 'go'
 				@stdout.flush
-}
+
 				$timer.end "turn"
 				$timer.end "total"
 
 				$timer.display
 
-				$logger.info { $pointcache.status }
+				$logger.info(true) { $pointcache.status }
 
 				turn_count += 1
 			end
@@ -367,7 +365,7 @@ Thread.exclusive {
 						my_ants.push a
 					else
 						a = sq.moved_here 
-						$logger.info { "Moved ant from #{ a.square } to #{ sq }." }
+						$logger.info { "#{ a } to #{ sq }." }
 						a.square =  sq
 					end
 
@@ -383,7 +381,8 @@ Thread.exclusive {
 			when 'd'
 				if owner==0
 					if sq.moved_here?
-						$logger.info { "My ant at #{ sq } died!" }
+						a = sq.moved_here 
+						$logger.info { "My #{ a } died!" }
 						
 						sq.moved_here.die
 						my_ants.delete sq.moved_here
@@ -419,6 +418,7 @@ Thread.exclusive {
 					# which handles these resets. It screws up the movement
 					square.moved_here.moved=false
 					square.moved_here.moved_to=nil
+					square.moved_here.prev_move = square.moved_here.moved_to
 					square.moved_here.friends=nil
 					square.moved_here.abspos=nil
 					square.moved_here = nil

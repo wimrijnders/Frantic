@@ -24,7 +24,9 @@ class Logger
 		return unless @log or str === true
 
 		# don't bother with empty input
-		return if not str.nil? and str.length == 0
+		if not str === true 
+			return if ( not str.nil? and str.length == 0 )
+		end
 
 		time = (Time.now - @start)*1000
 
@@ -150,8 +152,8 @@ class Timer
 
 
 	def display
-		#$logger.info (true) {
-		$logger.info {
+		$logger.info (true) {
+		#$logger.info {
 			str = "Timer results (msec):\n";
 			max_k = nil
 			@list.each_pair do |k,v|

@@ -8,7 +8,11 @@ module Evasion
 
 
 	def evade_init
-		@left = @@curleft
+		# WRI test- all ants start out with same dir
+
+		@left = false
+
+#		@left = @@curleft
 		@@curleft = !@@curleft
 	end
 
@@ -51,6 +55,8 @@ module Evasion
 		(0..2).each do
 			newdir = evade_dir newdir
 
+			next if square.neighbor(newdir).hole?
+
 			# can_pass? is supplied by the encompassing class
 			if can_pass? newdir
 				done = true
@@ -73,16 +79,16 @@ module Evasion
 		unless @next_dir.nil?
 			#$logger.info { "evading next_dir" }
 
-			if can_pass? @next_dir
-				order @next_dir
+			if can_pass? @next_dir and not square.neighbor( @next_dir).hole?
 
-				# if the direction went corresponds with the
+				# if the direction we're going corresponds with the
 				# direction wanted, we are done.
 				if @next_dir == @want_dir
 					$logger.info { "#{ self } evasion complete" }
 					@next_dir = nil
 					@want_dir = nil
 				else
+					order @next_dir
 					@next_dir = evade2_dir @next_dir
 				end
 			else 
@@ -273,6 +279,10 @@ class EvadePathFinder
 	def order dir
 		@history << dir
 		@square = @square.neighbor dir
+	end
+
+	def square
+		@square
 	end
 end
 

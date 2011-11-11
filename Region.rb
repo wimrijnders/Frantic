@@ -29,7 +29,7 @@ class PointCache
 	end
 
 
-	def get from, to, check_invalid = false, check_liaison = true
+	def get from, to, check_invalid = false, check_liaison = false
 
 		raise "#{from} not a square" if not from.is_a? Square
 		raise "#{to} not a square" if not to.is_a? Square
@@ -38,6 +38,8 @@ class PointCache
 			# return a dummy item
 			return @zero_distance_item
 		end
+
+		do_nil = true
 
 		f = @cache[ from ]
 		t = nil
@@ -48,59 +50,80 @@ class PointCache
 			invalid = t[3] unless t.nil?
 		end
 
-		if not t.nil? and not invalid
-			$logger.info "hit #{from}-#{ to}: dist #{ t[0]}, dir #{ t[2] }"
-			@hits += 1
-			return f[to]
-		elsif not check_invalid and check_liaison
-			# Try to find a path to the liaison
-			firstliaison = $region.first_liaison from, to
+		if not t.nil? 
+			# items with distance one can be validated immediately
+			if invalid and t[0] == 1
+				t[3] = false
+				invalid = t[3]
+				t[1] = @zero_pathitem
+			end	
 
-			# ignore to as liaison, here above we concluded it is not in the cache 
-			if not firstliaison.nil? and firstliaison != to
+			if not invalid
 
-				# recursive call
-				$logger.info "Getting liaison"
-				item = get from, firstliaison, false, false
-				unless item.nil?
-					# Must be there, it is also called in first_liaison
-					pathitem = $region.get_path_basic from.region, to.region
+				$logger.info "hit #{from}-#{ to}: dist #{ t[0]}, dir #{ t[2] }"
+				@hits += 1
 
-					#now we cheat a bit - contrive a cache item for further processing
-					ret_item     = item.clone
-					ret_item[0] += pathitem[:dist]
-					ret_item[1]  = pathitem
-					# Retain move
-					ret_item[3]  = true
-					
-if false
-					# TODO: need also to add distance last liasion to 'to'	
-					unless ret_item[3]	
-						# In fact, we now have a perfectly valid cache item!
-						# save it.
-						$logger.info "Storing path through liaison"
-						set from, to, ret_item[0], ret_item[1], false, ret_item[2]
-					end
-end
-	
-					return ret_item 
+				return t
+			else
+				if check_invalid
+					return nil
+				else
+				 	result = t	
+					do_nil = false
 				end
 			end
 		end
 
 		@misses += 1
+
+		return nil if check_invalid 
+
+# NOTE: Following creates more problems than it solves.
+#       disabled thru default value of check_liaison
+
+		# Try to find a path to the liaison
+	if check_liaison
+		firstliaison = $region.first_liaison from, to
+
+		# ignore to as liaison, here above we concluded it is not in the cache 
+		if not firstliaison.nil? and firstliaison != to
+
+			# recursive call
+			$logger.info "Getting liaison"
+			item = get from, firstliaison, false, false
+			unless item.nil?
+				# Must be there, it is also called in first_liaison
+				pathitem = $region.get_path_basic from.region, to.region
 	
-		if check_invalid	
-			nil
-		elsif not invalid
+				#now we cheat a bit - contrive a cache item for further processing
+				ret_item     = item.clone
+				ret_item[0] += pathitem[:dist]
+				ret_item[1]  = pathitem
+				# Retain move
+				ret_item[3]  = true
+			
+				$logger.info "Found liaison item #{ ret_item }"	
+				result = ret_item 
+			end
+		end
+	end	
+
+
+		# initiate search here
+		@add_points << [ from, to ]
+
+		if do_nil	
 			$logger.info { "Adding nilitem for #{ from}-#{ to}" }
-			# initiate search here
-			@add_points << [ from, to ]
 
 			set to, from, nil, nil, true
 			# Note that this returns a value
-			set from, to, nil, nil, true
+			tmp = set( from, to, nil, nil, true)
+			if result.nil?
+				result = tmp
+			end
 		end
+
+		result
 	end
 
 
@@ -123,14 +146,6 @@ end
 		move
 	end
 
-
-	def get_line sq
-		@cache[sq]
-	end
-
-	def set_line sq, line
-		@cache[sq] = line.clone
-	end
 
 
 	def set from, to, distance, item, invalid = false, move = nil
@@ -198,6 +213,7 @@ end
 	def invalidate pathitem
 		count = 0
 
+Thread.exclusive {
 		@cache.clone.each_pair do |k,v|
 			v.clone.each_pair do |k2, v2|
 				if v2[1] == pathitem
@@ -210,6 +226,7 @@ end
 				@cache.delete k
 			end
 		end
+}
 
 		$logger.info "Invalidated #{ count } items."
 		@invalidate_times += 1
@@ -288,6 +305,7 @@ end
 
 	def direction from, to
 		item = get from, to
+		$logger.info "item #{ item }"
 		#item = retrieve_item from, to
 
 		return nil if item.nil?
@@ -297,6 +315,8 @@ end
 
 
 	def get_sorted from, to, valid_first = false
+
+
 		# Following to take ants into account
 		if from.respond_to? :square
 			sq = from.square
@@ -304,7 +324,15 @@ end
 			sq = from
 		end
 
+		# randomize the input list a put a cap on it
+		if to.length > 100
+			$logger.info "Maxing and randomizing to-list"
+			to = ( to.sort { rand} )[0,100]
+		end
+
 		list = []
+
+Thread.exclusive { 
 		to.each do |a|
 			if a.respond_to? :square
 				sq_to = a.square
@@ -330,6 +358,17 @@ end
 				 a[1][0] <=> b[1][0]
 			end
 		}
+
+		$logger.info {
+			str = "After sort:\n"
+			list.each do |result|
+				str << "#{ result }\n"
+			end
+
+			str
+		}
+}
+
 
 		# return list with distance info only
 		ret = []
@@ -841,12 +880,7 @@ class Region
 		t3 = RegionsThread.new self, @@add_regions
 		t3.priority = -2
 
-		# Thread.pass does NOT work!
-		sleep 0.1	
-		t1.run
-		t2.run
-		t3.run
-		t4.run
+		liaisons_thread
 	end
 
 	def self.add_paths result
@@ -982,6 +1016,11 @@ class Region
 			nil
 		end
 	end
+
+	def get_liaisons from
+		@liaison[ from ]
+	end
+
 
 	private
 
@@ -1607,29 +1646,14 @@ private
 		sq_ants   = Region.ants_to_squares ants
 		Region.add_searches ant.square, sq_ants, false, max_length
 
-		# only include if we have a real path
-		# TODO: Prob inefficient again!
-		ants_with_distance.keep_if { |a|
-			sq = a[0].square
-
-			#if get_path_basic( ant.square.region, sq.region).nil? 
-			if not $pointcache.get( ant.square, sq, true ).nil?
-				true
-			else
-				walk = Distance.get_walk(ant.square, sq )
-
-				( walk.length > 0 and [-1][0] == sq )
+		$logger.info {
+			str = "neighbors after sort:\n"
+			ants_with_distance.each do |result|
+				str << "#{ result }\n"
 			end
-		}
 
-		#$logger.info {
-		#	str = "neighbors after sort:\n"
-		#	ants_with_distance.each do |result|
-		#		str << "#{ result }\n"
-		#	end
-#
-#			str
-#		}
+			str
+		}
 
 		ants_with_distance
 	end
@@ -1656,5 +1680,32 @@ private
 		end
 
 		to
+	end
+
+	def can_reach from, to
+		return true if from == to
+		
+		if from.respond_to? :square
+			from = from.square
+		end
+		if to.respond_to? :square
+			to = to.square
+		end
+
+		pathitem = get_path_basic from.region, to.region
+	
+		unless pathitem.nil?	
+			$logger.info "Found path for #{ from }-#{to }"
+			return true
+		end
+
+		walk = Distance.get_walk from, to
+		if walk.length > 0 and walk[-1][0] == to
+			$logger.info "Found walk for #{ from }-#{to }"
+			return true
+		end
+
+		$logger.info "Can not reach #{ from }-#{to }"
+		false
 	end
 end

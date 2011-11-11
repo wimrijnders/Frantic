@@ -44,21 +44,12 @@ class BaseStrategy
 		# Note that the search is actually back to front, from food
 		# to ants. The distance of course is the same
 		paths = nil
-		#if all_ants
-			# Do a cache search only - we rely on the backburner thread
-			# to find the paths for us. 
-			result = $region.get_neighbors_sorted sq, ants, false, max_length
+		result = $region.get_neighbors_sorted sq, ants, false, max_length
 
-			if result.length > 0
-				# Remove distance info
-				result.each { |l| antlist << l[0] }
-			end
-		#else
-		#	path = Pathinfo.shortest_path sq, sq_ants
-		#	unless path.nil?
-		#		antlist = BaseStrategy.target_ants ants, sq.region, [path], all_ants
-		#	end
-		#end
+		if result.length > 0
+			# Remove distance info
+			result.each { |l| antlist << l[0] }
+		end
 
 		antlist
 	end
@@ -98,14 +89,9 @@ class BaseStrategy
 
 			l.reset
 	
-			if $region
-				$timer.start "closest_ant_region"
-				ant = BaseStrategy.closest_ant_region sq, ai
-				$timer.end "closest_ant_region"
-			else
-				ant = closest_ant_view l.coord, ai
-				next if ant.collective?	
-			end
+			$timer.start "closest_ant_region"
+			ant = BaseStrategy.closest_ant_region sq, ai
+			$timer.end "closest_ant_region"
 
 			unless ant.nil?
 				if ant.set_order sq, :FORAGE

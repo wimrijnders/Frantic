@@ -188,6 +188,11 @@ module Orders
 	def set_order square, what, offset = nil
 		n = Order.new(square, what, offset)
 
+		if not $region.can_reach self.square, square
+			# ignore order
+			return false
+		end
+
 		square = ai.map[n.square.row][ n.square.col ]
 		if square.water?
 			$logger.info { "Target #{ square.to_s } is water; determine nearest land" }
@@ -522,12 +527,15 @@ end
 			end
 		end
 
-		#to = @orders[0].handle_liaison( self.square, ai )
-		#if to.nil? 
-		#	return false
-		#else
-		#	move_to to
-		#end
+		to = @orders[0].handle_liaison( self.square, ai )
+		$logger.info { "#{ to_s } order #{ order_order } to #{ order_sq }, dir #{ to }" }
+		if to.nil? 
+			return false
+		else
+			move_to to
+		end
+
+if false
 		to_dir = $pointcache.direction self.square, @orders[0].square
 		$logger.info { "#{ to_s } order #{ order_order } to #{ order_sq }, dir #{ to_dir }" }
 		if to_dir.nil?
@@ -535,6 +543,7 @@ end
 		else
 			move to_dir, order_sq
 		end
+end
 
 		true
 	end

@@ -35,7 +35,6 @@ class WorkerThread < Thread
 			# Note the explicit stop here, strictly
 			# speaking not necessary but added for start/stop test.
 			# threads must be started on creation
-			Thread.stop
 			Thread.current[ :name ] = name 
 
 			$logger.info "activated"
@@ -222,9 +221,9 @@ class PointsThread < WorkerThread
 end
 
 
+
 def patterns_thread
 		t = Thread.new do
-			#Thread.stop
 			Thread.current[ :name ] = "Patterns"
 			$logger.info "activated"
 
@@ -243,8 +242,11 @@ def patterns_thread
 					sleep 0.2 
 				end
 
-				# Only handle last square added
-				square = @add_squares.pop
+				# Only handle last square added with known region
+				while square = @add_squares.pop
+					break if square.done_region
+				end
+				next if square.nil?
 				@add_squares.clear
 
 				$logger.info { "Got square #{ square}" }
@@ -268,6 +270,80 @@ def patterns_thread
 				end
 
 				#if WorkerThread.start_next "FindRegions"
+			end rescue $logger.info "Boom! #{ $! }"
+
+			$logger.info "closing down."
+		end
+		t.priority = -3
+end
+
+
+def liaisons_thread
+		t = Thread.new do
+			Thread.current[ :name ] = "liaisons"
+			$logger.info "activated"
+
+			squares = []
+			(0...$ai.rows).each do |row |
+				(0...$ai.cols).each do |col|
+					squares << [ $ai.map[ row][col], nil ]
+				end
+			end
+
+			while squares.length > 0
+
+				$logger.info "waiting"
+				sleep 0.2 
+
+				count = 0
+				squares.clone.each do |item|
+					sq = item[0]
+
+					if sq.water?
+						squares.delete item
+						count+= 1
+						next
+					end
+
+					next if sq.region.nil?
+
+					if item[1].nil?
+						liaisons = $region.get_liaisons sq.region
+
+						if liaisons.nil? or liaisons.length == 0
+							next
+						end
+
+						item[1] = liaisons.values
+					end
+
+					$logger.info "testing #{ item }"
+
+					item[1].clone.each do |l|
+						if sq == l
+							item[1].delete l
+							next
+						end
+
+						if $pointcache.get(sq, l, true ).nil? 
+							$pointcache.retrieve_item sq, l, true
+						elsif $pointcache.get(l, sq, true ).nil? 
+							$pointcache.retrieve_item l, sq, true
+						else
+							item[1].delete l
+							next
+						end
+					end
+	
+					if item[1].length == 0 
+						$logger.info "Found all liaisons for #{ sq}"
+						squares.delete item
+						count += 1
+					end
+
+				end
+				$logger.info "Found #{count} items. to go: #{ squares.length}"
+
 			end rescue $logger.info "Boom! #{ $! }"
 
 			$logger.info "closing down."

@@ -612,6 +612,7 @@ class Patterns
 	Line_tests = [ :DIAG_TLBR, :DIAG_BLTR, :HOR, :VERT]
 
 	def add_square square
+		$logger.info "Adding square #{ square } to patterns."
 		@add_squares.push square
 	end
 
@@ -632,6 +633,7 @@ class Patterns
 	def match_range sq1, sq2, how 
 		matches = 0
 
+		water_count = 0
 		range = (-radius..radius)
 		range.each do |row|
 			range.each do |col|
@@ -642,12 +644,16 @@ class Patterns
 
 				if sq_a.water? == sq_b.water?
 					matches += 1
+					water_count += 1 if sq_a.water?
 				else
 					return nil
 				end
 
 			end
 		end
+
+		# Mark matches without water as not valid
+		matches = 0 if water_count == 0
 
 		matches
 	end

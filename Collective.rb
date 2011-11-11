@@ -17,6 +17,9 @@ class Collective
 		@ants << a
 	end
 
+	def square
+		@ants[0].square
+	end
 
 	def size
 		@ants.length
