@@ -252,8 +252,6 @@ class Collective
 	
 			# Don't even think about assembling if not enough ants around
 			next if ant.ai.my_ants.length < AntConfig::ASSEMBLE_LIMIT
-
-
 	
 			if ant.ai.defensive? 
 				# If collective nearby, don't bother creating a new one

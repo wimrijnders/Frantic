@@ -229,7 +229,7 @@ class Strategy < BaseStrategy
 				$logger.info "furthest #{ furthest }."
 				$patterns.add_square furthest.square
 			end
-			break
+			break			# TODO: determine why this is here
 		end
 
 		check_attacked ai	
@@ -387,4 +387,6 @@ $ai.run do |ai|
 			$logger.info { "Profiling done." }
 		end
 	end
+
+	# signal that we didn't max out
 end

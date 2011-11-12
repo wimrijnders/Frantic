@@ -225,11 +225,6 @@ class AI
 	
 			over=false
 			until over
-
-				# Doing +1 is contrived, but the actual turn number is 
-				# read in during the turn.
-				$logger.all { "turn #{ @turn_number + 1 }" }
-
 				set_throttle
 
 				$timer.start "total"
@@ -238,13 +233,19 @@ class AI
 
 				unless over 
 					$timer.start "turn"
-					@turn.start @turn_number
 
 					$timer.start( "turn_end" ) { turn_end }
 					$timer.start( "yield" )    { 
 						catch :maxed_out do
 							yield self
 						end
+
+						$logger.info "=== Stay Phase ==="
+						my_ants.each do |ant|
+							next if ant.moved?
+							ant.stay
+						end
+
 					}
 		
 					@turn.go @turn_number
@@ -329,6 +330,9 @@ class AI
 			_, num = *rd.match(/\Aturn (\d+)\Z/)
 			@turn_number=num.to_i
 		end
+
+		$logger.all { "turn #{ @turn_number }" }
+		@turn.start @turn_number
 	
 		# reset the map data
 		@map.each do |row|

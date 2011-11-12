@@ -13,7 +13,7 @@ class Logger
 			# a block forces override of log inhibition.
 			# I use this to output timer info without outputting 
 			# regular traces
-			return nil unless log or str === true
+			return nil unless log or ( str === true and AntConfig::LOG_STATUS )
 
 			# don't bother with empty input
 			if not str === true 

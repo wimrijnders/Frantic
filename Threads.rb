@@ -1,3 +1,60 @@
+#!/usr/local/bin/ruby
+require 'thread'
+require 'timeout'
+
+class Mutex
+
+	def set_wait
+		@wait = ConditionVariable.new
+	end
+
+	def signal
+		@wait.signal
+		Thread.pass
+	end
+
+	# Don't call your input param 'timeout'. It interferes with
+	# the timeout module definition.
+	def waitlock period
+if false
+		begin		
+			Timeout::timeout(period) {
+				#self.lock
+				@wait.wait self
+			}
+
+			$logger.info "Got the lock"
+			true
+		rescue Timeout::Error
+			$logger.info "KABLOOEY!!!!"
+			return false
+		end
+end
+
+		start = Time.now	
+		@wait.wait self, period
+		if Time.now - start < period
+			$logger.info "Got the lock"
+			true
+		else
+			@wait.signal	# WRI DEBUG
+			$logger.info "KABLOOEY!!!!"
+			false
+		end
+	end
+
+	def try_unlock
+		begin
+			unlock
+			true
+		rescue ThreadError
+			$logger.info "Lock not mine"
+			false
+		end
+	end
+end
+
+
 #
 # Following definitions used in Region
 #
@@ -172,7 +229,7 @@ class Thread2 < WorkerThread
 		end
 
 		if from.nil?
-			$logger.info "ERROR from item is nil; skipping"
+			$logger.info(true) { "ERROR from item is nil; skipping" }
 			return
 		end
 
@@ -353,7 +410,7 @@ end
 
 class TurnThread < Thread
 	MAX_HISTORY = 10
-	CRITICAL_MARGIN = 3
+	CRITICAL_MARGIN = 2
 
 	def add_history val
 		@history << val
@@ -379,13 +436,17 @@ class TurnThread < Thread
 	end
 
 	def initialize loadtime, turntime, stdout
-		margin = 200 
+		@mutex = Mutex.new
+		@mutex2 = Mutex.new
+		@mutex.set_wait
+		@wait = ConditionVariable.new
+
+		margin = 350 
 
 		@turntime = 1.0*(turntime - margin)/1000
 		@loadtime = 1.0*(loadtime - margin)/1000
 		@stdout = stdout
 
-		@open = false
 		@buffer = {} 
 		@history = []
 	
@@ -399,49 +460,46 @@ class TurnThread < Thread
 
 			$logger.info "activated"
 
+			@mutex.lock
+
 			doing = true
 			while doing
-				unless @open
-					$logger.info "waiting"
-					while not @open 
-						sleep 0.001
-					end
-				end
 
-				$logger.info(true) { "Counting #{ hist_to_s }" }
-				start = Time.now
+				$logger.info(true) { "waiting...."	}
+begin
+				@wait.wait @mutex
+end rescue $logger.info( "Boom! #{ $! }" )
+
 				turn = @turn
-				diff = 0.0
+				$logger.info(true) { "Counting turn #{ turn}: #{ hist_to_s }" }
+				start = Time.now
 
 				# For first turn use loadtime instead
 				if turn == 0
-					$logger.info(true) { "doing loadtime #{ @loadtime }" }
+					$logger.info { "doing loadtime #{ @loadtime }" }
 					max = @loadtime
 				else 
 					max = @turntime
 				end
 
-				while @open and turn == @turn and diff < max 
-					#sleep 0.001
-					Thread.pass
-					diff = Time.now - start
-				end 
+				success = @mutex.waitlock max
 
-				if turn != @turn
-					$logger.info(true) {
-						"turn changed #{ turn } => #{ @turn}"
-					}
-				end
-
-				if diff >= max 
+				if not success 
 					$logger.info(true) { "Maxed out!" }
 					if turn == @turn
 						go turn
 					else
-						$logger.info(true) { "Different turn; not daring to send" }
+						$logger.info(true) {
+							"ERROR: turn changed #{ turn } => #{ @turn}" 
+						}
+
+						# Send anyway; the server is waiting for a response
+						go turn
 					end
 					add_history 1 
 				else
+					diff = Time.now - start
+
 					$logger.info(true) {
 						"sent in time: #{ (diff*1000).to_i } msec"
 					}
@@ -455,50 +513,66 @@ class TurnThread < Thread
 		t.priority = 1
 	end
 
+
 	def go turn
-#Thread.exclusive {
-		@open = false
+@mutex2.synchronize {
+
+		# Do the signal before, so that thread is informed as early as possible 
+
+		unless Thread.current[ :name ] == "Turn" 
+			@mutex.signal
+		end
 
 		$logger.info(true) { "sending for turn #{ turn }" }
 		if @buffer[ turn ].nil?
 			$logger.info(true) { "Nothing to send!" }
-			return
+		else
+		
+			@stdout.puts @buffer[ turn ]
+			@stdout.puts "go"
+			@stdout.flush
+
+			@buffer.delete( turn  ) {
+				$logger.info(true) { "ERROR: buffer not deleted." }
+			}
 		end
 
-		
-		@stdout.puts @buffer[ turn ]
-		@stdout.puts "go"
-		@stdout.flush
-
-		@buffer.delete turn 
-#}
+}
 	end
 
-	def start turn
-		if @open 
-			$logger.info "ERROR: Output already open!"
-			return
-		end
 
-		$logger.info "output open"
+	def start turn
+		start = Time.now
+		diff = 0.0
+		diff = start - @start unless @start.nil?
+		@start = start
+
+		$logger.info(true) { "output open turn  #{ turn } - time from previous open: #{ (diff*1000).to_i }" }
 		@turn = turn
-		@open = true
 		@buffer[turn] = ""
+
+		@wait.signal
+		Thread.pass
 	end
 
 	def send str
-		if @open
-			$logger.info "output open."
+@mutex2.synchronize {
+		ret = true
+
+		unless @buffer[ @turn ].nil?
+			$logger.info(true) { "output open." }
 			@buffer[ @turn ] << str + "\n"
-			true
 		else
-			$logger.info "output closed!"
+			$logger.info(true) { "output closed!" }
 
 			# Concurrency problems with following
 			# TODO: sort it out
-			#throw :maxed_out
-			false
+			throw :maxed_out
+			ret = false
 		end
+
+		ret
+}
 	end
 end
 
