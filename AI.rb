@@ -141,6 +141,7 @@ class AI
 	attr_accessor :stdout
 
 	attr_accessor :hills, :harvesters
+	attr_reader :turn
 
 	# Initialize a new AI object.
 	# Arguments are streams this AI will read from and write to.
@@ -185,15 +186,23 @@ class AI
 
 		yield self if block_given?
 		
-		@turn = TurnThread.new  @turntime, @stdout
+		@turn = TurnThread.new  @loadtime, @turntime, @stdout
 		
 		@did_setup=true
 	end
 
+
 	def set_throttle
 		val = $timer.get "turn"
 
-		if not val.nil? and val >= @turntime*0.60
+		max_cap = @turntime*0.60
+
+		if @turn.maxed_out?
+			$logger.info "maxed out: throttling even further"
+			max_cap /= 2
+		end
+
+		if not val.nil? and val >= max_cap 
 			@do_throttle = true 
 		else
 			@do_throttle = false
@@ -212,27 +221,37 @@ class AI
 	# Turn logic. If setup wasn't yet called, it will call it (and yield the block in it once).
 	def run &b # :yields: self
 		begin
-			setup &b if !@did_setup
+			setup self  if !@did_setup
 	
-			turn_count = 1	
 			over=false
 			until over
-				$logger.all { "turn #{ turn_count }" }
+
+				# Doing +1 is contrived, but the actual turn number is 
+				# read in during the turn.
+				$logger.all { "turn #{ @turn_number + 1 }" }
 
 				set_throttle
 
 				$timer.start "total"
 
-				$timer.start "read"
-				over = read_turn
-				$timer.end "read"
-				$timer.start "yield"
-				yield self
-				$timer.end "yield"
-		
-				@turn.go	
+				$timer.start( "read" ) { over = read_turn }
 
-				$timer.end "turn"
+				unless over 
+					$timer.start "turn"
+					@turn.start @turn_number
+
+					$timer.start( "turn_end" ) { turn_end }
+					$timer.start( "yield" )    { 
+						catch :maxed_out do
+							yield self
+						end
+					}
+		
+					@turn.go @turn_number
+
+					$timer.end "turn"
+				end
+
 				$timer.end "total"
 
 				$logger.stats(true) { 
@@ -240,15 +259,13 @@ class AI
 
 					# Don't display double when logging is on
 					unless $logger.log? 
-						str << "turn #{ turn_count }\n"
+						str << "turn #{ @turn_number }\n"
 					end
 
 					str +
 					$timer.display + "\n" + 
 					$pointcache.status
 				}
-
-				turn_count += 1
 			end
 			$logger.info "Exited game loop - goodbye"
 		rescue => e
@@ -325,7 +342,7 @@ class AI
 			a.enemies = []
 		end
 	
-		new_enemy_ants=[]
+		@new_enemy_ants=[]
 		@food.start_turn
 
 		$timer.end "turn_init"
@@ -385,7 +402,7 @@ class AI
 					a= EnemyAnt.new owner, sq, self
 
 					sq.ant = a
-					new_enemy_ants.push a
+					@new_enemy_ants.push a
 				end
 			when 'd'
 				if owner==0
@@ -401,7 +418,7 @@ class AI
 				else
 					$logger.info { "Enemy ant died at #{ sq }, owner #{ owner }." }
 					sq.ant = EnemyAnt.new owner, sq, self, false
-					new_enemy_ants.push sq.ant 
+					@new_enemy_ants.push sq.ant 
 				end
 
 			when 'r'
@@ -414,11 +431,10 @@ class AI
 		end
 		$timer.end "loop"
 
-		# Actual turn time starts here, after 'go' has been received
-		$timer.start "turn"
-		@turn.start
+		ret
+	end
 
-		$timer.start "turn_end"
+	def turn_end
 
 		# reset the moved ants 
 		@map.each do |row|
@@ -446,12 +462,9 @@ class AI
 			$logger.info "Did fill_map"
 		end
 
-		$timer.start "detect_enemies"
-		detect_enemies new_enemy_ants
-		$timer.end "detect_enemies"
-		$timer.end "turn_end"
-
-		return ret
+		$timer.start( "detect_enemies" ) {
+			detect_enemies @new_enemy_ants
+		}
 	end
 	
 	
@@ -695,6 +708,8 @@ Distance.set_ai $ai
 Coord.set_ai $ai
 
 $ai.setup do |ai|
+	$logger.info "Doing setup"
+
 	ai.harvesters = Harvesters.new ai.rows, ai.cols, ai.viewradius2
 	$region = Region.new ai
 	Pathinfo.set_region $region

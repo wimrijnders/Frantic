@@ -29,6 +29,7 @@ class WorkerThread < Thread
 	def initialize name, region, list
 		@region = region
 		@list = list
+		@turn = 0
 
 		super do 
 		begin
@@ -351,20 +352,48 @@ end
 
 
 class TurnThread < Thread
+	MAX_HISTORY = 10
+	CRITICAL_MARGIN = 3
 
-	def initialize turntime, stdout
-		# Take off 10msec for the turntime
-		@turntime = 1.0*(turntime - 10)/1000
+	def add_history val
+		@history << val
+		if @history.length > MAX_HISTORY
+			@history = @history[1..-1]
+		end
+	end
+
+
+	def history
+		sum = 0
+		@history.each { |h| sum += h }
+
+		sum
+	end
+
+	def hist_to_s
+		"#{ history }/#{ @history.length }"	
+	end
+
+	def maxed_out? 
+		history >=  CRITICAL_MARGIN
+	end
+
+	def initialize loadtime, turntime, stdout
+		margin = 200 
+
+		@turntime = 1.0*(turntime - margin)/1000
+		@loadtime = 1.0*(loadtime - margin)/1000
 		@stdout = stdout
 
 		@open = false
-		@str =  ""
+		@buffer = {} 
+		@history = []
 	
 		# First time send	
 		@stdout.puts 'go'
 		@stdout.flush
  
-		super do 
+		t = super do 
 		begin
 			Thread.current[ :name ] = "Turn" 
 
@@ -372,48 +401,102 @@ class TurnThread < Thread
 
 			doing = true
 			while doing
-				$logger.info "waiting"
-				while not @open 
-					sleep 0.001
+				unless @open
+					$logger.info "waiting"
+					while not @open 
+						sleep 0.001
+					end
 				end
 
-				$logger.info "Counting"
-				sleep @turntime
+				$logger.info(true) { "Counting #{ hist_to_s }" }
+				start = Time.now
+				turn = @turn
+				diff = 0.0
 
-				if @open
-					$logger.info "Maxed out!"
-					go
+				# For first turn use loadtime instead
+				if turn == 0
+					$logger.info(true) { "doing loadtime #{ @loadtime }" }
+					max = @loadtime
+				else 
+					max = @turntime
+				end
+
+				while @open and turn == @turn and diff < max 
+					#sleep 0.001
+					Thread.pass
+					diff = Time.now - start
+				end 
+
+				if turn != @turn
+					$logger.info(true) {
+						"turn changed #{ turn } => #{ @turn}"
+					}
+				end
+
+				if diff >= max 
+					$logger.info(true) { "Maxed out!" }
+					if turn == @turn
+						go turn
+					else
+						$logger.info(true) { "Different turn; not daring to send" }
+					end
+					add_history 1 
 				else
-					$logger.info "sent in time"
+					$logger.info(true) {
+						"sent in time: #{ (diff*1000).to_i } msec"
+					}
+					add_history 0 
 				end
 			end
 
 			$logger.info "closing down."
 		end rescue $logger.info( "Boom! #{ $! }" )
 		end
+		t.priority = 1
 	end
 
-	def go
+	def go turn
+#Thread.exclusive {
 		@open = false
+
+		$logger.info(true) { "sending for turn #{ turn }" }
+		if @buffer[ turn ].nil?
+			$logger.info(true) { "Nothing to send!" }
+			return
+		end
+
 		
-		@stdout.puts @str
+		@stdout.puts @buffer[ turn ]
 		@stdout.puts "go"
 		@stdout.flush
 
-		@str = ""
+		@buffer.delete turn 
+#}
 	end
 
-	def start
+	def start turn
+		if @open 
+			$logger.info "ERROR: Output already open!"
+			return
+		end
+
 		$logger.info "output open"
+		@turn = turn
 		@open = true
+		@buffer[turn] = ""
 	end
 
 	def send str
 		if @open
-			@str << str + "\n"
+			$logger.info "output open."
+			@buffer[ @turn ] << str + "\n"
 			true
 		else
 			$logger.info "output closed!"
+
+			# Concurrency problems with following
+			# TODO: sort it out
+			#throw :maxed_out
 			false
 		end
 	end

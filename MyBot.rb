@@ -239,10 +239,14 @@ class Strategy < BaseStrategy
 		$logger.info "=== Collective Phase ==="
 		$timer.start "Collective Phase"
 		Collective.complete_collectives ai
-		if not ai.kamikaze? 
-			unless enough_collectives ai
-				Collective.create_collectives ai unless ai.kamikaze? 
-			else
+
+		if ai.turn.maxed_out?
+			$logger.info "maxed out; blocking collective creation"
+		else
+			if not ai.kamikaze? and not ai.turn.maxed_out?
+				unless enough_collectives ai
+					Collective.create_collectives ai unless ai.kamikaze? 
+				end
 			end
 		end
 		$timer.end "Collective Phase"

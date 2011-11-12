@@ -325,9 +325,17 @@ Thread.exclusive {
 		end
 
 		# randomize the input list a put a cap on it
-		if to.length > 80
+		max_cap = 80
+
+		if $ai.turn.maxed_out?
+			# Make the value even smaller
+			$logger.info "maxed_out: tightening sort limit"
+			max_cap = max_cap/4
+		end
+
+		if to.length > max_cap
 			$logger.info "Maxing and randomizing to-list"
-			to = ( to.sort { rand} )[0,80]
+			to = to.sample( max_cap)
 		end
 
 		list = []
