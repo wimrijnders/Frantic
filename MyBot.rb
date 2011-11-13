@@ -107,6 +107,8 @@ class Strategy < BaseStrategy
 		$logger.info "check if own hills are safe"
 
 		ai.hills.each_friend do |square| 
+			ai.turn.check_maxed_out
+
 			# Find nearest enemies	
 			near_enemies = BaseStrategy.nearby_ants_region square, ai.enemy_ants, true 
 		

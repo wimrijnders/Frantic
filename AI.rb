@@ -234,9 +234,10 @@ class AI
 				unless over 
 					$timer.start "turn"
 
-					$timer.start( "turn_end" ) { turn_end }
 					$timer.start( "yield" )    { 
 						catch :maxed_out do
+							$timer.start( "turn_end" ) { turn_end }
+
 							yield self
 						end
 
@@ -272,12 +273,16 @@ class AI
 						str << "turn #{ @turn_number }\n"
 					end
 
-					str +
-					$timer.display + "\n" + 
-					$pointcache.status
+					str + $timer.display
 				}
 			end
 			$logger.info "Exited game loop - goodbye"
+
+			# It appears that you can time out on the end game turn
+			# Following added to be sure
+			@stdout.puts "go"
+			@stdout.flush
+
 		rescue => e
 			puts "Exception - SystemStackError?"
 			print e.backtrace.join("\n")

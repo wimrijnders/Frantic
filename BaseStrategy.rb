@@ -74,6 +74,7 @@ class BaseStrategy
 
 		count = 0
 		ai.food.each do |l|
+
 			sq = ai.map[ l.row ][ l.col ]
 
 			unless l.should_forage? 
@@ -86,6 +87,8 @@ class BaseStrategy
 				$logger.info { "Hit limit for foraging; did #{ count - 1 }" }
 				break
 			end
+
+			ai.turn.check_maxed_out
 
 			l.reset
 	
@@ -105,6 +108,8 @@ class BaseStrategy
 		$logger.info "=== Evade Phase ==="
 		ai.my_ants.each do |ant|
 			next if ant.moved?
+			ai.turn.check_maxed_out
+
 			ant.evading
 		end
 	end
@@ -114,6 +119,9 @@ class BaseStrategy
 		ant = list[-1]
 
 		return false if ant.moved?
+		$ai.turn.check_maxed_out
+
+
 
 		if not ant.stuck?
 			ant.handle_orders
@@ -174,6 +182,8 @@ class BaseStrategy
 			next if ant.moved?
 			next if ant.collective?
 			next if ant.harvesting?
+
+			ai.turn.check_maxed_out
 
 			default_move ant
 		end

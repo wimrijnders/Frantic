@@ -258,25 +258,6 @@ class RegionsThread < WorkerThread
 end
 
 
-class PointsThread < WorkerThread
-	# Region is a misnomer; here it is actually the PointCache instance
-	def initialize region, list
-		super("Points", region, list)
-	end
-
-	def action source
-		pointcache = @region
-
-		from = source[0]
-		to = source[1]
-		$logger.info "Handling #{from}-#{to}"
-	
-		pointcache.retrieve_item from, to, nil, true
-	end
-end
-
-
-
 def patterns_thread
 		t = Thread.new do
 			Thread.current[ :name ] = "Patterns"
@@ -325,80 +306,6 @@ def patterns_thread
 				end
 
 				#if WorkerThread.start_next "FindRegions"
-			end rescue $logger.info( "Boom! #{ $! }\n #{ $!.backtrace }" )
-
-			$logger.info "closing down."
-		end
-		t.priority = -3
-end
-
-
-def liaisons_thread
-		t = Thread.new do
-			Thread.current[ :name ] = "liaisons"
-			$logger.info "activated"
-
-			squares = []
-			(0...$ai.rows).each do |row |
-				(0...$ai.cols).each do |col|
-					squares << [ $ai.map[ row][col], nil ]
-				end
-			end
-
-			while squares.length > 0
-
-				$logger.info "waiting"
-				sleep 0.2 
-
-				count = 0
-				squares.clone.each do |item|
-					sq = item[0]
-
-					if sq.water?
-						squares.delete item
-						count+= 1
-						next
-					end
-
-					next if sq.region.nil?
-
-					if item[1].nil?
-						liaisons = $region.get_liaisons sq.region
-
-						if liaisons.nil? or liaisons.length == 0
-							next
-						end
-
-						item[1] = liaisons.values
-					end
-
-					$logger.info "testing #{ item }"
-
-					item[1].clone.each do |l|
-						if sq == l
-							item[1].delete l
-							next
-						end
-
-						if $pointcache.get(sq, l, true ).nil? 
-							$pointcache.retrieve_item sq, l, nil, true
-						elsif $pointcache.get(l, sq, true ).nil? 
-							$pointcache.retrieve_item l, sq, nil, true
-						else
-							item[1].delete l
-							next
-						end
-					end
-	
-					if item[1].length == 0 
-						$logger.info "Found all liaisons for #{ sq}"
-						squares.delete item
-						count += 1
-					end
-
-				end
-				$logger.info "Found #{count} items. to go: #{ squares.length}"
-
 			end rescue $logger.info( "Boom! #{ $! }\n #{ $!.backtrace }" )
 
 			$logger.info "closing down."

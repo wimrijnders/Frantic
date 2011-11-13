@@ -56,9 +56,6 @@ bots = [
 	"python sample_bots/python/GreedyBot.py",
 	"python2.7 sample_bots/python/HunterBot.py",
 	"python sample_bots/python/GreedyBot.py",
-	"python2.7 sample_bots/python/HunterBot.py",
-
-	# NB: logfiles interfere if $logger.info(true!)
 	"ruby ../GoSouth.rb",
 	"ruby ../Twitcher.rb",
 	"ruby ../Inertia.rb",

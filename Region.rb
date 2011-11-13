@@ -4,32 +4,12 @@
 class PointCache
 
 	def initialize ai
-		@cache = {}
-
-		@hits = 0
-		@misses = 0
-		@replaces = 0
-		@sets = 0
-		@known = 0
-		@invalidate_times = 0
-		@invalidate_num = 0 
-
-		@nil_pathitem = nil
 		@zero_pathitem = { :path => [], :dist => 0 }
 		@zero_distance_item = [ 0, @zero_pathitem, :STAY, false ]
-
-		@add_points = []
-
-		t = PointsThread.new self, @add_points		
-		t.priority = -1
-
-		# Thread.pass does NOT work!
-		sleep 0.1	
-		t.run
 	end
 
 
-	def get from, to, check_invalid = false, check_liaison = false
+	def get from, to, check_invalid = false
 
 		raise "#{from} not a square" if not from.is_a? Square
 		raise "#{to} not a square" if not to.is_a? Square
@@ -39,91 +19,8 @@ class PointCache
 			return @zero_distance_item
 		end
 
-		do_nil = true
-
-		f = @cache[ from ]
-		t = nil
-		invalid = false
-
-		unless f.nil?
-			t = f[to]
-			invalid = t[3] unless t.nil?
-		end
-
-		if not t.nil? 
-			# items with distance one can be validated immediately
-			if invalid and t[0] == 1
-				t[3] = false
-				invalid = t[3]
-				t[1] = @zero_pathitem
-			end	
-
-			if not invalid
-
-				$logger.info "hit #{from}-#{ to}: dist #{ t[0]}, dir #{ t[2] }"
-				@hits += 1
-
-				return t
-			else
-				if check_invalid
-					return nil
-				else
-				 	result = t	
-					do_nil = false
-				end
-			end
-		end
-
-		@misses += 1
-
-		return nil if check_invalid 
-
-# NOTE: Following creates more problems than it solves.
-#       disabled thru default value of check_liaison
-
-		# Try to find a path to the liaison
-	if check_liaison
-		firstliaison = $region.first_liaison from, to
-
-		# ignore to as liaison, here above we concluded it is not in the cache 
-		if not firstliaison.nil? and firstliaison != to
-
-			# recursive call
-			$logger.info "Getting liaison"
-			item = get from, firstliaison, false, false
-			unless item.nil?
-				# Must be there, it is also called in first_liaison
-				pathitem = $region.get_path_basic from.region, to.region
-	
-				#now we cheat a bit - contrive a cache item for further processing
-				ret_item     = item.clone
-				ret_item[0] += pathitem[:dist]
-				ret_item[1]  = pathitem
-				# Retain move
-				ret_item[3]  = true
-			
-				$logger.info "Found liaison item #{ ret_item }"	
-				result = ret_item 
-			end
-		end
-	end	
-
-
-		# initiate search here
-		@add_points << [ from, to ]
-
-		if do_nil and not $ai.turn.maxed_out?
-			$logger.info { "Adding nilitem for #{ from}-#{ to}" }
-
-			set to, from, nil, nil, true
-			# Note that this returns a value
-			tmp = set( from, to, nil, nil, true)
-			if result.nil?
-				result = tmp
-			end
-		end
-
-		result
+		# Note that this returns a value
+       	set( from, to, nil, nil, true)
 	end
 
 
@@ -152,99 +49,59 @@ class PointCache
 		raise "#{from} not a square" if not from.is_a? Square
 		raise "#{to} not a square" if not to.is_a? Square
 
+		found = false
+
+		while true
+			if from.region.nil?
+				$logger.info "#{from} region nil; skipping"
+				break
+			end
+
+			if to.region.nil?
+				$logger.info "#{to} region nil; skipping"
+				break
+			end
+
+			item = $region.get_path_basic from.region, to.region
+
+			if item.nil?
+				$logger.info "#{item} item nil; skipping"
+				break
+			end
+
+			p = Pathinfo.new from, to, item[:path]
+
+			if p.path.nil?
+				$logger.info "#{p} path nil; skipping"
+				break
+			end
+
+			distance = p.dist
+			found = true
+			invalid = false
+			break
+		end
+
+
+		unless found 
+			d = Distance.new from, to
+			distance = d.dist
+			move = d.dir if move.nil?
+			invalid = true
+		else
+			move = determine_move from, to if move.nil?
+		end
+
+		result = [distance, item, move, invalid ]
+
 		$logger.info {
 			"from-to => [ distance, item, move, invalid] : " +
 			"#{ from }-#{ to } => [ #{ distance }, #{ item }, #{ move }, #{ invalid } ]"
 		}
 
-		if item.nil?
-			item = @nil_pathitem
-		end
-
-		#$logger.info "Adding #{ from }, #{ to }"
-
-		f = @cache[ from ]
-		if f.nil?
-			@cache[from] = {}
-			f = @cache[from]
-		end
-
-		$logger.info { "f.nil?: #{f.nil?}, f[to]: #{ f[to] }" }
-
-		if f[to].nil?
-			@sets += 1
-
-			if invalid
-				d = Distance.new from, to
-				distance = d.dist
-				move = d.dir if move.nil?
-			else
-				move = determine_move from, to if move.nil?
-			end
-
-			f[to] = [distance, item, move, invalid ]
-
-			$logger.info {
-				"set: [ #{ distance }, #{item}, #{ move}, #{ invalid } ] "
-			}
-
-		elsif not invalid
-			t = f[to]
-
-			if t[3]  or t[0] > distance
-				move = determine_move from, to if move.nil?
-
-				$logger.info {
-					"new item is better; old: #{ t }, new: [ #{ distance }, #{item}, #{ move}, false ]"
-				}
-
-				@replaces += 1 
-				f[to] = [distance, item, move, false ]
-			else
-				@known += 1
-			end
-
-		end
-
-		f[to]
+		result	
 	end
 
-
-	def invalidate pathitem
-		count = 0
-
-Thread.exclusive {
-		@cache.clone.each_pair do |k,v|
-			v.clone.each_pair do |k2, v2|
-				if v2[1] == pathitem
-					v.delete k2
-					count += 1
-				end
-			end
-
-			if v.length == 0
-				@cache.delete k
-			end
-		end
-}
-
-		$logger.info "Invalidated #{ count } items."
-		@invalidate_times += 1
-		@invalidate_num += count 
-	end
-
-
-	def status
-		"pointcache status:
-   hits      :%9d 
-   misses    :%9d
-   replaces  :%9d
-   sets      :%9d
-   known     :%9d
-   invalidate: #{ @invalidate_times } times, #{ @invalidate_num } items
-" % [ @hits, @misses, @replaces, @sets, @known  ]
-
-	end
 
 	#
 	# Store full information for given input into the path cache.
@@ -280,11 +137,6 @@ Thread.exclusive {
 							set_walk lastliaison, to
 						end
 
-#						pathitem = $region.get_path_basic path[0], path[-1]
-#
-#						unless pathitem.nil?
-#							newitem = set from, to, p.dist, pathitem
-#						end
 					else
 						$logger.info "WARNING: small path encountered; should not happen."
 			
@@ -300,7 +152,6 @@ Thread.exclusive {
 
 	def distance from, to, in_path = nil
 		item = get from, to
-		#item = retrieve_item from, to, in_path
 		return nil if item.nil?
 		item[0]
 	end
@@ -309,7 +160,6 @@ Thread.exclusive {
 	def direction from, to
 		item = get from, to
 		$logger.info "item #{ item }"
-		#item = retrieve_item from, to
 
 		return nil if item.nil?
 
@@ -414,26 +264,6 @@ Thread.exclusive {
 
 			firstliaison = $region.get_liaison path[0], path[1]
 			lastliaison = $region.get_liaison path[-2], path[-1]
-
-			# This test may not be such a good idea, because the cache can be updated
-			# next time the method is called, and more paths may be filled.
-if false
-			# Check if this path has been done before.
-			testitem = get( firstliaison, lastliaison, true)
-			unless testitem.nil?
-				$logger.info "item already present, must have done this before. testitem: #{ testitem}"
-				p = Pathinfo.new firstliaison, lastliaison, path
-				$logger.info "path from cache: #{ p.path }"
-
-				testdist = testitem[1][:dist] unless testitem[1].nil?
-
-				if not testdist.nil? and testdist <= p.dist
-					#$logger.info "Path is same, skipping"
-					$logger.info "current solution is better, skipping"
-					return
-				end	
-			end
-end
 
 			(0...(path.length() -2) ).each do |n|
 		
@@ -890,8 +720,6 @@ class Region
 
 		t3 = RegionsThread.new self, @@add_regions
 		t3.priority = -2
-
-		#RIP: liaisons_thread
 	end
 
 	def self.add_paths result
@@ -1082,9 +910,6 @@ class Region
 				$logger.info { "Found shorter path for #{ from }-#{ to }: #{ path }; prev_dist: #{ prev_dist }, new_dist: #{ dist }" }
 				ret = :replaced
 				
-				# Invalidate the point cache for this new path
-				$pointcache.invalidate prev_item
-				
 			else
 				change = false
 			end
@@ -1102,8 +927,6 @@ class Region
 		else
 			@paths[from][ to ] = item
 		end
-
-		$pointcache.set_regions from, to, item
 
 		ret
 	end
@@ -1388,11 +1211,6 @@ private
 						break
 					end
 				end
-			end
-
-			unless this_path.nil?
-				$logger.info "Adding #{from}-#{ to }: #{ this_path } to pointcache"
-				$pointcache.retrieve_item from, to, this_path
 			end
 		end
 	end

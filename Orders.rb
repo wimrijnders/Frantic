@@ -124,6 +124,8 @@ module Orders
 	]
 
 	def sort_orders
+		ai.turn.check_maxed_out
+
 		$logger.info {
 			str = ""
 			@orders.each do |o|
@@ -133,6 +135,11 @@ module Orders
 		}
 
 		# Nearest orders first
+		items = {}
+		@orders.each { |a| 
+			items[a] = $pointcache.get self.pos, a.square
+		}
+
 		@orders.sort! do |a,b|
 			# Food goes before rest
 			if a.order == :FORAGE and b.order == :FORAGE
@@ -142,8 +149,8 @@ module Orders
 				#bdist = Distance.new( self.pos, b.square)
 				#adist.dist <=> bdist.dist
 
-				itema = $pointcache.get self.pos, a.square
-				itemb = $pointcache.get self.pos, b.square
+				itema = items[a] 
+				itemb = items[b] 
 
 				# valid items first
 				if itema.nil? and not itemb.nil?
@@ -387,6 +394,7 @@ end
 
 	def handle_orders
 		return false if moved?
+		ai.turn.check_maxed_out
 
 		prev_order = (orders?) ? @orders[0].square: nil
 
@@ -542,16 +550,6 @@ end
 		else
 			move_to to
 		end
-
-if false
-		to_dir = $pointcache.direction self.square, @orders[0].square
-		$logger.info { "#{ to_s } order #{ order_order } to #{ order_sq }, dir #{ to_dir }" }
-		if to_dir.nil?
-			return false
-		else
-			move to_dir, order_sq
-		end
-end
 
 		true
 	end
