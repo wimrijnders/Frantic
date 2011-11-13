@@ -25,6 +25,7 @@ end
 #
 
 $logger.log = false
+$logger.log_status = false
 strategy = Strategy.new
 
 $ai.run do |ai|

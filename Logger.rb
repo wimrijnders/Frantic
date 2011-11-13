@@ -2,6 +2,7 @@
 class Logger
 	def initialize ai
 		@log = AntConfig::LOG_OUTPUT
+		@log_status = true
 		@@ai = ai
 		@start = Time.now
 
@@ -13,7 +14,7 @@ class Logger
 			# a block forces override of log inhibition.
 			# I use this to output timer info without outputting 
 			# regular traces
-			return nil unless log or ( str === true and AntConfig::LOG_STATUS )
+			return nil unless log or ( str === true and log_status? )
 
 			# don't bother with empty input
 			if not str === true 
@@ -74,6 +75,13 @@ class Logger
 		@log
 	end
 
+	def log_status= val
+		@log_status = val
+	end
+
+	def log_status?
+		@log_status and AntConfig::LOG_STATUS
+	end
 
 	private
 

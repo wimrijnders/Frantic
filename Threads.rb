@@ -532,6 +532,17 @@ class TurnThread < Thread
 		else
 		
 			@stdout.puts @buffer[ turn ]
+
+if false
+			# Hold out as long as you can, to give the helper threads
+			# as much time as possible to do their stuff
+			diff = Time.now - @start - 0.1
+			if diff > 0
+				$logger.info { "Holding out for #{ (diff*1000).to_i } msec" }
+				sleep diff
+			end
+end
+
 			@stdout.puts "go"
 			@stdout.flush
 
@@ -568,8 +579,6 @@ class TurnThread < Thread
 		else
 			$logger.info(true) { "output closed!" }
 
-			# Concurrency problems with following
-			# TODO: sort it out
 			throw :maxed_out
 			ret = false
 		end

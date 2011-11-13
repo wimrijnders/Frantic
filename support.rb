@@ -58,6 +58,7 @@ class Timer
 
 	def display
 		str = "Timer results (msec):\n";
+		start = Time.now
 		max_k = nil
 		@list.each_pair do |k,v|
 			if max_k.nil? or max_k.length < k.length
@@ -69,7 +70,7 @@ class Timer
 		uncomplete = []
 		@list.each_pair do |k,v|
 			if v[1].nil?
-				uncomplete << k
+				uncomplete << [k, v]
 				next
 			end
 
@@ -88,7 +89,11 @@ class Timer
 			lines.transpose[0].join( "\n" ) 
 
 		if uncomplete.length > 0
-			str << "\nDid not complete: " + uncomplete.join( ", ")
+			tmp = uncomplete.collect {|n| 
+				value = ( (start - n[1][0])*1000 ).to_i 
+				"#{ n[0] }: #{ value} msec" 
+			}
+			str << "\nDid not complete:\n   " + tmp.join( "\n   ")
 		end
 
 		str

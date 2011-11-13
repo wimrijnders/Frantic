@@ -327,7 +327,7 @@ Thread.exclusive {
 			sq = from
 		end
 
-		# randomize the input list a put a cap on it
+		# randomize the input list to put a cap on it
 		max_cap = 80
 
 		if $ai.turn.maxed_out?
@@ -1645,6 +1645,8 @@ private
 	# TODO: do_search not used 
 	#
 	def get_neighbors_sorted ant, in_ants, do_search = false, max_length = nil
+		$ai.turn.check_maxed_out
+
 		ants = in_ants.clone
 		ants.delete_if { |a| ant.square == a.square }
 		return [] if ants.length == 0

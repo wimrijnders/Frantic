@@ -241,10 +241,19 @@ class AI
 						end
 
 						$logger.info "=== Stay Phase ==="
+						# Mark non-moved ants as staying; these are put at the top 
+						# of the list, so that they get processed first next turn
+						top = []
+						bottom = [] 
 						my_ants.each do |ant|
-							next if ant.moved?
-							ant.stay
+							if ant.moved?
+								bottom << ant
+							else
+								ant.stay
+								top << ant
+							end
 						end
+						@my_ants = top + bottom
 
 					}
 		
@@ -691,7 +700,9 @@ class AI
 		# move and hope this helps a bit
 	else
 		$timer.start( "sort enemies" ) {
-			@my_ants.each { |b| b.add_enemies @enemy_ants }
+			@my_ants.each { |b| 
+				b.add_enemies @enemy_ants
+			}
 		}
 	end
 
