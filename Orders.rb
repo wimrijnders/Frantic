@@ -254,6 +254,14 @@ end
 		evade_reset
 		sort_orders
 
+
+		if ai.turn.maxed_out?
+			# Maxed out situation
+			# If at all possible, handle orders right away,
+			# So that we get as many orders as possible through
+			handle_orders
+		end
+
 		true
 	end
 

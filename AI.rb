@@ -685,9 +685,16 @@ class AI
 
 		@enemy_ants = new_enemy_ants
 
+
+	if turn.maxed_urgent?
+		# Screw the new enemies situation; retain the data from the previous
+		# move and hope this helps a bit
+	else
 		$timer.start( "sort enemies" ) {
 			@my_ants.each { |b| b.add_enemies @enemy_ants }
 		}
+	end
+
 	end
 
 	def all_squares

@@ -98,7 +98,7 @@ class Logger
 				filename = "log.txt"
 			end
 
-			@f[ thread ] = File.new( filename, "w")
+			@f[ thread ] = File.new( "logs/" + filename, "w")
 		end
 
 		thread

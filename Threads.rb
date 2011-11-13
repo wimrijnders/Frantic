@@ -132,7 +132,7 @@ class WorkerThread < Thread
 			end
 
 			$logger.info "closing down."
-		end rescue $logger.info( "Boom! #{ $! }" )
+		end rescue $logger.info( "Boom! #{ $! }\n #{ $!.backtrace }" )
 		end
 	end
 
@@ -325,7 +325,7 @@ def patterns_thread
 				end
 
 				#if WorkerThread.start_next "FindRegions"
-			end rescue $logger.info "Boom! #{ $! }"
+			end rescue $logger.info( "Boom! #{ $! }\n #{ $!.backtrace }" )
 
 			$logger.info "closing down."
 		end
@@ -381,9 +381,9 @@ def liaisons_thread
 						end
 
 						if $pointcache.get(sq, l, true ).nil? 
-							$pointcache.retrieve_item sq, l, true
+							$pointcache.retrieve_item sq, l, nil, true
 						elsif $pointcache.get(l, sq, true ).nil? 
-							$pointcache.retrieve_item l, sq, true
+							$pointcache.retrieve_item l, sq, nil, true
 						else
 							item[1].delete l
 							next
@@ -399,7 +399,7 @@ def liaisons_thread
 				end
 				$logger.info "Found #{count} items. to go: #{ squares.length}"
 
-			end rescue $logger.info "Boom! #{ $! }"
+			end rescue $logger.info( "Boom! #{ $! }\n #{ $!.backtrace }" )
 
 			$logger.info "closing down."
 		end
@@ -432,6 +432,10 @@ class TurnThread < Thread
 	end
 
 	def maxed_out? 
+		history >=  MAX_HISTORY - 2
+	end
+
+	def maxed_urgent?
 		history >=  CRITICAL_MARGIN
 	end
 
@@ -441,7 +445,7 @@ class TurnThread < Thread
 		@mutex.set_wait
 		@wait = ConditionVariable.new
 
-		margin = 350 
+		margin = 250 
 
 		@turntime = 1.0*(turntime - margin)/1000
 		@loadtime = 1.0*(loadtime - margin)/1000
@@ -466,9 +470,8 @@ class TurnThread < Thread
 			while doing
 
 				$logger.info(true) { "waiting...."	}
-begin
+				
 				@wait.wait @mutex
-end rescue $logger.info( "Boom! #{ $! }" )
 
 				turn = @turn
 				$logger.info(true) { "Counting turn #{ turn}: #{ hist_to_s }" }
@@ -508,7 +511,7 @@ end rescue $logger.info( "Boom! #{ $! }" )
 			end
 
 			$logger.info "closing down."
-		end rescue $logger.info( "Boom! #{ $! }" )
+		end rescue $logger.info( "Boom! #{ $! }\n #{ $!.backtrace }" )
 		end
 		t.priority = 1
 	end
@@ -573,6 +576,13 @@ end rescue $logger.info( "Boom! #{ $! }" )
 
 		ret
 }
+	end
+
+	def check_maxed_out
+		if @buffer[ @turn ].nil?
+			$logger.info "throwing :maxed_out"
+			throw :maxed_out
+		end
 	end
 end
 

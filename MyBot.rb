@@ -99,10 +99,11 @@ class Strategy < BaseStrategy
 		end
 	end
 
+
 	#
-	# Handle non-collective ants which are in a conflict situation
 	#
-	def ant_conflict ai
+	#
+	def defend_hills ai
 		$logger.info "check if own hills are safe"
 
 		ai.hills.each_friend do |square| 
@@ -156,13 +157,6 @@ class Strategy < BaseStrategy
 				end
 			end
 		end
-
-
-		$logger.info "Do individual conflict ants"
-		ai.my_ants.each do |ant|
-			next if ant.collective?
-			ant.handle_conflict
-		end
 	end
 
 
@@ -207,6 +201,18 @@ class Strategy < BaseStrategy
 	# Main turn routine
 	#
 	def turn ai
+		ai.turn.check_maxed_out
+	if ai.turn.maxed_urgent?
+		# Try to complete all outstanding orders and hope for the best
+		# with any luck, some of the next phases may be completed in tim.
+
+		$logger.info "=== Urgent Order Phase ==="
+		$timer.start( "Urgent Order Phase" ) {
+			ant_orders ai
+		}
+	end
+
+		ai.turn.check_maxed_out
 		$logger.info "=== Init Phase ==="
 		$timer.start "Init Phase"
 
@@ -220,6 +226,7 @@ class Strategy < BaseStrategy
 			end
 		end
 
+	unless ai.turn.maxed_out?
 		# Determine ant furthest away from first own active hill,
 		# for the pattern matcher
 		ai.hills.each_friend do |sq|
@@ -231,45 +238,61 @@ class Strategy < BaseStrategy
 			end
 			break			# TODO: determine why this is here
 		end
+	end
 
 		check_attacked ai	
 
 		$timer.end "Init Phase"
 
-		$logger.info "=== Collective Phase ==="
-		$timer.start "Collective Phase"
-		Collective.complete_collectives ai
+		ai.turn.check_maxed_out
+		unless ai.turn.maxed_out?
+			$logger.info "=== Collective Phase ==="
+			$timer.start "Collective Phase"
 
-		if ai.turn.maxed_out?
-			$logger.info "maxed out; blocking collective creation"
-		else
-			if not ai.kamikaze? and not ai.turn.maxed_out?
-				unless enough_collectives ai
+			Collective.complete_collectives ai
+
+			if not ai.kamikaze?  and not enough_collectives ai
 					Collective.create_collectives ai unless ai.kamikaze? 
-				end
 			end
+
+			$timer.end "Collective Phase"
 		end
-		$timer.end "Collective Phase"
 
 
+		ai.turn.check_maxed_out
 		$logger.info "=== Food Phase ==="
 		$timer.start( "Food Phase") {
 			find_food ai
 		}
 
 
+		ai.turn.check_maxed_out
 		$logger.info "=== Conflict Phase ==="
 		$timer.start( "Conflict Phase" ) {
-			ant_conflict ai
+			unless ai.turn.maxed_out?
+				defend_hills ai
+			end
+
+			# Handle non-collective ants which are in a conflict situation
+			$logger.info "Do individual conflict ants"
+			ai.my_ants.each do |ant|
+				next if ant.collective?
+				ant.handle_conflict
+			end
 		}
 
-		$logger.info "=== Hill Phase ==="
-		$timer.start( "Hill Phase" ) {
-			handle_hills ai
-		}
+
+		ai.turn.check_maxed_out
+		unless ai.turn.maxed_out?
+			$logger.info "=== Hill Phase ==="
+			$timer.start( "Hill Phase" ) {
+				handle_hills ai
+			}
+		end
 
 
-		if ai.kamikaze? and ai.enemy_ants.length > 0
+		ai.turn.check_maxed_out
+		if ai.kamikaze? and ai.enemy_ants.length > 0  and not ai.turn.maxed_out?
 			$logger.info "=== Kamikaze Phase ==="
 			$timer.start "Kamikaze Phase"
 
@@ -289,10 +312,11 @@ class Strategy < BaseStrategy
 		end
 
 if false
+		ai.turn.check_maxed_out
 		$logger.info "=== Enlist Phase ==="
 		$timer.start "Enlist Phase"
 		# Don't harvest if	not enough ants
-		if ai.my_ants.length > 10
+		if ai.my_ants.length > 10 and not ai.turn.maxed_out?
 			ai.my_ants.each do |ant|
 				next if ant.orders?
 				next if ant.moved?
@@ -326,16 +350,19 @@ if false
 		$timer.end "Enlist Phase"
 end
 
+		ai.turn.check_maxed_out
 		$logger.info "=== Move Collective Phase ==="
 		$timer.start( "Colmove Phase") {
 			Collective.move_collectives ai
 		}
 
+		ai.turn.check_maxed_out
 		$logger.info "=== Order Phase ==="
 		$timer.start( "Order Phase" ) {
 			ant_orders ai
 		}
 
+		ai.turn.check_maxed_out
 		$logger.info "=== Super Phase ==="
 		$timer.start( "Super Phase" ) {
 			super ai, false, false #, ( !ai.kamikaze? ) 
@@ -382,7 +409,7 @@ $ai.run do |ai|
 			#printer = RubyProf::FlatPrinter.new(result)
 			printer = RubyProf::GraphPrinter.new(result)
 			#printer.print(STDOUT)
-			printer.print( File.new("profile2.txt","w"))
+			printer.print( File.new("logs/profile2.txt","w"))
 		
 			$logger.info { "Profiling done." }
 		end

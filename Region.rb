@@ -112,7 +112,7 @@ class PointCache
 		# initiate search here
 		@add_points << [ from, to ]
 
-		if do_nil	
+		if do_nil and not $ai.turn.maxed_out?
 			$logger.info { "Adding nilitem for #{ from}-#{ to}" }
 
 			set to, from, nil, nil, true
@@ -270,11 +270,14 @@ Thread.exclusive {
 					# since it also happens in Pathinfo
 					if path.length > 2
 						pathitem = $region.get_path_basic path[0], path[-1]
+
+						firstliaison = $region.get_liaison path[0], path[1]
+						lastliaison = $region.get_liaison path[-2], path[-1]
 						unless pathitem.nil?
 							# fill in the full walk as much as possible
-							set_walk from, path[0], to
+							set_walk from, firstliaison, to
 							set_regions from, to, pathitem
-							set_walk path[-1], to
+							set_walk lastliaison, to
 						end
 
 #						pathitem = $region.get_path_basic path[0], path[-1]
@@ -888,7 +891,7 @@ class Region
 		t3 = RegionsThread.new self, @@add_regions
 		t3.priority = -2
 
-		liaisons_thread
+		#RIP: liaisons_thread
 	end
 
 	def self.add_paths result

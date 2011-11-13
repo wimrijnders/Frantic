@@ -113,9 +113,16 @@ class BaseStrategy
 	def move_neighbors list
 		ant = list[-1]
 
-		if not ant.moved? and not ant.stuck?
+		return false if ant.moved?
+
+		if not ant.stuck?
 			ant.handle_orders
 			return true 
+		else
+			if $ai.turn.maxed_out?
+				ant.stay
+				return false
+			end
 		end
 
 		[ :N, :E, :S, :W ].each do |dir|

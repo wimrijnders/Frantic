@@ -2,8 +2,8 @@
 
 module AntConfig
 
-	LOG_OUTPUT      = true	# Output logging info to stdout
-	LOG_STATUS      = true  # Log status info only if LOG_OUTPUT is false
+	LOG_OUTPUT      = false	# Output logging info to stdout
+	LOG_STATUS      = false	# Log status info only if LOG_OUTPUT is false
 
 	DEFENSIVE_LIMIT = 20	# Number of ants needed to be present
 							# before ants start attacking as well
