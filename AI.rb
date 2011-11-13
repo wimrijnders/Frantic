@@ -226,6 +226,9 @@ class AI
 	
 			over=false
 			until over
+				# WRI test
+				$region.t1.resume
+
 				set_throttle
 
 				$timer.start "total"

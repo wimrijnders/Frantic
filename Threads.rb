@@ -2,6 +2,25 @@
 require 'thread'
 require 'timeout'
 
+require 'fiber'
+
+class Fiber
+
+	def []= arg, value
+
+		@hash = {} if @hash.nil?
+
+		@hash[arg] = value
+	end
+
+	def [] arg
+		@hash = {} if @hash.nil?
+		@hash[arg]
+	end
+end
+
+
+
 class Mutex
 
 	def set_wait
@@ -58,6 +77,86 @@ end
 #
 # Following definitions used in Region
 #
+
+class WorkerFiber 
+
+	def resume; @fiber.resume; end
+
+	def initialize name, region, list
+		@region = region
+		@list = list
+		@turn = 0
+
+		@fiber = Fiber.new do
+			run_fiber
+		end
+		@fiber[ :name ] = 'Fiber1'
+	end
+
+	def run_fiber
+		begin
+			longest_diff = nil
+			longest_count = nil
+
+			doing = true
+			while doing
+				$logger.info "waiting"
+				while list.length == 0
+					Fiber.yield
+				end
+
+				count = 0
+				start = Time.now
+				init_loop
+
+$logger.info "Running fibre loop"
+$timer.start("fibre") {
+
+				while list.length > 0
+					# Handle next item
+					action list.pop
+
+					count += 1
+
+					Fiber.yield
+				end
+}
+$logger.info "Done fibre loop"
+
+				done_loop
+
+				$logger.info {
+					diff = ( (Time.now - start)*1000 ).to_i
+
+					if longest_diff.nil? or diff > longest_diff
+						longest_diff = diff
+						longest_count = count
+
+					end
+
+					str = " Longest: #{ longest_count } in #{ longest_diff } msec"
+
+					"added #{ count } results in #{ diff} msec. #{ str }" 
+				}
+
+			end
+
+			$logger.info "closing down."
+		end rescue $logger.info( "Boom! #{ $! }\n #{ $!.backtrace }" )
+	end
+
+	def list
+		@list
+	end
+
+
+	def init_loop
+	end
+
+
+	def done_loop
+	end
+end
 
 class WorkerThread < Thread
 
@@ -150,7 +249,8 @@ class WorkerThread < Thread
 end
 
 
-class Thread1 < WorkerThread
+#class Thread1 < WorkerThread
+class Thread1 < WorkerFiber
 	def initialize region, list
 		super("Thread1", region, list)
 	end
@@ -160,6 +260,7 @@ class Thread1 < WorkerThread
 	end
 
 	def action path
+
 		return if path.length == 0
 
 		$logger.info { "saving path: #{ path }" }

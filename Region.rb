@@ -368,11 +368,13 @@ class Region
 	@@add_searches = []
 	@@add_regions = []
 
+	def t1; @t1; end
+
 	private 
 
 	def do_thread
-		t1 = Thread1.new self, @@add_paths
-		t1.priority = -2
+		@t1 = Thread1.new self, @@add_paths
+		#t1.priority = -2
 
 		t2 = Thread2.new self, @@add_searches
 		t2.priority = -1

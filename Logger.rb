@@ -91,6 +91,8 @@ class Logger
 		if name.nil?
 			if Thread.current != Thread.main
 				thread = Thread.current[ :name ]
+			elsif not Fiber.current.nil?
+				thread = Fiber.current[ :name ]
 			else 
 				thread = "Main"
 			end
