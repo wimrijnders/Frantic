@@ -238,7 +238,7 @@ end
 	def order direction
 		# Following needed because duplicate orders
 		# are filed as errors on the site.
-		# TODO: Fix this so that no duplicate errors occur
+		# Looks to be going fine; but it's a good safeguard
 		if moved?
 			$logger.info "ERROR - duplicate move detected"
 			# Original is retained
@@ -292,20 +292,22 @@ end
 		count == 0
 	end
 
+
 	def move dir, target = nil
-		str = "#{ self } to #{ dir } => #{ target } - "
+
+		str = ""
 
 		next_sq = square.neighbor(dir)
 
 		$logger.info { "next_sq: #{ next_sq }, hole: #{ next_sq.hole?}" }
 
 		if dir == :STAY
-			str +=  "stuck"
+			str =  "stuck"
 			stay
 
 		# If next square is a hole and not our target, we dont want to go there
-		elsif can_pass? dir and not ( next_sq.hole? and not target.nil? and next_sq != target )
-			str +=  "passable"
+		elsif can_pass? dir and ( ( not target.nil? and next_sq == target ) or  not next_sq.hole? )
+			str =  "passable"
 			order dir
 		else
 			path_finder = EvadePathFinder.new square, dir, @left
@@ -314,7 +316,7 @@ end
 			unless target.nil?
 				best = path_finder.best_direction target
 				if best.nil?
-					str << "Have no path"
+					str = "Have no path"
 					do_it = false
 				else
 					@left = best
@@ -330,7 +332,7 @@ end
 				else
 	
 					# Take a shortcut to a point on the evasion path
-					if set_order evade_target, :EVADE_GOTO
+					if set_order evade_target, :EVADE_GOTO, nil, true
 	
 						# Take the first step, since we are already committed
 						# to moving.
@@ -338,7 +340,7 @@ end
 						if not dir.nil? and square.neighbor(dir).passable?
 							order dir
 						end
-						str << "taking shortcut through #{ dir }"
+						str = "taking shortcut through #{ dir }"
 					else
 						# Fall back to regular evasion
 						evade dir
@@ -346,7 +348,8 @@ end
 				end
 			end
 		end
-		$logger.info { str }
+
+		$logger.info { "#{ self } to #{ dir } => #{ target } - #{ str }" }
 	end
 
 	#

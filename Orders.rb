@@ -192,7 +192,7 @@ module Orders
 	#
 	# Returns true if order added, false otherwise
 	# 
-	def set_order square, what, offset = nil
+	def set_order square, what, offset = nil, from_handle_orders = false
 		n = Order.new(square, what, offset)
 
 		if not $region.can_reach self.square, square
@@ -266,7 +266,11 @@ end
 			# Maxed out situation
 			# If at all possible, handle orders right away,
 			# So that we get as many orders as possible through
-			handle_orders
+			if from_handle_orders
+				$logger.info "Called from handle_orders; not recursing"
+			else
+				handle_orders
+			end
 		end
 
 		true

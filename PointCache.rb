@@ -2,8 +2,31 @@
 class PointCache
 
 	def initialize ai
+		@cache = {}
+
+		@hits = 0
+		@misses = 0
+		@replaces = 0
+		@sets = 0
+		@known = 0
+		@invalidate_times = 0
+		@invalidate_num = 0 
+
 		@zero_pathitem = { :path => [], :dist => 0 }
 		@zero_distance_item = [ 0, @zero_pathitem, :STAY, false ]
+	end
+
+
+	def status
+		"pointcache status:
+   hits      :%9d 
+   misses    :%9d
+   replaces  :%9d
+   sets      :%9d
+   known     :%9d
+   invalidate: #{ @invalidate_times } times, #{ @invalidate_num } items
+" % [ @hits, @misses, @replaces, @sets, @known  ]
+
 	end
 
 
@@ -17,9 +40,61 @@ class PointCache
 			return @zero_distance_item
 		end
 
-		# Note that this returns a value
-       	set( from, to, nil, nil, true)
+		do_nil = true
+
+		f = @cache[ from ]
+		t = nil
+		invalid = false
+
+		unless f.nil?
+			t = f[to]
+		end
+
+		if not t.nil? 
+			invalid = t[3]
+
+			# items with distance one can be validated immediately
+			if invalid and t[0] == 1
+				t[3] = false
+				invalid = t[3]
+				t[1] = @zero_pathitem
+			end	
+
+			if not invalid
+
+				$logger.info "hit #{from}-#{ to}: dist #{ t[0]}, dir #{ t[2] }"
+				@hits += 1
+
+				return t
+			else
+				if check_invalid
+					return nil
+				else
+				 	result = t	
+					do_nil = false
+				end
+			end
+		end
+
+		@misses += 1
+
+		return nil if check_invalid 
+
+
+		if do_nil 
+			$logger.info { "Adding nilitem for #{ from}-#{ to}" }
+
+			#set to, from, nil, nil, true
+			# Note that this returns a value
+			tmp = set( from, to, nil, nil, true)
+			if result.nil?
+				result = tmp
+			end
+		end
+
+		result
 	end
+
 
 
 	def	determine_move from, to
@@ -96,6 +171,19 @@ class PointCache
 			"from-to => [ distance, item, move, invalid] : " +
 			"#{ from }-#{ to } => [ #{ distance }, #{ item }, #{ move }, #{ invalid } ]"
 		}
+
+		f = @cache[ from ]
+		if f.nil?
+			@cache[from] = {}
+			f = @cache[from]
+		end
+
+		if f[to].nil?
+			@sets += 1
+		else
+			@known += 1
+		end
+		f[to] = result
 
 		result	
 	end

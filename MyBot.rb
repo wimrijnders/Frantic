@@ -204,6 +204,7 @@ class Strategy < BaseStrategy
 	#
 	def turn ai
 		ai.turn.check_maxed_out
+
 	if ai.turn.maxed_urgent?
 		# Try to complete all outstanding orders and hope for the best
 		# with any luck, some of the next phases may be completed in tim.

@@ -14,6 +14,7 @@ require 'Collective.rb'
 require 'Harvesters.rb'
 require 'Food.rb'
 require 'Threads.rb'
+require 'PointCache.rb'
 require 'Region.rb'
 require 'Patterns.rb'
 require 'Ant.rb'
@@ -273,7 +274,7 @@ class AI
 						str << "turn #{ @turn_number }\n"
 					end
 
-					str + $timer.display
+					str + $timer.display + "\n" + $pointcache.status
 				}
 			end
 			$logger.info "Exited game loop - goodbye"
@@ -345,8 +346,9 @@ class AI
 			@turn_number=num.to_i
 		end
 
-		$logger.all { "turn #{ @turn_number }" }
+		# Order important
 		@turn.start @turn_number
+		$logger.all { "turn #{ @turn_number }" }
 	
 		# reset the map data
 		@map.each do |row|

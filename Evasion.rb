@@ -147,8 +147,12 @@ class EvadePathFinder
 	end
 
 	def move
-		# Go as far as you can while evading
-		find_path @start_left
+		if @left.nil?
+			# Go as far as you can while evading
+			find_path @start_left
+		else
+			$logger.info { "find_path already called; not doing again" }
+		end
 		self
 	end
 
@@ -167,6 +171,8 @@ class EvadePathFinder
 			target1 = @square
 			#d1 = Pathinfo.new(target1, target).dist
 			d1 = $pointcache.distance target1, target
+		
+			history1 = @history
 		end
 
 		find_path false 
@@ -177,25 +183,27 @@ class EvadePathFinder
 		end
 
 		# Select known paths over unknown paths
+		do_left = false
 		if d1.nil? and not d2.nil?
 			$logger.info "selecting right; left is unknown"
 			return false
 		elsif not d1.nil? and d2.nil?
 			$logger.info "selecting left; right is unknown"
-			#reset internal state, it was overwritten with last search
-			find_path true 
-
-			return true
+			do_left = true
 		elsif d1.nil? and d2.nil?
 			$logger.info "No known paths"
 			# Don't make any assumptions
 			return nil
 		end
 
-		if d1 < d2 
+		if do_left or d1 < d2 
 			$logger.info "left is better"
+
 			#reset internal state, it was overwritten with last search
-			find_path true 
+			#find_path true 
+			@left = true
+			@history = history1
+			@square = target1
 
 			true
 		else
