@@ -83,14 +83,23 @@ class WorkerFiber
 	def resume; @fiber.resume; end
 
 	def initialize name, region, list
+		@name = name
 		@region = region
 		@list = list
 		@turn = 0
 
+		@count = 0
+		@longest_count = 0
+		@longest_diff = 0
+
 		@fiber = Fiber.new do
 			run_fiber
 		end
-		@fiber[ :name ] = 'Fiber1'
+		@fiber[ :name ] = name 
+	end
+
+	def status
+		[  @name, @count, @longest_count, @longest_diff ]
 	end
 
 	def run_fiber
@@ -109,7 +118,7 @@ class WorkerFiber
 				start = Time.now
 				init_loop
 
-$logger.info "Running fibre loop"
+$logger.info "Running fiber loop"
 $timer.start("fibre") {
 
 				while list.length > 0
@@ -117,11 +126,11 @@ $timer.start("fibre") {
 					action list.pop
 
 					count += 1
-
+					@count += 1
 					Fiber.yield
 				end
 }
-$logger.info "Done fibre loop"
+$logger.info "Done fiber loop"
 
 				done_loop
 
@@ -129,12 +138,12 @@ $logger.info "Done fibre loop"
 					diff = ( (Time.now - start)*1000 ).to_i
 
 					if longest_diff.nil? or diff > longest_diff
-						longest_diff = diff
-						longest_count = count
+						@longest_diff = diff
+						@longest_count = count
 
 					end
 
-					str = " Longest: #{ longest_count } in #{ longest_diff } msec"
+					str = " Longest: #{ @longest_count } in #{ @longest_diff } msec"
 
 					"added #{ count } results in #{ diff} msec. #{ str }" 
 				}
@@ -250,9 +259,9 @@ end
 
 
 #class Thread1 < WorkerThread
-class Thread1 < WorkerFiber
+class Fiber1 < WorkerFiber
 	def initialize region, list
-		super("Thread1", region, list)
+		super("fiber1", region, list)
 	end
 
 	def init_loop
@@ -284,10 +293,10 @@ class Thread1 < WorkerFiber
 end
 
 
-class BigSearchThread < WorkerThread
+class BigSearch< WorkerFiber
 	def initialize region, list
-		$logger.info "Initializing BigSearchThread"
-		super("BigSearchThread", region, list)
+		$logger.info "Initializing BigSearch"
+		super("BigSearch", region, list)
 	end
 
 	def action item
@@ -298,16 +307,14 @@ class BigSearchThread < WorkerThread
 
 		# Results will be cached within this call
 		@region.find_paths from, to_list, do_shortest, max_length
-
-		#WorkerThread.start_next "Patterns"
 	end
 end
 
 
-class Thread2 < WorkerThread
+class Fiber2 < WorkerFiber
 
 	def initialize region, list
-		super("Thread2", region, list)
+		super("fiber2", region, list)
 		@add_search = []
 	end
 
@@ -338,8 +345,6 @@ class Thread2 < WorkerThread
 
 		# Results will be cached within this call
 		@region.find_paths from, to_list, do_shortest, max_length
-
-		#WorkerThread.start_next "Patterns"
 	end
 end
 
@@ -603,3 +608,36 @@ end
 	end
 end
 
+
+class Fibers
+
+	def initialize
+		@list = []
+
+		self
+	end
+
+	def init_fibers
+		@list += $region.init_fibers
+
+		self
+	end
+
+	def resume
+		@list.each { |f| f.resume }
+	end
+
+	def status
+		format1 = "%10s %5s %7s %5s\n"
+		format = "%10s %5d %7d %5d\n"
+		str = "Fibers:\n" +
+			format1 % [ "Name      ", "count", "    max", "diff" ] +
+			format1 % [ "==========", "=====", "=======", "====" ]
+
+		@list.each { |f|
+			str << format % f.status
+		 }
+
+		str
+	end
+end

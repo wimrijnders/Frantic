@@ -368,18 +368,15 @@ class Region
 	@@add_searches = []
 	@@add_regions = []
 
-	def t1; @t1; end
-
 	private 
 
 	def do_thread
-		@t1 = Thread1.new self, @@add_paths
+		#@t1 = Thread1.new self, @@add_paths
 		#t1.priority = -2
 
-		t2 = Thread2.new self, @@add_searches
-		t2.priority = -1
+		#t2 = Thread2.new self, @@add_searches
+		#t2.priority = -1
 
-		t4 = BigSearchThread.new self, t2.my_list 
 
 		t3 = RegionsThread.new self, @@add_regions
 		t3.priority = -2
@@ -391,6 +388,20 @@ class Region
 	end
 
 	public 
+
+	def init_fibers
+		t2 = Fiber2.new( self, @@add_searches) 
+
+		list = [
+			Fiber1.new( self, @@add_paths ), 
+			t2, 
+			BigSearch.new( self, t2.my_list )
+		]
+
+
+		list
+	end
+
 
 	def self.add_searches from, to_list, do_shortest = false, max_length = nil
 		sq_ants   = Region.ants_to_squares to_list

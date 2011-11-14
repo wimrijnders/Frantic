@@ -227,7 +227,7 @@ class AI
 			over=false
 			until over
 				# WRI test
-				$region.t1.resume
+				$fibers.resume
 
 				set_throttle
 
@@ -277,7 +277,10 @@ class AI
 						str << "turn #{ @turn_number }\n"
 					end
 
-					str + $timer.display + "\n" + $pointcache.status
+					str +
+					$timer.display + "\n" + 
+					$pointcache.status + "\n" +
+					$fibers.status
 				}
 			end
 			$logger.info "Exited game loop - goodbye"
@@ -747,6 +750,7 @@ $ai.setup do |ai|
 	Pathinfo.set_region $region
 	$patterns = Patterns.new ai
 	$pointcache = PointCache.new ai
+	$fibers = Fibers.new.init_fibers
 end
 
 if false

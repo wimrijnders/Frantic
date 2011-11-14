@@ -93,7 +93,9 @@ class Logger
 				thread = Thread.current[ :name ]
 			elsif not Fiber.current.nil?
 				thread = Fiber.current[ :name ]
-			else 
+			end
+
+			if thread.nil? or thread.length == 0	
 				thread = "Main"
 			end
 		else

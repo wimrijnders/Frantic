@@ -24,8 +24,7 @@ class PointCache
    replaces  :%9d
    sets      :%9d
    known     :%9d
-   invalidate: #{ @invalidate_times } times, #{ @invalidate_num } items
-" % [ @hits, @misses, @replaces, @sets, @known  ]
+   invalidate: #{ @invalidate_times } times, #{ @invalidate_num } items" % [ @hits, @misses, @replaces, @sets, @known  ]
 
 	end
 
