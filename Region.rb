@@ -281,6 +281,10 @@ class LiaisonSearch
 			return []
 		end
 
+
+		# Be cooperative with the other fibers
+		Fiber.yield
+
 		if @find_shortest and not @cur_best_dist.nil?
 			dist = Pathinfo.path_distance current_path
 
@@ -348,12 +352,6 @@ class LiaisonSearch
 			end
 		end
 
-if false
-		$logger.info "Pausing for a breather"
-		sleep 0.02
-		Thread.pass
-end
-
 		results
 	end
 end
@@ -377,9 +375,8 @@ class Region
 		#t2 = Thread2.new self, @@add_searches
 		#t2.priority = -1
 
-
-		t3 = RegionsThread.new self, @@add_regions
-		t3.priority = -2
+		#t3 = RegionsThread.new self, @@add_regions
+		#t3.priority = -2
 	end
 
 	def self.add_paths result
@@ -395,9 +392,9 @@ class Region
 		list = [
 			Fiber1.new( self, @@add_paths ), 
 			t2, 
-			BigSearch.new( self, t2.my_list )
+			BigSearch.new( self, t2.my_list ),
+			RegionsFiber.new( self, @@add_regions )
 		]
-
 
 		list
 	end
@@ -866,6 +863,7 @@ private
 
 		results
 	end
+
 
 	def store_points from, to_list, results
 		return if results.nil? or results.length == 0

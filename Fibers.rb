@@ -1,10 +1,9 @@
 #!/usr/local/bin/ruby
 require 'thread'
-require 'timeout'
-
 require 'fiber'
 
 class Fiber
+
 
 	def []= arg, value
 
@@ -17,58 +16,25 @@ class Fiber
 		@hash = {} if @hash.nil?
 		@hash[arg]
 	end
-end
 
+	def inc_yields
+		@yields = 0	if @yields.nil?
 
-
-class Mutex
-
-	def set_wait
-		@wait = ConditionVariable.new
+		@yields += 1
 	end
 
-	def signal
-		@wait.signal
-		Thread.pass
+	def yields
+		@yields = 0	if @yields.nil?
+
+		@yields
 	end
 
-	# Don't call your input param 'timeout'. It interferes with
-	# the timeout module definition.
-	def waitlock period
-if false
-		begin		
-			Timeout::timeout(period) {
-				#self.lock
-				@wait.wait self
-			}
+	class << self
+		alias :prev_yield :yield
 
-			$logger.info "Got the lock"
-			true
-		rescue Timeout::Error
-			$logger.info "KABLOOEY!!!!"
-			return false
-		end
-end
-
-		start = Time.now	
-		@wait.wait self, period
-		if Time.now - start < period
-			$logger.info "Got the lock"
-			true
-		else
-			@wait.signal	# WRI DEBUG
-			$logger.info "KABLOOEY!!!!"
-			false
-		end
-	end
-
-	def try_unlock
-		begin
-			unlock
-			true
-		rescue ThreadError
-			$logger.info "Lock not mine"
-			false
+		def yield
+			Fiber.current.inc_yields
+			prev_yield
 		end
 	end
 end
@@ -89,8 +55,7 @@ class WorkerFiber
 		@turn = 0
 
 		@count = 0
-		@longest_count = 0
-		@longest_diff = 0
+		@status = :init
 
 		@fiber = Fiber.new do
 			run_fiber
@@ -98,8 +63,12 @@ class WorkerFiber
 		@fiber[ :name ] = name 
 	end
 
-	def status
-		[  @name, @count, @longest_count, @longest_diff ]
+	def status 
+		@status
+	end
+
+	def stats
+		[  @name, @status.to_s, @count, @fiber.yields  ]
 	end
 
 	def run_fiber
@@ -111,11 +80,13 @@ class WorkerFiber
 			while doing
 				$logger.info "waiting"
 				while list.length == 0
+					@status = :waiting
 					Fiber.yield
 				end
 
 				count = 0
 				start = Time.now
+				@status = :running
 				init_loop
 
 $logger.info "Running fiber loop"
@@ -138,18 +109,19 @@ $logger.info "Done fiber loop"
 					diff = ( (Time.now - start)*1000 ).to_i
 
 					if longest_diff.nil? or diff > longest_diff
-						@longest_diff = diff
-						@longest_count = count
+						longest_diff = diff
+						longest_count = count
 
 					end
 
-					str = " Longest: #{ @longest_count } in #{ @longest_diff } msec"
+					str = " Longest: #{ longest_count } in #{ longest_diff } msec"
 
 					"added #{ count } results in #{ diff} msec. #{ str }" 
 				}
 
 			end
 
+			@status = :done
 			$logger.info "closing down."
 		end rescue $logger.info( "Boom! #{ $! }\n #{ $!.backtrace }" )
 	end
@@ -162,10 +134,10 @@ $logger.info "Done fiber loop"
 	def init_loop
 	end
 
-
 	def done_loop
 	end
 end
+
 
 class WorkerThread < Thread
 
@@ -258,7 +230,6 @@ class WorkerThread < Thread
 end
 
 
-#class Thread1 < WorkerThread
 class Fiber1 < WorkerFiber
 	def initialize region, list
 		super("fiber1", region, list)
@@ -349,17 +320,15 @@ class Fiber2 < WorkerFiber
 end
 
 
-class RegionsThread < WorkerThread
+class RegionsFiber < WorkerFiber
 	def initialize region, list
-		super("FindRegions", region, list)
+		super("regions", region, list)
 	end
 
 	def action source
 		$logger.info { "finding regions for #{ source }" }
 		@region.find_regions source 
 		$patterns.fill_map source 
-
-		# WorkerThread.start_next "Thread2"
 	end
 end
 
@@ -421,193 +390,6 @@ end
 
 
 
-class TurnThread < Thread
-	MAX_HISTORY = 10
-	CRITICAL_MARGIN = 2
-
-	def add_history val
-		@history << val
-		if @history.length > MAX_HISTORY
-			@history = @history[1..-1]
-		end
-	end
-
-
-	def history
-		sum = 0
-		@history.each { |h| sum += h }
-
-		sum
-	end
-
-	def hist_to_s
-		"#{ history }/#{ @history.length }"	
-	end
-
-	def maxed_out? 
-		history >=  MAX_HISTORY - 2
-	end
-
-	def maxed_urgent?
-		history >=  CRITICAL_MARGIN
-	end
-
-	def initialize loadtime, turntime, stdout
-		@mutex = Mutex.new
-		@mutex2 = Mutex.new
-		@mutex.set_wait
-		@wait = ConditionVariable.new
-
-		margin = 250 
-
-		@turntime = 1.0*(turntime - margin)/1000
-		@loadtime = 1.0*(loadtime - margin)/1000
-		@stdout = stdout
-
-		@buffer = {} 
-		@history = []
-	
-		# First time send	
-		@stdout.puts 'go'
-		@stdout.flush
- 
-		t = super do 
-		begin
-			Thread.current[ :name ] = "Turn" 
-
-			$logger.info "activated"
-
-			@mutex.lock
-
-			doing = true
-			while doing
-
-				$logger.info(true) { "waiting...."	}
-				
-				@wait.wait @mutex
-
-				turn = @turn
-				$logger.info(true) { "Counting turn #{ turn}: #{ hist_to_s }" }
-				start = Time.now
-
-				# For first turn use loadtime instead
-				if turn == 0
-					$logger.info { "doing loadtime #{ @loadtime }" }
-					max = @loadtime
-				else 
-					max = @turntime
-				end
-
-				success = @mutex.waitlock max
-
-				if not success 
-					$logger.info(true) { "Maxed out!" }
-					if turn == @turn
-						go turn
-					else
-						$logger.info(true) {
-							"ERROR: turn changed #{ turn } => #{ @turn}" 
-						}
-
-						# Send anyway; the server is waiting for a response
-						go turn
-					end
-					add_history 1 
-				else
-					diff = Time.now - start
-
-					$logger.info(true) {
-						"sent in time: #{ (diff*1000).to_i } msec"
-					}
-					add_history 0 
-				end
-			end
-
-			$logger.info "closing down."
-		end rescue $logger.info( "Boom! #{ $! }\n #{ $!.backtrace }" )
-		end
-		t.priority = 1
-	end
-
-
-	def go turn
-@mutex2.synchronize {
-
-		# Do the signal before, so that thread is informed as early as possible 
-
-		unless Thread.current[ :name ] == "Turn" 
-			@mutex.signal
-		end
-
-		$logger.info(true) { "sending for turn #{ turn }" }
-		if @buffer[ turn ].nil?
-			$logger.info(true) { "Nothing to send!" }
-		else
-		
-			@stdout.puts @buffer[ turn ]
-
-if false
-			# Hold out as long as you can, to give the helper threads
-			# as much time as possible to do their stuff
-			diff = Time.now - @start - 0.1
-			if diff > 0
-				$logger.info { "Holding out for #{ (diff*1000).to_i } msec" }
-				sleep diff
-			end
-end
-
-			@stdout.puts "go"
-			@stdout.flush
-
-			@buffer.delete( turn  ) {
-				$logger.info(true) { "ERROR: buffer not deleted." }
-			}
-		end
-
-}
-	end
-
-
-	def start turn
-		start = Time.now
-		diff = 0.0
-		diff = start - @start unless @start.nil?
-		@start = start
-
-		$logger.info(true) { "output open turn  #{ turn } - time from previous open: #{ (diff*1000).to_i }" }
-		@turn = turn
-		@buffer[turn] = ""
-
-		@wait.signal
-		Thread.pass
-	end
-
-	def send str
-@mutex2.synchronize {
-		ret = true
-
-		unless @buffer[ @turn ].nil?
-			$logger.info(true) { "output open." }
-			@buffer[ @turn ] << str + "\n"
-		else
-			$logger.info(true) { "output closed!" }
-
-			throw :maxed_out
-			ret = false
-		end
-
-		ret
-}
-	end
-
-	def check_maxed_out
-		if @buffer[ @turn ].nil?
-			$logger.info "throwing :maxed_out"
-			throw :maxed_out
-		end
-	end
-end
-
 
 class Fibers
 
@@ -624,18 +406,34 @@ class Fibers
 	end
 
 	def resume
-		@list.each { |f| f.resume }
+		list = @list.clone
+
+		while list.length > 0 
+			list.clone.each { |f|
+				# run at least once, to be able to reset the state
+				f.resume
+
+				if f.status == :waiting or f.status == :done
+					list.delete f
+					next
+				end
+
+			}
+
+			$ai.turn.check_maxed_out
+		end
 	end
 
+
 	def status
-		format1 = "%10s %5s %7s %5s\n"
-		format = "%10s %5d %7d %5d\n"
+		format1 = "%10s %8s %7s %7s\n"
+		format  = "%10s %8s %7d %7d\n"
 		str = "Fibers:\n" +
-			format1 % [ "Name      ", "count", "    max", "diff" ] +
-			format1 % [ "==========", "=====", "=======", "====" ]
+			format1 % [ "Name      ", "status  ", "  count", "yields" ] +
+			format1 % [ "==========", "========", "  =====", "======" ]
 
 		@list.each { |f|
-			str << format % f.status
+			str << format % f.stats
 		 }
 
 		str
