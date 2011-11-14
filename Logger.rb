@@ -56,6 +56,14 @@ class Logger
 		out "stats", caller_method_name, str
 	end	
 
+	def turn str = nil, &bl
+		str = @validate.call @log, str, bl
+		return if str.nil?
+
+		init_logfile "turn" 
+		out "turn", caller_method_name, str
+	end	
+
 
 	def info str = nil, &bl
 		str = @validate.call @log, str, bl
