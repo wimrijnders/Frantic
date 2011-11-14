@@ -4,7 +4,7 @@ class Hypothesis
 	CONFIRM_LIMIT = 10
 
 	attr_accessor :parent, :name, :type, :orient, :num_players, :row_inc, :col_inc
-	attr_accessor :negated, :supported, :good_matches, :confirmed
+	attr_accessor :negated, :supported, :good_matches, :confirmed, :complete
 
 	@@ai = nil
 
@@ -17,6 +17,8 @@ class Hypothesis
 		@good_matches = 0
 		@symmetry_items = []
 		@confirmed = false
+
+		@complete = false
 	end
 
 	def symmetry_item
@@ -620,11 +622,18 @@ class Patterns
 		@add_squares = []
 		@ai = ai
 		@tests = []
-		Hypothesis.set_ai ai
 
-		patterns_thread
+		@radius = ( $ai.viewradius/Math.sqrt(2) ).to_i
+
+		$logger.info "viewradius2: #{ $ai.viewradius2 }"
+		$logger.info "radius: #{ @radius }"
+
+		Hypothesis.set_ai ai
 	end
 
+	def init_fiber
+		PatternsFiber.new self, @add_squares 
+	end
 
 	#
 	# Count the number of true positive matches
@@ -703,11 +712,6 @@ class Patterns
 		did_blanks
 	end
 
-	private 
-
-	def ai
-		@ai
-	end
 
 	def init_tasks
 		rows = ai.rows
@@ -764,6 +768,45 @@ class Patterns
 		$logger.info "done"
 	end
 
+	def match_tests source
+		@tests.each do |test|
+			unless test.confirmed
+				test.test_match source
+				test.confirm
+
+				handle_confirm test if test.confirmed
+
+				Fiber.yield
+			end
+		end
+
+		# clean up negated tasks
+		@tests.delete_if { |t| t.negated === true }
+		@tests.compact!
+
+
+		$logger.info { "Tests still in the running:\n\t#{ ( @tests.collect { |t| t.info} ).join( "\n\t") }" }
+	end
+
+	def all_confirmed
+		result = true 
+		@tests.each do |t|
+			unless t.confirmed and t.complete
+				result = false
+				break
+			end
+		end
+
+		result
+	end
+
+	private 
+
+	def ai
+		@ai
+	end
+
+
 	def fill_region source, target, orient
 		#$logger.info "entered"
 #
@@ -811,6 +854,8 @@ class Patterns
 		$logger.info "entered"
 
 		(0...ai.rows).each do |row|
+			Fiber.yield
+
 			(0...ai.cols).each do |col|
 				fill_square test, ai.map[row][col]
 			end
@@ -877,25 +922,10 @@ class Patterns
 				end
 			end
 		end
+
+		test.complete = true
 	end
 
-	def match_tests source
-		@tests.each do |test|
-			unless test.confirmed
-				test.test_match source
-				test.confirm
-
-				handle_confirm test if test.confirmed
-			end
-		end
-
-		# clean up negated tasks
-		@tests.delete_if { |t| t.negated === true }
-		@tests.compact!
-
-
-		$logger.info { "Tests still in the running:\n\t#{ ( @tests.collect { |t| t.info} ).join( "\n\t") }" }
-	end
 
 	def match source
 		(0...ai.rows).each do |row|

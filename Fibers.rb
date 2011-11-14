@@ -1,5 +1,4 @@
 #!/usr/local/bin/ruby
-require 'thread'
 require 'fiber'
 
 class Fiber
@@ -89,9 +88,6 @@ class WorkerFiber
 				@status = :running
 				init_loop
 
-$logger.info "Running fiber loop"
-$timer.start("fibre") {
-
 				while list.length > 0
 					# Handle next item
 					action list.pop
@@ -100,10 +96,8 @@ $timer.start("fibre") {
 					@count += 1
 					Fiber.yield
 				end
-}
-$logger.info "Done fiber loop"
 
-				done_loop
+				doing = !done_loop
 
 				$logger.info {
 					diff = ( (Time.now - start)*1000 ).to_i
@@ -135,99 +129,10 @@ $logger.info "Done fiber loop"
 	end
 
 	def done_loop
+		false
 	end
 end
 
-
-class WorkerThread < Thread
-
-	#
-	# Tryout to see if threads can start and stop between themselves
-	# Doesn't work, because threads don't restart.
-	#
-	def self.start_next name
-		return false
-
-		foundit = false
-		Thread.list.each { |t|
-			if t[ :name ] == name 
-				$logger.info "starting #{name}"
-				t.run
-				foundit = true
-				break
-			end
-		}
-
-		Thread.stop
-		$logger.info "restarted"
-		#foundit
-	end
-
-	def initialize name, region, list
-		@region = region
-		@list = list
-		@turn = 0
-
-		super do 
-		begin
-			Thread.current[ :name ] = name 
-
-			$logger.info "activated"
-
-			longest_diff = nil
-			longest_count = nil
-
-			doing = true
-			while doing
-				$logger.info "waiting"
-				while list.length == 0
-					sleep 0.2
-				end
-
-				count = 0
-				start = Time.now
-				init_loop
-				while list.length > 0
-					# Handle next item
-					action list.pop
-
-					count += 1
-				end
-				done_loop
-
-				$logger.info {
-					diff = ( (Time.now - start)*1000 ).to_i
-
-					if longest_diff.nil? or diff > longest_diff
-						longest_diff = diff
-						longest_count = count
-
-					end
-
-					str = " Longest: #{ longest_count } in #{ longest_diff } msec"
-
-					"added #{ count } results in #{ diff} msec. #{ str }" 
-				}
-
-			end
-
-			$logger.info "closing down."
-		end rescue $logger.info( "Boom! #{ $! }\n #{ $!.backtrace }" )
-		end
-	end
-
-	def list
-		@list
-	end
-
-
-	def init_loop
-	end
-
-
-	def done_loop
-	end
-end
 
 
 class Fiber1 < WorkerFiber
@@ -260,6 +165,7 @@ class Fiber1 < WorkerFiber
 		$logger.info {
 			"new: #{ @new_count}, known: #{ @known_count }, replaced: #{ @replaced_count }"
 		}
+		false
 	end
 end
 
@@ -333,59 +239,45 @@ class RegionsFiber < WorkerFiber
 end
 
 
-def patterns_thread
-		t = Thread.new do
-			Thread.current[ :name ] = "Patterns"
-			$logger.info "activated"
+class PatternsFiber < WorkerFiber
+	def initialize patterns, list
+		super("patterns", patterns, list)
 
-			@radius = ( ai.viewradius/Math.sqrt(2) ).to_i
-
-			$logger.info "viewradius2: #{ ai.viewradius2 }"
-			$logger.info "radius: #{ @radius }"
-
-			init_tasks
-
-			doing = true
-			while doing
-
-				$logger.info "waiting"
-				while @add_squares.length == 0
-					sleep 0.2 
-				end
-
-				# Only handle last square added with known region
-				while square = @add_squares.pop
-					break if square.done_region
-				end
-				next if square.nil?
-				@add_squares.clear
-
-				$logger.info { "Got square #{ square}" }
-				show_field square
-
-				match_tests square
+		patterns.init_tasks
+	end
 
 
-				# Loop exit condition; no more tests to do.
+	def action square
+		# Confusion arbitrator...
+		patterns = @region 
 
-				all_confirmed = true 
-				@tests.each do |t|
-					unless t.confirmed
-						all_confirmed = false
-						break
-					end
-				end
-				if all_confirmed
-					$logger.info "No more open tests; yay, we're done!"
-					doing = false
-				end
-
-				#if WorkerThread.start_next "FindRegions"
-			end rescue $logger.info( "Boom! #{ $! }\n #{ $!.backtrace }" )
-
-			$logger.info "closing down."
+		# Only handle last square added with known region
+		unless square.done_region
+			while square = @list.pop
+				break if square.done_region
+			end
 		end
-		t.priority = -3
+		@list.clear
+
+		return  if square.nil?
+
+		$logger.info { "Got square #{ square}" }
+		patterns.show_field square
+		patterns.match_tests square
+	end
+
+
+	def done_loop
+		# Confusion arbitrator...
+		patterns = @region 
+
+		if patterns.all_confirmed
+			$logger.info "No more open tests; yay, we're done!"
+			true
+		else
+			false
+		end
+	end
 end
 
 
@@ -401,19 +293,27 @@ class Fibers
 
 	def init_fibers
 		@list += $region.init_fibers
+		@list << $patterns.init_fiber
 
 		self
 	end
+
 
 	def resume
 		list = @list.clone
 
 		while list.length > 0 
 			list.clone.each { |f|
+				# Remove done fibers immediately
+				if f.status == :done
+					list.delete f
+					next
+				end
+
 				# run at least once, to be able to reset the state
 				f.resume
 
-				if f.status == :waiting or f.status == :done
+				if f.status == :waiting 
 					list.delete f
 					next
 				end

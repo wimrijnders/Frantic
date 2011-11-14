@@ -278,7 +278,6 @@ class PointCache
 
 		list = []
 
-Thread.exclusive { 
 		to.each do |a|
 			if a.respond_to? :square
 				sq_to = a.square
@@ -289,6 +288,8 @@ Thread.exclusive {
 			item = get sq, sq_to
 
 			list << [ a, item ] unless item.nil?
+
+			$ai.turn.check_maxed_out
 		end
 
 		# Sort list on distance; if specified, give precedence to valid
@@ -313,8 +314,6 @@ Thread.exclusive {
 
 			str
 		}
-}
-
 
 		# return list with distance info only
 		ret = []
