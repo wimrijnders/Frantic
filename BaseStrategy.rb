@@ -123,8 +123,6 @@ class BaseStrategy
 
 		$ai.turn.check_maxed_out
 
-
-
 		if not ant.stuck?
 			ant.handle_orders
 			return true 

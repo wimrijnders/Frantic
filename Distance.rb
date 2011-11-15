@@ -194,6 +194,18 @@ class Distance
 		#true
 	end
 
+
+	def self.direct_path? from, to
+		walk = Distance.get_walk from, to
+		return false if walk.length == 0
+		walked_full_path = ( walk[-1][0] == to )
+
+		$logger.info { "Direct path between #{ from } and #{ to }" }
+
+		walked_full_path
+	end
+
+
 	#
 	# Make a shortest path between the two points.
 	# If water is encountered, return path up till the water

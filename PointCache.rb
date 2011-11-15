@@ -61,7 +61,7 @@ class PointCache
 
 			if not invalid
 
-				$logger.info "hit #{from}-#{ to}: dist #{ t[0]}, dir #{ t[2] }"
+				#$logger.info "hit #{from}-#{ to}: dist #{ t[0]}, dir #{ t[2] }"
 				@hits += 1
 
 				return t
@@ -81,7 +81,7 @@ class PointCache
 
 
 		if do_nil 
-			$logger.info { "Adding nilitem for #{ from}-#{ to}" }
+			#$logger.info { "Adding nilitem for #{ from}-#{ to}" }
 
 			#set to, from, nil, nil, true
 			# Note that this returns a value
@@ -137,7 +137,7 @@ class PointCache
 			item = $region.get_path_basic from.region, to.region
 
 			if item.nil?
-				$logger.info "#{item} item nil; skipping"
+				#$logger.info "#{item} item nil; skipping"
 				break
 			end
 
@@ -173,10 +173,10 @@ class PointCache
 
 		result = [distance, item, move, invalid ]
 
-		$logger.info {
-			"from-to => [ distance, item, move, invalid] : " +
-			"#{ from }-#{ to } => [ #{ distance }, #{ item }, #{ move }, #{ invalid } ]"
-		}
+		#$logger.info {
+		#	"from-to => [ distance, item, move, invalid] : " +
+		#	"#{ from }-#{ to } => [ #{ distance }, #{ item }, #{ move }, #{ invalid } ]"
+		#}
 
 		f = @cache[ from ]
 		if f.nil?
@@ -367,13 +367,7 @@ class PointCache
 	end
 
 	def has_direct_path from, to
-		walk = Distance.get_walk from, to
-		return false if walk.length == 0
-		walked_full_path = ( walk[-1][0] == to )
-
-		$logger.info { "Direct path between #{ from } and #{ to }" }
-
-		walked_full_path
+		Distance.direct_path? from, to
 	end
 
 	#

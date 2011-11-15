@@ -1149,14 +1149,14 @@ private
 		sq_ants   = Region.ants_to_squares ants
 		Region.add_searches ant.square, sq_ants, false, max_length
 
-		$logger.info {
-			str = "neighbors after sort:\n"
-			ants_with_distance.each do |result|
-				str << "#{ result }\n"
-			end
-
-			str
-		}
+		#$logger.info {
+		#	str = "neighbors after sort:\n"
+		#	ants_with_distance.each do |result|
+		#		str << "#{ result }\n"
+		#	end
+		#
+		#	str
+		#}
 
 		ants_with_distance
 	end

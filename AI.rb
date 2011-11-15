@@ -155,28 +155,33 @@ class AI
 						end
 
 						$logger.info "=== Stay Phase ==="
-						# Mark non-moved ants as staying; these are put at the top 
-						# of the list, so that they get processed first next turn
-						top = []
-						bottom = [] 
-						my_ants.each do |ant|
-							if ant.moved?
-								bottom << ant
-							else
-								ant.stay
-								top << ant
+						$timer.start( "stay" ) {
+							# Mark non-moved ants as staying; these are put at
+							# the top of the list, so that they get processed
+							# first next turn
+							top = []
+							bottom = [] 
+							my_ants.each do |ant|
+								if ant.moved?
+									bottom << ant
+								else
+									ant.stay
+									top << ant
+								end
 							end
-						end
-						@my_ants = top + bottom
+							@my_ants = top + bottom
+						}
 
 					}
 	
 	
-					$timer.start( "fibers resume") {
-						catch :maxed_out do
+					catch :maxed_out do
+						@turn.check_time_limit
+
+						$timer.start( "fibers resume") {
 							$fibers.resume
-						end
-					}
+						}
+					end
 
 					@turn.go @turn_number
 

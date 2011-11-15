@@ -120,6 +120,7 @@ class Collective
 				#       For the logic, this is the best place to put it.
 				if side_effect
 					#a.clear_orders if a.orders?
+					a.clear_order :ASSEMBLE
 					a.evade_reset if a.evading?
 				end
 			else
@@ -233,7 +234,7 @@ class Collective
 
 			coll = ant.collective
 
-			next if coll.assembled? false
+			next if coll.assembled?
 
 			if coll.complete? and coll.furthest_follower_distance < 5
 				$logger.info { "#{ coll } followers almost there; not re-recruiting" }
@@ -691,7 +692,7 @@ class Collective
 				# Collectives don't evade any more
 				# TODO: Find a way for pathfinder to work with collectives
 				#dir = evade dir
-				stay
+				random_move
 			end
 		else
 			$logger.info "#{ leader.to_s } no attacker"
@@ -722,7 +723,7 @@ class Collective
 						# Collectives don't evade any more
 						# TODO: Find a way for pathfinder to work with collectives
 						#dir = evade d.dir
-						stay
+						random_move
 					end
 				end
 			elsif assembled? and leader.first_order :RAZE

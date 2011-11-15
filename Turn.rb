@@ -11,8 +11,9 @@ class Turn
 		@turntime = 1.0*(turntime - margin)/1000
 		@stdout = stdout
 
-		@buffer = {} 
+		@open = false
 		@history = []
+		@last_go = Time.now 
 	
 		# First time send	
 		@stdout.puts 'go'
@@ -40,7 +41,7 @@ class Turn
 
 
 	def check_maxed_out
-		if @buffer[ @turn ].nil?
+		unless @open
 			$logger.turn "throwing :maxed_out"
 			throw :maxed_out
 		else
@@ -58,19 +59,15 @@ class Turn
 	def go turn, maxed_out = 0
 
 		$logger.turn(true) { "sending for turn #{ turn }" }
-		if @buffer[ turn ].nil?
+		unless @open
 			$logger.turn(true) { "Nothing to send!" }
 		else
 		
-			@stdout.puts @buffer[ turn ]
-
 			@stdout.puts "go"
 			@stdout.flush
 
-			@buffer.delete( turn  ) {
-				$logger.turn(true) { "ERROR: buffer not deleted." }
-			}
-
+			@last_go = Time.now
+			@open = false
 			add_history maxed_out 
 		end
 
@@ -80,21 +77,26 @@ class Turn
 	def start turn
 		start = Time.now
 		diff = 0.0
-		diff = start - @start unless @start.nil?
+		diff = ((start - @start)*1000).to_i unless @start.nil?
 		@start = start
 
-		$logger.turn(true) { "turn  #{ turn } - maxout #{ hist_to_s }; last call #{ (diff*1000).to_i } msec ago" }
+		diff_go = ((start - @last_go)*1000).to_i
+
+		$logger.turn(true) { "turn  #{ turn } - maxout #{ hist_to_s }; last call #{ diff }, last go #{ diff_go }" }
+
 		@turn = turn
-		@buffer[turn] = ""
+		@open = true
 	end
 
 
 	def send str
 		ret = true
 
-		unless @buffer[ @turn ].nil?
+		if @open
 			$logger.turn(true) { "output open." }
-			@buffer[ @turn ] << str + "\n"
+
+			@stdout.puts str 
+			@stdout.flush
 		else
 			$logger.turn(true) { "output closed!" }
 
