@@ -7,7 +7,7 @@
 live    = true
 bot_num = nil 
 turns   = 1000 
-flags   = "--turntime=500" #--serial" # "--nolaunch"
+flags   = "--turntime=2000" #--serial" # "--nolaunch"
 
 
 #
@@ -53,6 +53,12 @@ map = map.to_i if is_number? map
 
 bots = [
 	"ruby ../MyBot.rb",					# Frantic - latest version
+	"ruby ../Twitcher.rb",
+	"ruby ../Inertia.rb",
+	"ruby ../Twitcher.rb",
+	"ruby ../Inertia.rb",
+	"ruby ../Twitcher.rb",
+	"ruby ../Inertia.rb",
 	"python sample_bots/python/GreedyBot.py",
 	"python2.7 sample_bots/python/HunterBot.py",
 	"python sample_bots/python/GreedyBot.py",

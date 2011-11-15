@@ -28,7 +28,12 @@ class Order
 	end
 
 	def to_s
-		"Order #{ order }, #{ @square }, offset #{ @offset }"
+		str = ""
+		unless @offset.nil?
+			str = ", offset #{ @offset }"
+		end
+
+		"Order #{ order }, #{ @square }#{ str }"
 	end
 
 	def square= v
@@ -194,9 +199,16 @@ module Orders
 	# 
 	def set_order square, what, offset = nil, from_handle_orders = false
 		n = Order.new(square, what, offset)
+		#$logger.info { "Trying #{ n } for #{ self.to_s }" }
+
+		if collective_leader? and what == :FORAGE
+			$logger.info { "Collective leader #{ self } doesn't accept order #{ what }" }
+			return false
+		end
 
 		if not $region.can_reach self.square, square
 			# ignore order
+			$logger.info "#{ self } can't reach target #{ n }"
 			return false
 		end
 
@@ -381,7 +393,17 @@ module Orders
 
 	def handle_orders
 		return false if moved?
+		return false if collective_assembled?
 		ai.turn.check_maxed_out
+
+		# If right next to enemy, stay put and ignore orders
+		# This happens when razing hills.
+		unless neighbor_enemies( 1 ).empty?
+			$logger.info { " #{ self } right next to enemy, staying and ignoring orders." }
+			stay
+			return true
+		end
+
 
 		prev_order = (orders?) ? @orders[0].square: nil
 
@@ -416,7 +438,7 @@ module Orders
 					else
 						$logger.info { "Defending hill #{ order_sq.to_s}." }
 						stay
-						return
+						return true
 					end
 				end 
 			end
@@ -478,7 +500,7 @@ module Orders
 							if d.dist == 1
 								str << ", right next to it"
 								stay
-								return
+								return true
 							end
 						end
 					else
@@ -534,7 +556,7 @@ module Orders
 					$logger.info { "Set order offset to #{ @orders[0].offset }." }
 					stay
 					evade_reset
-					return
+					return true
 				end
 			end
 
@@ -554,10 +576,16 @@ module Orders
 		end
 
 		if @orders[0].order == :ASSEMBLE
+			# NB: method assemble removes :ASSEMBLE and other orders
+			#     from collective members
 			if collective and collective.assemble
 				stay
+				evade_reset
+				return true
 			end
 		end
+
+		return false if !orders?
 
 		to = @orders[0].handle_liaison( self.square, ai )
 		$logger.info { "#{ to_s } order #{ order_order } to #{ order_sq }, dir #{ to }" }

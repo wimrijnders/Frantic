@@ -41,11 +41,7 @@ class Collective
 	end
 
 	def to_s
-		str = ""
-		@ants.each do |a|
-			str << a.square.to_s
-		end
-		"collective [#{ str }]"
+		"collective [#{ @ants.join(", ") }]"
 	end
 
 	def leader? a
@@ -92,7 +88,7 @@ class Collective
 	# their individual way
 	#
 	def disband
-		$logger.info "Disbanding"
+		$logger.info "Disbanding #{ self }"
 		leader = nil
 		@ants.each do |a|
 			if leader.nil?
@@ -123,7 +119,7 @@ class Collective
 				# Note: following is a side effect.
 				#       For the logic, this is the best place to put it.
 				if side_effect
-					a.clear_orders if a.orders?
+					#a.clear_orders if a.orders?
 					a.evade_reset if a.evading?
 				end
 			else
@@ -182,13 +178,15 @@ class Collective
 				a.set_collective self
 				rally a
 
-				return if assembled? false
 			end
+
+			return assemble
 
 		else
 			add a
 			a.set_collective self 
 			rally a
+			return assemble
 		end
 	end
 
@@ -231,10 +229,18 @@ class Collective
 	#
 	def self.complete_collectives ai
 		ai.my_ants.each do |ant|
-			next unless ant.collective?
-			next if ant.collective.assembled? false
+			next unless ant.collective? and not ant.collective_leader?
 
-			$logger.info "Completing collective."
+			coll = ant.collective
+
+			next if coll.assembled? false
+
+			if coll.complete? and coll.furthest_follower_distance < 5
+				$logger.info { "#{ coll } followers almost there; not re-recruiting" }
+				next
+			end
+			
+			$logger.info "Completing #{ coll }."
 	
 			recruit ant
 		end
@@ -248,7 +254,7 @@ class Collective
 		ai.my_ants.each do |ant|
 			next if ant.collective?
 			next unless ant.attacked? 
-			next if ant.has_order :RAZE 
+			#next if ant.has_order :RAZE 
 	
 			# Don't even think about assembling if not enough ants around
 			next if ant.ai.my_ants.length < AntConfig::ASSEMBLE_LIMIT
@@ -258,7 +264,7 @@ class Collective
 				collective_near = false
 				ant.neighbor_friends( 10 ).each do |a|
 					if a.collective?
-						$logger.info "#{ ant.square.to_s } has collective nearby"
+						$logger.info "#{ ant.to_s } has collective nearby"
 						collective_near = true
 						break
 					end
@@ -272,7 +278,7 @@ class Collective
 			collective_near = false
 			ant.neighbor_friends( 3 ).each do |a|
 				if a.collective?
-					$logger.info "#{ ant.square.to_s } assembling collective too close "
+					$logger.info "#{ ant.to_s } assembling collective too close "
 					collective_near = true
 					break
 				end
@@ -307,7 +313,8 @@ class Collective
 
 
 	#
-	# Determine best move in conflict between single collective2 and multiple enemies
+	# Determine best move in conflict between single collective2
+	# and multiple enemies.
 	#
 	# No other neighboring friends are taken into account.
 	#
@@ -316,10 +323,12 @@ class Collective
 	def analyze_attack()
 		enemies = []
 		guess = []
+		harmless = true
 		leader.enemies_in_view.each do |e|
 			adist = Distance.new( leader.pos, e.pos)
 			break unless adist.in_peril?
 
+			harmless &&= ( e.twitch? or e.stay? )
 			enemies << e 
 
 			guess << e.guess_next_pos
@@ -340,7 +349,12 @@ class Collective
 		end
 
 		# Note that we don't bother with orientation so close to conflict	
-		moves[ :STAY ] = @ants.collect { |a| a.square }
+
+		if harmless
+			$logger.info { "#{ self } attackers harmless; staying is not an option" }
+		else
+			moves[ :STAY ] = @ants.collect { |a| a.square }
+		end
 		lam.call :N
 		lam.call :E
 		lam.call :S
@@ -444,6 +458,29 @@ class Collective
 		[ friend_dead, enemy_dead]
 	end
 
+	def complete?
+		size == fullsize 
+	end
+
+	# Pre: collective complete
+	def furthest_follower_distance
+		leader = @ants[0]
+
+		#$logger.info " ants: #{ @ants }"
+
+		found_dist = nil
+		@ants[1..-1].each do |ant|
+			d = Distance.new leader, ant
+
+			if found_dist.nil? or d.dist > found_dist
+				found_dist = d.dist
+			end
+		end
+
+		found_dist
+	end
+
+
 	private
 
 	def leader
@@ -510,14 +547,14 @@ class Collective
 
 
 	def hold_ground dist
-		$logger.info "#{ leader.to_s} holding ground"
+		$logger.info "#{ self.to_s} holding ground"
 
 		# Allow sideways movement for better conflict placement
 		dir = dist.shortest_dir
 		if dir.nil? 
 			stay
 		else
-			$logger.info "#{ leader.to_s } placement to #{ dir }."
+			$logger.info "#{ self.to_s } placement to #{ dir }."
 			# Note: don't do evasion here, we're holding ground
 			# and don't want to move away
 		end
@@ -545,7 +582,7 @@ class Collective
 	def move2
 		dist = attack_distance
 
-		$logger.info "#{ leader.to_s } dist: #{ dist.to_s }"
+		$logger.info "#{ self.to_s } dist: #{ dist.to_s }"
 		if dist and dist.in_view?
 			# It is possible to approach an anthill completely and 
 			# be right next to the emerging enemy ants. Following ensures
@@ -566,11 +603,11 @@ class Collective
 
 			dir = nil
 			if !assembled?
-				$logger.info "#{ leader.to_s } not assembled"
+				$logger.info "#{ self.to_s } not assembled"
 
 				# If followers are close, don't move
 				if size == fullsize and furthest_follower_distance < 3
-					$logger.info "#{ leader.to_s } almost assembled. waiting"
+					$logger.info "#{ self.to_s } almost assembled. waiting"
 					leader.stay
 					return
 				end
@@ -582,7 +619,6 @@ class Collective
 					hold_ground dist if dist.in_peril?
 				end
 			else
-				# WRI TEST
 				dir = analyze_attack
 				unless dir === false
 					if dir == :STAY
@@ -651,10 +687,15 @@ class Collective
 
 			if !move_intern dir 
 				# Actual dir will be different
-				dir = evade dir
+
+				# Collectives don't evade any more
+				# TODO: Find a way for pathfinder to work with collectives
+				#dir = evade dir
+				stay
 			end
 		else
 			$logger.info "#{ leader.to_s } no attacker"
+
 
 			if !leader.ai.defensive? and assembled?
 				# We're in place but not attacked.
@@ -678,9 +719,26 @@ class Collective
 					@safe_count = 0
 					return if orient d.longest_dir
 					unless move_intern d.dir
-						dir = evade d.dir
+						# Collectives don't evade any more
+						# TODO: Find a way for pathfinder to work with collectives
+						#dir = evade d.dir
+						stay
 					end
 				end
+			elsif assembled? and leader.first_order :RAZE
+				# WRI TEST: this is a special case, using ant orders
+				# to move collectives.
+				# TODO: Check that this works OK
+				o = leader.get_first_order
+				to = o.handle_liaison( leader.square, leader.ai )
+				d = Distance.new( leader, to ) 
+
+				#if d.in_view?
+
+					$logger.info { "Moving #{ self } to raze target #{ to}, dir #{ d.dir}" }
+					move_intern d.dir
+					throw :done
+				#end
 			else
 				check_assembly
 
@@ -706,24 +764,6 @@ class Collective
 		end
 	end
 
-
-	# Pre: collective complete
-	def furthest_follower_distance
-		leader = @ants[0]
-
-		#$logger.info " ants: #{ @ants }"
-
-		found_dist = nil
-		@ants[1..-1].each do |ant|
-			d = Distance.new leader, ant
-
-			if found_dist.nil? or d.dist > found_dist
-				found_dist = d.dist
-			end
-		end
-
-		found_dist
-	end
 
 
 	def in_location? a, count
@@ -809,7 +849,12 @@ class Collective
 	def test_safe
 		tmp = false
 		@ants.each do |a|
-			tmp = true and break if a.attacked? and not a.orders?
+			return if a.has_order :ASSEMBLE
+
+			if a.attacked?
+				tmp = true 
+				break
+			end
 		end
 
 		if tmp 
@@ -819,6 +864,7 @@ class Collective
 		end
 
 		if @safe_count > AntConfig::SAFE_LIMIT
+			$logger.info "We're safe"
 			disband
 		end
 	end
@@ -851,7 +897,6 @@ class Collective
 		# Can not move at all - give up
 		disband
 	end
-
 end
 
 
@@ -1006,6 +1051,11 @@ class Collective2 < Collective
 				end
 
 				$logger.info "Collective2 assembled as #{ @ants }, orient #{ @orient_dir}"
+				@ants.each { |a|
+					[ :ASSEMBLE, :EVADE_GOTO ].each do |o|
+						a.clear_order o
+					end
+				}
 
 				# Ensure that the ants don't drift away
 				if @ants[0].moved? and not @ants[1].moved?

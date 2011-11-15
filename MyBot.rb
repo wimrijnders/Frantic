@@ -80,6 +80,7 @@ class Strategy < BaseStrategy
 
 	def default_move ant
 		return if ant.moved?
+		return if ant.collective?
 	
 		ant.move ant.default 
 	end

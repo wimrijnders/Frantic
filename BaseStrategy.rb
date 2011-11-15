@@ -119,6 +119,8 @@ class BaseStrategy
 		ant = list[-1]
 
 		return false if ant.moved?
+		return false if ant.collective_leader?
+
 		$ai.turn.check_maxed_out
 
 

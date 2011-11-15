@@ -279,7 +279,15 @@ class Distance
 	end
 
 	def longest_dir 
-		if row.abs > col.abs
+		if row.abs == col.abs
+			# randomize selection here, to avoid twitches
+			# for collectives
+			select = [true,false][ rand(2) ]
+		else
+			select = row.abs > col.abs
+		end
+
+		if select
 			if row > 0
 				return :S
 			else

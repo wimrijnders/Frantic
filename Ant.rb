@@ -35,7 +35,7 @@ class Ant
 	end
 
 	def to_s
-		"ant_#{id}" + square.to_s
+		"ant_#{id}#{ square.to_s }"
 	end
 end
 
@@ -80,6 +80,10 @@ class EnemyAnt < Ant
 
 	def twitch?
 		@state.twitch?
+	end
+
+	def stay?
+		@state.stay?
 	end
 
 
@@ -680,6 +684,16 @@ end
 
 	def harvesting?
 		has_order :HARVEST
+	end
+
+
+	def to_s
+		str = ""
+		o = get_first_order
+		unless o.nil?
+			str = "[ #{ o.to_s } ]"
+		end
+		"ant_#{id}#{ square.to_s }#{str}"
 	end
 end
 
