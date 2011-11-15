@@ -44,8 +44,20 @@ end
 #
 
 class WorkerFiber 
+	attr_accessor :status
 
-	def resume; @fiber.resume; end
+
+	def resume 
+		start = Time.now
+
+		@fiber.resume 
+
+		diff = Time.now - start
+
+		if @max_resume < diff
+			@max_resume = diff
+		end
+	end
 
 	def initialize name, region, list
 		@name = name
@@ -55,6 +67,7 @@ class WorkerFiber
 
 		@count = 0
 		@status = :init
+		@max_resume = 0.0 
 
 		@fiber = Fiber.new do
 			run_fiber
@@ -62,12 +75,8 @@ class WorkerFiber
 		@fiber[ :name ] = name 
 	end
 
-	def status 
-		@status
-	end
-
 	def stats
-		[  @name, @status.to_s, @count, @fiber.yields  ]
+		[  @name, @status.to_s, @count, @fiber.yields, (@max_resume*1000).to_i  ]
 	end
 
 	def run_fiber
@@ -234,6 +243,9 @@ class RegionsFiber < WorkerFiber
 	def action source
 		$logger.info { "finding regions for #{ source }" }
 		@region.find_regions source 
+
+		Fiber.yield
+
 		$patterns.fill_map source 
 	end
 end
@@ -311,7 +323,15 @@ class Fibers
 				end
 
 				# run at least once, to be able to reset the state
-				f.resume
+				begin 
+					f.resume
+				rescue FiberError
+					$logger.info(true) { "Thread probably died...." }
+					# Help it out of its misery
+					f.status = :done
+					list.delete f
+					next
+				end
 
 				if f.status == :waiting 
 					list.delete f
@@ -320,17 +340,17 @@ class Fibers
 
 			}
 
-			$ai.turn.check_maxed_out
+			$ai.turn.check_time_limit
 		end
 	end
 
 
 	def status
-		format1 = "%10s %8s %7s %7s\n"
-		format  = "%10s %8s %7d %7d\n"
+		format1 = "%10s %8s %7s %7s %5s\n"
+		format  = "%10s %8s %7d %7d %5d\n"
 		str = "Fibers:\n" +
-			format1 % [ "Name      ", "status  ", "  count", "yields" ] +
-			format1 % [ "==========", "========", "  =====", "======" ]
+			format1 % [ "Name      ", "status  ", "  count", "yields", "  max" ] +
+			format1 % [ "==========", "========", "  =====", "======", "=====" ]
 
 		@list.each { |f|
 			str << format % f.stats

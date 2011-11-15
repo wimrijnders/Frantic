@@ -232,23 +232,6 @@ module Orders
 
 		$logger.info { "Setting order #{ what } on square #{ square.to_s } for #{ self.to_s }" }
 
-if false
-		if $region
-			liaison  = $region.path_direction self.square, square
-			if liaison.nil?
-				str = "No path to target #{ square } for #{ self.to_s }; "
-				if what == :ASSEMBLE #or what == :HARVEST
-					str << "doing our best"
-					$logger.info str
-				else
-					str << "ignoring order"
-					$logger.info str
-					return false
-				end
-			end
-		end
-end
-
 		# ASSEMBLE overrides the rest of the orders
 		clear_orders if what == :ASSEMBLE
 
@@ -446,9 +429,6 @@ end
 				if order_order == :RAZE
 					$logger.info { "Hit anthill at #{ self.square.to_s }" }
 
-					# TODO: clear_raze will move all raze targets, including
-					#       possibly target of current ant. Check if following
-					#		works.
 					clear_first_order
 					@ai.clear_raze self.square	
 					
@@ -474,7 +454,7 @@ end
 				end
 			end
 
-			# Check if in-range when visible for food
+			# Check if food still present when in-range
 			if order_order == :FORAGE
 				sq = order_sq
 				str = ""
@@ -508,6 +488,38 @@ end
 
 				$logger.info { "Food #{ sq } still there: #{ str}" }
 			end
+
+			# Check if hill still present when in-range
+			if order_order == :RAZE
+				sq = order_sq
+				str = ""
+
+				closest = closest_ant_view [ sq.row, sq.col], @ai
+				unless closest.nil?
+					d = Distance.new closest, sq
+
+					if d.in_view? 
+						result = @ai.hills.active? [ sq.row, sq.col]
+
+						if result.nil?
+							$logger.info "Hill not there!"
+						elsif result == true
+							str << "yes"
+						else
+							# hill is dead
+							str << "no"
+
+							clear_first_order
+							@ai.clear_raze sq
+						end
+					else
+						str << "can't tell, out of view"
+					end
+				end
+
+				$logger.info { "Hill #{ sq } still there: #{ str}" }
+			end
+
 
 			# check if harvest target is water
 			if order_order == :HARVEST and evading?

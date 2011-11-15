@@ -6,7 +6,7 @@ class Turn
 	public
 
 	def initialize turntime, stdout
-		margin = 250 
+		margin = 200 
 
 		@turntime = 1.0*(turntime - margin)/1000
 		@stdout = stdout
@@ -29,6 +29,15 @@ class Turn
 	end
 
 
+	def check_time_limit
+		diff = Time.now - @start
+
+		if diff >= @turntime
+			$logger.turn(true) { "Hit time limit" }
+			throw :maxed_out
+		end
+	end
+
 
 	def check_maxed_out
 		if @buffer[ @turn ].nil?
@@ -39,14 +48,14 @@ class Turn
 
 			if diff >= @turntime
 				$logger.turn(true) { "Maxed out!" }
-				go @turn
+				go @turn, 1
 				throw :maxed_out
 			end
 		end
 	end
 
 
-	def go turn
+	def go turn, maxed_out = 0
 
 		$logger.turn(true) { "sending for turn #{ turn }" }
 		if @buffer[ turn ].nil?
@@ -61,6 +70,8 @@ class Turn
 			@buffer.delete( turn  ) {
 				$logger.turn(true) { "ERROR: buffer not deleted." }
 			}
+
+			add_history maxed_out 
 		end
 
 	end
@@ -72,13 +83,11 @@ class Turn
 		diff = start - @start unless @start.nil?
 		@start = start
 
-		$logger.turn(true) { "output open turn  #{ turn } - time from previous open: #{ (diff*1000).to_i }" }
+		$logger.turn(true) { "turn  #{ turn } - maxout #{ hist_to_s }; last call #{ (diff*1000).to_i } msec ago" }
 		@turn = turn
 		@buffer[turn] = ""
-
-		#@wait.signal
-		#Thread.pass
 	end
+
 
 	def send str
 		ret = true

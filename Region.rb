@@ -199,11 +199,20 @@ class LiaisonSearch
 		end
 
 
-		result = catch :done do 
-			search_liaisons from_r, to_list_r, [from_r]
+		@search_list = [ [ from_r, to_list_r, [from_r] ] ]
+		@search_results = []
+		catch :done do 
+			while item = @search_list.shift
+
+				search_liaisons item[0], item[1], item[2] 
+		
+				# Be cooperative with the other fibers
+				Fiber.yield
+			end
 		end
 
 
+		result = @search_results
 		if @find_shortest and not result.nil? and result.length > 0
 			# Shortest item is last in list.
 			result = [ result[-1] ]
@@ -270,7 +279,7 @@ class LiaisonSearch
 
 		if @count >= MAX_COUNT
 			$logger.info { "Count #{ @count } hit the max; aborting this search." }
-			return []
+			throw :done
 		else
 			@count +=1
 		end
@@ -278,24 +287,22 @@ class LiaisonSearch
 		# Safeguard to avoid too deep searches
 		if @max_length != NO_MAX_LENGTH and current_path.length >= @max_length 
 			$logger.info { "Path length >= #{ @max_length }; skipping" }
-			return []
+			return
 		end
 
-
-		# Be cooperative with the other fibers
-		Fiber.yield
-
 		if @find_shortest and not @cur_best_dist.nil?
+			Fiber.yield
 			dist = Pathinfo.path_distance current_path
 
 			if dist > @cur_best_dist
-				$logger.info { "search_liaisons cur dist #{ dist } > cur best #{ @cur_best_dist}; skipping" }
+				$logger.info { "cur dist #{ dist } > cur best #{ @cur_best_dist}; skipping" }
 				return
 			end
 		end
-	
 
-		$logger.info { "search_liaisons searching #{ from }-#{ to_list }: #{ current_path }" }
+
+
+		$logger.info { "searching #{ from }-#{ to_list }: #{ current_path }" }
 		results = []
 		found_to = []
 
@@ -306,7 +313,7 @@ class LiaisonSearch
 
 			if to_list.length == 0
 				$logger.info "to_list now empty. Not searching further."
-				return []
+				return
 			end
 		end
 
@@ -315,13 +322,14 @@ class LiaisonSearch
 			to_list.each do |to|
 				if cur[ to ]
 					result = current_path + [to]
-					$logger.info { "search_liaisons found path#{ from }-#{ to_list }: #{ result }" }
+					$logger.info { "found path#{ from }-#{ to_list }: #{ result }" }
 
 					if @find_shortest
+						Fiber.yield
 						dist = Pathinfo.path_distance result
 
 						if @cur_best_dist.nil? or dist < @cur_best_dist
-							$logger.info { "search_liaisons path is new shortest" }
+							$logger.info { "path is new shortest" }
 							@cur_best_dist = dist
 							results << result 
 							@cached_results[to] = result
@@ -337,22 +345,23 @@ class LiaisonSearch
 				end
 			end
 
+			@search_results += results
+
 			if @find_shortest and results.length > 0 
 				# No point in looking further, any further paths will be longer
-				return results
+				return
 			end
 
 			to_list -= found_to
 
 			cur.keys.each do |key|
+				# Condition to prevent loops in path
 				unless current_path.include? key
-					tmp = search_liaisons key, to_list, current_path + [key]
-					results.concat tmp unless tmp.nil? 
+					@search_list << [ key, to_list, current_path + [key] ]
+					#search_liaisons key, to_list, current_path + [key]
 				end
 			end
 		end
-
-		results
 	end
 end
 
@@ -367,17 +376,6 @@ class Region
 	@@add_regions = []
 
 	private 
-
-	def do_thread
-		#@t1 = Thread1.new self, @@add_paths
-		#t1.priority = -2
-
-		#t2 = Thread2.new self, @@add_searches
-		#t2.priority = -1
-
-		#t3 = RegionsThread.new self, @@add_regions
-		#t3.priority = -2
-	end
 
 	def self.add_paths result
 		$logger.info { "add_paths #{ result }" }
@@ -434,9 +432,8 @@ class Region
 				@template[x][y] = in_radius
 			end
 		end
-
-		do_thread
 	end
+
 
 	def to_s
 		str = ""
@@ -457,6 +454,8 @@ class Region
 	def all_region
 		dim = @template.length
 		(1...dim).each do |x|
+			Fiber.yield
+
 			(0...dim).each do |y|
 				if @template[x][y]
 					yield x, y 
@@ -775,11 +774,12 @@ private
 
 		$logger.info { "find_regions for #{ square }" }
 
-		dim = @template.length
-		quadrant {|x,y| set_region square, -x,  y }
-		quadrant {|x,y| set_region square,  y,  x }
-		quadrant {|x,y| set_region square,  x, -y }
-		quadrant {|x,y| set_region square, -y, -x }
+		quadrant {|x,y| 
+			set_region square, -x,  y 
+			set_region square,  y,  x
+			set_region square,  x, -y
+			set_region square, -y, -x
+		}
 
 		square.done_region = true
 		$logger.info { show_regions square }

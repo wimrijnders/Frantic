@@ -156,10 +156,17 @@ class PointCache
 
 
 		unless found 
+			# Assume direct path
 			d = Distance.new from, to
 			distance = d.dist
 			move = d.dir if move.nil?
-			invalid = true
+
+			if has_direct_path from, to
+				# It really is a direct path!
+				invalid = false
+			else
+				invalid = true
+			end
 		else
 			move = determine_move from, to if move.nil?
 		end
@@ -357,6 +364,16 @@ class PointCache
 				set_walk liaison1, liaison2, lastliaison
 			end
 		end
+	end
+
+	def has_direct_path from, to
+		walk = Distance.get_walk from, to
+		return false if walk.length == 0
+		walked_full_path = ( walk[-1][0] == to )
+
+		$logger.info { "Direct path between #{ from } and #{ to }" }
+
+		walked_full_path
 	end
 
 	#

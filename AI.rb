@@ -105,7 +105,7 @@ class AI
 
 
 	def set_throttle
-		val = $timer.get "turn"
+		val = $timer.get "yield"
 
 		max_cap = @turntime*0.60
 
@@ -286,6 +286,7 @@ class AI
 	
 		@new_enemy_ants=[]
 		@food.start_turn
+		@hills.start_turn
 
 		$timer.end "turn_init"
 
@@ -395,14 +396,9 @@ class AI
 		end
 
 		# determine all known squares and regions
-		did_blanks = false
 		my_ants.each do |ant|
 			Region.add_regions ant.square
 		end unless $region.nil?
-
-		if did_blanks
-			$logger.info "Did fill_map"
-		end
 
 		$timer.start( "detect_enemies" ) {
 			detect_enemies @new_enemy_ants

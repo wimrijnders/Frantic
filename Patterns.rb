@@ -295,6 +295,9 @@ class Hypothesis
 		fail_count  = 0
 
 		1.upto( max_count) do
+			# Be a good citizen
+			Fiber.yield
+
 			coord[0] += row_inc
 			coord[1] += col_inc
 
@@ -645,6 +648,8 @@ class Patterns
 		water_count = 0
 		range = (-radius..radius)
 		range.each do |row|
+			Fiber.yield
+
 			range.each do |col|
 				sq_a = sq1.rel [ row, col ]
 				sq_b = sq2.rel target_coord( row, col, how )
@@ -809,7 +814,7 @@ class Patterns
 
 	def fill_region source, target, orient
 		#$logger.info "entered"
-#
+
 		return if target.done_region
 
 		# Set all known water fields
@@ -825,6 +830,8 @@ class Patterns
 
 			sq_b.water = sq_a.water
 		end
+
+		Fiber.yield
 
 		# fill in the regions
 		$region.find_regions target 
