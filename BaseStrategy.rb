@@ -92,15 +92,15 @@ class BaseStrategy
 
 			l.reset
 	
-			$timer.start "closest_ant_region"
-			ant = BaseStrategy.closest_ant_region sq, ai
-			$timer.end "closest_ant_region"
+			$timer.start( :closest_ant_region ) {
+				ant = BaseStrategy.closest_ant_region sq, ai
 
-			unless ant.nil?
-				if ant.set_order sq, :FORAGE
-					l.add_ant ant
+				unless ant.nil?
+					if ant.set_order sq, :FORAGE
+						l.add_ant ant
+					end
 				end
-			end
+			}
 		end 
 	end
 
@@ -151,11 +151,11 @@ class BaseStrategy
 	end
 
 	def ant_orders ai
-		$timer.start "ant_orders"
-		ai.my_ants.each do |ant|
-			move_neighbors [ant]
-		end
-		$timer.end "ant_orders"
+		$timer.start( :ant_orders ) {
+			ai.my_ants.each do |ant|
+				move_neighbors [ant]
+			end
+		}
 	end
 
 

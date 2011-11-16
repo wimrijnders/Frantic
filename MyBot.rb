@@ -211,14 +211,14 @@ class Strategy < BaseStrategy
 		# with any luck, some of the next phases may be completed in tim.
 
 		$logger.info "=== Urgent Order Phase ==="
-		$timer.start( "Urgent Order Phase" ) {
+		$timer.start( :Urgent_Order_Phase ) {
 			ant_orders ai
 		}
 	end
 
 		ai.turn.check_maxed_out
 		$logger.info "=== Init Phase ==="
-		$timer.start "Init Phase"
+		$timer.start :Init_Phase
 
 		if ai.throttle?
 			# All ants on top of hills should stay put
@@ -246,12 +246,12 @@ class Strategy < BaseStrategy
 
 		check_attacked ai	
 
-		$timer.end "Init Phase"
+		$timer.end :Init_Phase
 
 		ai.turn.check_maxed_out
 		unless ai.turn.maxed_out?
 			$logger.info "=== Collective Phase ==="
-			$timer.start "Collective Phase"
+			$timer.start :Collective_Phase
 
 			Collective.complete_collectives ai
 
@@ -259,20 +259,20 @@ class Strategy < BaseStrategy
 					Collective.create_collectives ai unless ai.kamikaze? 
 			end
 
-			$timer.end "Collective Phase"
+			$timer.end :Collective_Phase
 		end
 
 
 		ai.turn.check_maxed_out
 		$logger.info "=== Food Phase ==="
-		$timer.start( "Food Phase") {
+		$timer.start( :Food_Phase ) {
 			find_food ai
 		}
 
 
 		ai.turn.check_maxed_out
 		$logger.info "=== Conflict Phase ==="
-		$timer.start( "Conflict Phase" ) {
+		$timer.start( :Conflict_Phase ) {
 			unless ai.turn.maxed_out?
 				defend_hills ai
 			end
@@ -289,7 +289,7 @@ class Strategy < BaseStrategy
 		ai.turn.check_maxed_out
 		unless ai.turn.maxed_out?
 			$logger.info "=== Hill Phase ==="
-			$timer.start( "Hill Phase" ) {
+			$timer.start( :Hill_Phase ) {
 				handle_hills ai
 			}
 		end
@@ -298,7 +298,7 @@ class Strategy < BaseStrategy
 		ai.turn.check_maxed_out
 		if ai.kamikaze? and ai.enemy_ants.length > 0  and not ai.turn.maxed_out?
 			$logger.info "=== Kamikaze Phase ==="
-			$timer.start "Kamikaze Phase"
+			$timer.start :Kamikaze_Phase
 
 			ai.my_ants.each do |ant|
 				next if ant.orders?
@@ -312,13 +312,13 @@ class Strategy < BaseStrategy
 				end
 			end
 
-			$timer.end "Kamikaze Phase"
+			$timer.end :Kamikaze_Phase
 		end
 
 if false
 		ai.turn.check_maxed_out
 		$logger.info "=== Enlist Phase ==="
-		$timer.start "Enlist Phase"
+		$timer.start :Enlist_Phase
 		# Don't harvest if	not enough ants
 		if ai.my_ants.length > 10 and not ai.turn.maxed_out?
 			ai.my_ants.each do |ant|
@@ -351,24 +351,24 @@ if false
 				ai.harvesters.enlist ant
 			end
 		end
-		$timer.end "Enlist Phase"
+		$timer.end :Enlist_Phase
 end
 
 		ai.turn.check_maxed_out
 		$logger.info "=== Move Collective Phase ==="
-		$timer.start( "Colmove Phase") {
+		$timer.start( :Colmove_Phase ) {
 			Collective.move_collectives ai
 		}
 
 		ai.turn.check_maxed_out
 		$logger.info "=== Order Phase ==="
-		$timer.start( "Order Phase" ) {
+		$timer.start( :Order_Phase ) {
 			ant_orders ai
 		}
 
 		ai.turn.check_maxed_out
 		$logger.info "=== Super Phase ==="
-		$timer.start( "Super Phase" ) {
+		$timer.start( :Super_Phase ) {
 			super ai, false, false #, ( !ai.kamikaze? ) 
 		}
 	end

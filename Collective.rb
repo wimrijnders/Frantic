@@ -515,8 +515,14 @@ class Collective
 	def can_pass? dir #, water_only = false
 		water_only = false
 
+		list = pass_check(dir)
+		if list.empty? 
+			return false
+		end
+
+
 		ok = true
-		pass_check(dir).each do |n|
+		list.each do |n|
 			a = @ants[n]
 			next if a.nil?	# TODO: if ant is missing, can we still pass?
 			next unless in_location? a, n
@@ -609,7 +615,7 @@ class Collective
 				# If followers are close, don't move
 				if size == fullsize and furthest_follower_distance < 3
 					$logger.info "#{ self.to_s } almost assembled. waiting"
-					leader.stay
+					stay
 					return
 				end
 
@@ -925,6 +931,13 @@ class Collective4 < Collective
 	end
 
 	def pass_check dir
+		$logger.info { "dir #{ dir }" }
+
+		unless [:N, :E, :S, :W].include? dir
+			$logger.info { "ERROR: dir #{ dir } not valid" }
+			return []
+		end
+
 		@@move_order[dir][0,2]
 	end
 
@@ -975,6 +988,13 @@ class Collective2 < Collective
 	end
 
 	def pass_check dir
+		$logger.info { "dir #{ dir }" }
+
+		unless [:N, :E, :S, :W].include? dir
+			$logger.info { "ERROR: dir #{ dir } not valid" }
+			return []
+		end
+
 		if [:E,:W].include? @orient_dir
 			if [ :E, :W].include? dir
 				@@move_orderEW[dir]
@@ -1131,6 +1151,13 @@ class Collective3 < Collective
 
 
 	def pass_check dir
+		$logger.info { "dir #{ dir }" }
+
+		unless [:N, :E, :S, :W].include? dir
+			$logger.info { "ERROR: dir #{ dir } not valid" }
+			return []
+		end
+
 		ret = nil
 
 		if [:E,:W].include? @orient_dir

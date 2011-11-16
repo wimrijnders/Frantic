@@ -105,7 +105,7 @@ class AI
 
 
 	def set_throttle
-		val = $timer.get "yield"
+		val = $timer.get :yield
 
 		max_cap = @turntime*0.60
 
@@ -140,55 +140,57 @@ class AI
 
 				set_throttle
 
-				$timer.start "total"
+				$timer.start :total
 
-				$timer.start( "read" ) { over = read_turn }
+				$timer.start( :read ) { over = read_turn }
 
 				unless over 
-					$timer.start "turn"
+					$timer.start :turn
 
-					$timer.start( "yield" )    { 
+					$timer.start( :yield )    { 
 						catch :maxed_out do
-							$timer.start( "turn_end" ) { turn_end }
+							$timer.start( :turn_end ) { turn_end }
 
 							yield self
 						end
 
-						$logger.info "=== Stay Phase ==="
-						$timer.start( "stay" ) {
-							# Mark non-moved ants as staying; these are put at
-							# the top of the list, so that they get processed
-							# first next turn
-							top = []
-							bottom = [] 
-							my_ants.each do |ant|
-								if ant.moved?
-									bottom << ant
-								else
-									ant.stay
-									top << ant
-								end
-							end
-							@my_ants = top + bottom
-						}
 
 					}
-	
 	
 					catch :maxed_out do
 						@turn.check_time_limit
 
-						$timer.start( "fibers resume") {
+						$timer.start( :fibers_resume ) {
 							$fibers.resume
 						}
 					end
 
+
 					@turn.go @turn_number
 
-					$timer.end "turn"
+					$logger.info "=== Stay Phase ==="
+					$timer.start( :stay ) {
+						# Mark non-moved ants as staying; these are put at
+						# the top of the list, so that they get processed
+						# first next turn
+						top = []
+						bottom = [] 
+						my_ants.each do |ant|
+							if ant.moved?
+								bottom << ant
+							else
+								ant.stay
+								top << ant
+							end
+						end
+						@my_ants = top + bottom
+					}
+
+
+					$timer.end :turn
 				end
 
-				$timer.end "total"
+				$timer.end :total
 
 				$logger.stats(true) { 
 					str = ""
@@ -250,11 +252,11 @@ class AI
 	def read_turn
 		ret=false
 		rd = nil
-		$timer.start( "gets.strip" ) {
+		$timer.start( :gets_strip ) {
 			rd=@stdin.gets.strip
 		}
 	
-		$timer.start "turn_init"
+		$timer.start :turn_init
 	
 		if rd=='end'
 			@turn_number=:game_over
@@ -293,12 +295,12 @@ class AI
 		@food.start_turn
 		@hills.start_turn
 
-		$timer.end "turn_init"
+		$timer.end :turn_init
 
-		$timer.start "loop"
+		$timer.start :loop
 
 		until((rd=@stdin.gets.strip)=='go')
-			$timer.start "loop_intern"
+			$timer.start :loop_intern
 
 			_, type, row, col, owner = *rd.match(/(w|f|a|d|h) (\d+) (\d+)(?: (\d+)|)/)
 			row, col = row.to_i, col.to_i
@@ -375,9 +377,9 @@ class AI
 				warn "unexpected: #{rd}"
 			end
 
-			$timer.end "loop_intern"
+			$timer.end :loop_intern
 		end
-		$timer.end "loop"
+		$timer.end :loop
 
 		ret
 	end
@@ -405,7 +407,7 @@ class AI
 			Region.add_regions ant.square
 		end unless $region.nil?
 
-		$timer.start( "detect_enemies" ) {
+		$timer.start( :detect_enemies ) {
 			detect_enemies @new_enemy_ants
 		}
 	end
@@ -629,7 +631,7 @@ class AI
 		# Screw the new enemies situation; retain the data from the previous
 		# move and hope this helps a bit
 	else
-		$timer.start( "sort enemies" ) {
+		$timer.start( :sort_enemies ) {
 			@my_ants.each { |b| 
 				b.add_enemies @enemy_ants
 			}

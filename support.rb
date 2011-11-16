@@ -6,32 +6,32 @@ class Timer
 		@max = {}
 	end
 
-	def start str
-		@list[ str ] = [ Time.now, nil, @count ]
+	def start key
+		@list[ key ] = [ Time.now, nil, @count ]
 		@count += 1
 
 		if block_given?
 			yield
-			self.end str
+			self.end key
 		end
 	end
 
-	def add_max str, value
-		if @max[ str ].nil? or value > @max[str]
-			@max[ str ] = value
+	def add_max key, value
+		if @max[ key ].nil? or value > @max[ key ]
+			@max[ key ] = value
 		end
 	end
 
-	def end str
-		v = @list[str]
+	def end key
+		v = @list[ key]
 		if v 
 			v[1] = Time.now
 
 			value = ( (v[1] - v[0])*1000 ).to_i 
 
-			add_max str, value
+			add_max key, value
 		else
-			$logger.info { "No start time for #{ str } " }
+			$logger.info { "No start time for #{ key } " }
 		end
 	end
 
@@ -41,8 +41,8 @@ class Timer
 	end
 
 
-	def current str
-		v = @list[str]
+	def current key
+		v = @list[ key ]
 		value = nil
 		if v 
 			if v[1]
@@ -52,7 +52,7 @@ class Timer
 			end
 		end
 
-		"Timer #{str}: #{value} msec"
+		"Timer #{ key.to_s }: #{value} msec"
 	end
 
 
@@ -100,8 +100,8 @@ class Timer
 	end
 
 
-	def get str
-		v = @list[str]
+	def get key
+		v = @list[ key ]
 		unless v.nil?
 			( (v[1] - v[0])*1000).to_i
 		else
