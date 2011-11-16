@@ -313,6 +313,8 @@ class PointCache
 			end
 		}
 
+		$ai.turn.check_maxed_out
+
 		$logger.info {
 			str = "After sort:\n"
 			list.each do |result|

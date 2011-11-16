@@ -649,7 +649,7 @@ end
 
 
 	def handle_conflict
-		return if moved?
+		#return if moved?
 	
 		# If we can complete the order before being in conflict, 
 		# the order will take precedence.

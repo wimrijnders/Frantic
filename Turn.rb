@@ -22,7 +22,7 @@ class Turn
 
 
 	def maxed_out? 
-		history >=  MAX_HISTORY - 2
+		history >=  MAX_HISTORY - 3
 	end
 
 	def maxed_urgent?
@@ -33,7 +33,7 @@ class Turn
 	def check_time_limit
 		diff = Time.now - @start
 
-		if diff >= @turntime
+		if diff >= @turnlimit
 			$logger.turn(true) { "Hit time limit" }
 			throw :maxed_out
 		end
@@ -47,7 +47,7 @@ class Turn
 		else
 			diff = Time.now - @start
 
-			if diff >= @turntime
+			if diff >= @turnlimit
 				$logger.turn(true) { "Maxed out!" }
 				go @turn, 1
 				throw :maxed_out
@@ -73,15 +73,24 @@ class Turn
 	end
 
 
-	def start turn
+	def start turn, diff_gets_d
 		start = Time.now
 		diff = 0.0
 		diff = ((start - @start)*1000).to_i unless @start.nil?
 		@start = start
 
-		diff_go = ((start - @last_go)*1000).to_i
+		diff_go = start - @last_go
+		diff_go_d = (diff_go*1000).to_i
 
-		$logger.turn(true) { "turn  #{ turn } - maxout #{ hist_to_s }; last call #{ diff }, last go #{ diff_go }" }
+		diff_gets = 1.0*diff_gets_d/1000
+
+
+		@turnlimit = @turntime - diff_go + diff_gets
+		turnlimit_d  = (@turnlimit*1000).to_i
+
+		$logger.turn(true) { "turn  #{ turn } " +
+			"limit/go/gets = #{ turnlimit_d }/#{ diff_go_d }/#{ diff_gets_d } " +
+			" - maxout #{ hist_to_s }; last call #{ diff }, last go #{ diff_go_d }" }
 
 		@turn = turn
 		@open = true
@@ -106,6 +115,9 @@ class Turn
 		ret
 	end
 
+	def open?
+		@open
+	end
 
 	private
 

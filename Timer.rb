@@ -2,7 +2,12 @@
 class Timer
 
 	def initialize
-		clear
+		@list = {}
+
+		# Following to make throttle calc on first turn work.
+		@list[ :yield ] = [ Time.now, Time.now, 0 ]
+
+		@count = 0
 		@max = {}
 	end
 
@@ -36,8 +41,17 @@ class Timer
 	end
 
 	def clear
-		@list = {}
-		@count = 0
+		# Don't delete yield
+		if @list[ :yield ]
+			val = @list[ :yield ]
+			val[2] = 0
+			@list = {}
+			@list[ :yield ] = val
+			@count = 1
+		else
+			@list = {}
+			@count = 0
+		end
 	end
 
 
@@ -96,6 +110,10 @@ class Timer
 			str << "\nDid not complete:\n   " + tmp.join( "\n   ")
 		end
 
+		# After creating the stats, we can reset the faulty timers
+		# Except for yield, which is used for turn timing.
+		clear
+
 		str
 	end
 
@@ -105,11 +123,9 @@ class Timer
 		unless v.nil?
 			endtime = v[1]
 
-			# If the timer did not complete, return a value
-			# which is way above the turntime
 			if endtime.nil?
 				$logger.info { "WARNING: timer #{ key } endtime nil!" }
-				2*$ai.turntime
+				nil
 			else
 				( (endtime - v[0])*1000).to_i
 			end

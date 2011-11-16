@@ -53,7 +53,7 @@ class WorkerFiber
 		@fiber.resume 
 
 		diff = Time.now - start
-
+	
 		if @max_resume < diff
 			@max_resume = diff
 		end
@@ -324,6 +324,7 @@ class Fibers
 
 				# run at least once, to be able to reset the state
 				begin 
+					$ai.turn.check_time_limit
 					f.resume
 				rescue FiberError
 					$logger.info(true) { "Thread probably died...." }
@@ -339,8 +340,6 @@ class Fibers
 				end
 
 			}
-
-			$ai.turn.check_time_limit
 		end
 	end
 

@@ -310,7 +310,12 @@ class LiaisonSearch
 			cur.keys.each do |key|
 				# Condition to prevent loops in path
 				unless current_path.include? key
-					@search_list << [ key, to_list, current_path + [key] ]
+					tmp_path = current_path + [key]
+		
+					# Add to cache
+					Region.add_paths [ tmp_path ] 
+
+					@search_list << [ key, to_list, tmp_path ]
 				end
 			end
 		else

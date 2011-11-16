@@ -110,21 +110,26 @@ class AI
 	def set_throttle
 		val = $timer.get :yield
 
-		max_cap = @turntime*0.60
+		max_cap = @turntime*0.75
 
 		if @turn.maxed_out?
 			$logger.info "maxed out: throttling even further"
 			max_cap /= 2
 		end
 
-		if not val.nil? and val >= max_cap 
+		if  val.nil? or val >= max_cap 
+			$logger.info "Throttling set, val #{ val } hit max_cap #{ max_cap }"
 			@do_throttle = true 
 		else
 			@do_throttle = false
 		end
 
-		if @do_throttle
-			$logger.info "Throttling set"
+		# Limit number of ants 
+		max_num_ants = AntConfig::KAMIKAZE_LIMIT + 10
+
+		if not @do_throttle and my_ants.length >= max_num_ants
+			$logger.info { "Throttling set, num ants #{ my_ants.length } hit limit #{ max_num_ants }" }
+			@do_throttle = true 
 		end
 	end
 
@@ -275,7 +280,8 @@ class AI
 		end
 
 		# Order important
-		@turn.start @turn_number
+		@turn.start @turn_number, $timer.get( :gets_strip )
+
 		$logger.all { "turn #{ @turn_number }" }
 	
 		# reset the map data

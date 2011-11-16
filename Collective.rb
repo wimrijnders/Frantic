@@ -296,6 +296,8 @@ class Collective
 		ai.my_ants.each do |ant|
 			next unless ant.collective_leader?
 
+			ai.turn.check_maxed_out
+
 			$logger.info "Moving collective."	
 			ant.move_collective
 		end
