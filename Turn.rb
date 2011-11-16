@@ -62,7 +62,6 @@ class Turn
 		unless @open
 			$logger.turn(true) { "Nothing to send!" }
 		else
-		
 			@stdout.puts "go"
 			@stdout.flush
 

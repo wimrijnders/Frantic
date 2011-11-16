@@ -11,7 +11,7 @@ class Pathinfo
 		@from, @to = from, to
 
 		unless path
-			path = $region.find_path from, to, false
+			path = $region.find_path from, to
 		end
 
 		if path
@@ -222,56 +222,7 @@ class LiaisonSearch
 	end
 
 
-	#
-	#
-	def find_first from_r, to_r
-		$logger.info { "find_first #{ from_r }-#{ to_r }" }
-
-		# Same region always wins
-		if from_r == to_r 
-			$logger.info { "search_liaison found same region" }
-			return []
-		end
-
-		result = catch :done do
-			search_liaison from_r, to_r, [from_r]
-		end
-
-		result
-	end
-
-
 	private
-
-	#
-	# Search for first path between from and to.
-	#
-	def search_liaison from, to, current_path
-		$logger.info { "search_liaison searching #{ from }-#{ to }: #{ current_path }" }
-
-		if @max_length != NO_MAX_LENGTH and current_path.length >= @max_length 
-			$logger.info { "Path length >= #{ @max_length }; skipping" }
-			return nil
-		end
-
-		cur = @liaison[from]
-
-		if cur
-			if cur[ to ]
-				throw :done, current_path + [to]
-			end
-
-			cur.keys.each do |key|
-				unless current_path.include? key
-					search_liaison key, to, current_path + [key]
-				end
-			end
-		end
-
-		nil
-	end
-
-
 
 	def search_liaisons from, to_list, current_path
 		to_list.compact!
@@ -319,10 +270,12 @@ class LiaisonSearch
 
 		cur = @liaison[from]
 		if cur
+			$logger.info { "#{ cur.length } targets from liaison #{ from }" }
+
 			to_list.each do |to|
 				if cur[ to ]
 					result = current_path + [to]
-					$logger.info { "found path#{ from }-#{ to_list }: #{ result }" }
+					$logger.info { "found path #{ from }-#{ to_list }: #{ result }" }
 
 					if @find_shortest
 						Fiber.yield
@@ -358,9 +311,11 @@ class LiaisonSearch
 				# Condition to prevent loops in path
 				unless current_path.include? key
 					@search_list << [ key, to_list, current_path + [key] ]
-					#search_liaisons key, to_list, current_path + [key]
 				end
 			end
+		else
+			# Should never happen; there is always the way back for any given liaison
+			$logger.info { "WARNING: No targets from liaison #{ from }" }
 		end
 	end
 end
@@ -796,6 +751,7 @@ private
 		not from.water_close?
 	end
 
+
 	#
 	# Given the from and to squares, determine
 	# to which liaison square we need to move in order
@@ -806,16 +762,16 @@ private
 	#         nil    if path can not be determined
 	#
 	def path_direction from, to
-		path = find_path from, to, false
+		path = find_path from, to
 
 		return nil if path.nil?
 		return false if path.length < 2 
 
 		liaison = get_liaison path[0], path[1]
-		$logger.info { "path_direction liaison #{ liaison }, from #{ from }" }
+		$logger.info { "liaison #{ liaison }, from #{ from }" }
 
 		if liaison and clear_path from, liaison 
-			$logger.info { "path_direction #{ from } clear to  liaison. skipping."} 
+			$logger.info { "#{ from } clear to  liaison. skipping."} 
 			path = path[1,-1]
 			return false if path.nil?
 			return false if path.length < 2
@@ -858,33 +814,7 @@ private
 			results = paths
 		end
 
-		# Apparently, following is pointless
-		#store_points from, to_list, results
-
 		results
-	end
-
-
-	def store_points from, to_list, results
-		return if results.nil? or results.length == 0
-		$logger.info "entered"
-
-		to_list.each do |to |
-			from_r = from.region
-			to_r   = to.region
-
-			this_path = nil
-			if from_r == to_r
-				this_path = []
-			else
-				results.each do |path|
-					if path[0] == from_r and path[-1] == to_r
-						this_path = path
-						break
-					end
-				end
-			end
-		end
 	end
 
 
@@ -971,7 +901,7 @@ private
 	#
 	# Find path between given squares
 	#
-	def find_path from, to, do_search = true
+	def find_path from, to
 		# Assuming input are squares
 		from_r = from.region
 		to_r   = to.region
@@ -981,7 +911,7 @@ private
 			return nil
 		end
 	
-		result = find_path_regions from_r, to_r, do_search
+		result = find_path_regions from_r, to_r
 		if result
 			$logger.info { "found cached result #{ result }." }
 
@@ -995,7 +925,7 @@ private
 					result = []
 				end
 			end		
-		elsif not do_search
+		else
 			$logger.info "putting search on backburner"
 			Region.add_searches from, [ to ], true
 		end
@@ -1007,7 +937,7 @@ private
 	#
 	# Find path between given regions
 	#
-	def find_path_regions from_r, to_r, do_search = true
+	def find_path_regions from_r, to_r
 		#$logger.info { "find_path_regions #{ from_r}-#{to_r }" }
 
 		# Test for unknown regions
@@ -1021,15 +951,7 @@ private
 			return nil
 		end
 
-		result = get_path from_r, to_r
-			
-		# Only do search if specified
-		if not result and do_search
-			result = LiaisonSearch.new( @liaison).find_first from_r, to_r
-			store_path from_r, to_r, [ result ]
-		end
-
-		result
+		get_path from_r, to_r
 	end
 
 

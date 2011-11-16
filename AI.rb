@@ -3,6 +3,7 @@
 # Released under CC-BY 3.0 license
 require 'Config.rb'
 require 'Logger.rb'
+require 'Timer.rb'
 require 'support.rb'
 require 'Square.rb'
 require 'Evasion.rb'
@@ -93,6 +94,8 @@ class AI
 	
 	# Zero-turn logic. 
 	def setup 
+		#$stderr.puts "Hello there!"
+
 		read_intro
 		@map=Array.new(@rows){|row| Array.new(@cols){|col| Square.new false, false, nil, row, col, self } }
 
@@ -147,17 +150,13 @@ class AI
 				unless over 
 					$timer.start :turn
 
-					$timer.start( :yield )    { 
-						catch :maxed_out do
+					catch :maxed_out do
+						$timer.start( :yield )    { 
 							$timer.start( :turn_end ) { turn_end }
 
 							yield self
-						end
+						}
 
-
-					}
-	
-					catch :maxed_out do
 						@turn.check_time_limit
 
 						$timer.start( :fibers_resume ) {
@@ -165,8 +164,8 @@ class AI
 						}
 					end
 
-
 					@turn.go @turn_number
+
 
 					$logger.info "=== Stay Phase ==="
 					$timer.start( :stay ) {
