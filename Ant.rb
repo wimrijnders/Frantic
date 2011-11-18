@@ -314,6 +314,15 @@ end
 			str =  "passable"
 			order dir
 		else
+
+			# Only use pathfinder on water squares
+			unless next_sq.water?
+				# Do regular evasion
+				evade dir
+				#stay	- bad idea
+				return 
+			end
+
 			path_finder = EvadePathFinder.new square, dir, @left
 
 			do_it = true

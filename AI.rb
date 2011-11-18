@@ -110,10 +110,11 @@ class AI
 	def set_throttle
 		val = $timer.get :yield
 
-		max_cap = @turntime*0.75
+		#max_cap = @turntime*0.75
+		max_cap = @turntime
 
 		if @turn.maxed_out?
-			$logger.info "maxed out: throttling even further"
+			$logger.info "maxed out: throttling."
 			max_cap /= 2
 		end
 
@@ -127,7 +128,7 @@ class AI
 		# Limit number of ants 
 		max_num_ants = AntConfig::THROTTLE_LIMIT
 
-		if not @do_throttle and my_ants.length >= max_num_ants
+		if not @do_throttle and ( max_num_ants != -1 and my_ants.length >= max_num_ants )
 			$logger.info { "Throttling set, num ants #{ my_ants.length } hit limit #{ max_num_ants }" }
 			@do_throttle = true 
 		end
@@ -164,11 +165,12 @@ class AI
 
 						@turn.check_time_limit
 
-						$logger.info "garbage collecting"
-						$timer.start( :garbage_collect ) {
-							GC.start	
-						}
-
+						# Bad idea, unfortunately; got a peak of > 600ms here
+						# Let the GC do its thing and hope for the best.
+						#$logger.info "garbage collecting"
+						#$timer.start( :garbage_collect ) {
+						#	GC.start	
+						#}
 
 						@turn.check_time_limit
 
@@ -217,6 +219,7 @@ class AI
 					str +
 					$timer.display + "\n" + 
 					$pointcache.status + "\n" +
+					"GC count: #{ GC.count }\n" +
 					$fibers.status
 				}
 			end
@@ -672,6 +675,8 @@ end
 # Global component initialization
 #
 
+
+#GC.disable
 
 $ai=AI.new
 $logger = Logger.new $ai

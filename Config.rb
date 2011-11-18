@@ -8,12 +8,12 @@ module AntConfig
 	DEFENSIVE_LIMIT = 20	# Number of ants needed to be present
 							# before ants start attacking as well
 
-	AGGRESIVE_LIMIT = 40	# At this number, the ant will
+	AGGRESIVE_LIMIT = 30	# At this number, the ant will
 							# choose fights sooner 
 
-	THROTTLE_LIMIT  = 110
+	THROTTLE_LIMIT  = 130 
 
-	KAMIKAZE_LIMIT  = 95	# There's too many ants, getting close to
+	KAMIKAZE_LIMIT  = -1	# There's too many ants, getting close to
 							# timeout. Take extreme measures to bring down the population 
 							# -1 for no limit
 

@@ -315,14 +315,14 @@ class PointCache
 
 		$ai.turn.check_maxed_out
 
-		$logger.info {
-			str = "After sort:\n"
-			list.each do |result|
-				str << "#{ result }\n"
-			end
+		#$logger.info {
+		#	str = "After sort:\n"
+		#	list.each do |result|
+		#		str << "#{ result }\n"
+		#	end
 
-			str
-		}
+		#	str
+		#}
 
 		# return list with distance info only
 		ret = []

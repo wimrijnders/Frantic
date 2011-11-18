@@ -92,7 +92,7 @@ class Strategy < BaseStrategy
 		end
 		num_ants = ai.my_ants.length
 
-		if 2*num_collectives >=  num_ants/2
+		if 2*num_collectives >=  num_ants*0.8
 			$logger.info { "Enough collectives: #{ num_collectives } collectives for #{ num_ants }" }
 			true
 		else
@@ -277,7 +277,7 @@ class Strategy < BaseStrategy
 
 			Collective.complete_collectives ai
 
-			if not ai.kamikaze? # and not enough_collectives ai
+			if not ai.kamikaze? and not enough_collectives ai
 				Collective.create_collectives ai unless ai.kamikaze? 
 			end
 
