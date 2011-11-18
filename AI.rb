@@ -125,7 +125,7 @@ class AI
 		end
 
 		# Limit number of ants 
-		max_num_ants = AntConfig::KAMIKAZE_LIMIT + 10
+		max_num_ants = AntConfig::THROTTLE_LIMIT
 
 		if not @do_throttle and my_ants.length >= max_num_ants
 			$logger.info { "Throttling set, num ants #{ my_ants.length } hit limit #{ max_num_ants }" }
@@ -164,11 +164,21 @@ class AI
 
 						@turn.check_time_limit
 
+						$logger.info "garbage collecting"
+						$timer.start( :garbage_collect ) {
+							GC.start	
+						}
+
+
+						@turn.check_time_limit
+
+						$logger.info "fibers_resume"
 						$timer.start( :fibers_resume ) {
 							$fibers.resume
 						}
 					end
 
+					$logger.info "sending go"
 					@turn.go @turn_number
 
 
@@ -638,6 +648,9 @@ class AI
 	else
 		$timer.start( :sort_enemies ) {
 			@my_ants.each { |b| 
+				# Don't sort enemies for collective followers
+				next if b.collective_follower?
+
 				b.add_enemies @enemy_ants
 			}
 		}

@@ -53,10 +53,10 @@ map = map.to_i if is_number? map
 
 bots = [
 	"ruby ../MyBot.rb",					# Frantic - latest version
-	"python sample_bots/python/GreedyBot.py",
-	"python2.7 sample_bots/python/HunterBot.py",
 	"ruby ../Twitcher.rb",
 	"ruby ../Inertia.rb",
+	"python2.7 sample_bots/python/HunterBot.py",
+	"python sample_bots/python/GreedyBot.py",
 	"ruby ../Twitcher.rb",
 	"ruby ../Inertia.rb",
 	"ruby ../Twitcher.rb",

@@ -84,13 +84,14 @@ class Turn
 
 		diff_gets = 1.0*diff_gets_d/1000
 
+		diff_start_d = ( (start - $logger.start)*1000).to_i
 
 		@turnlimit = @turntime - diff_go + diff_gets
 		turnlimit_d  = (@turnlimit*1000).to_i
 
-		$logger.turn(true) { "turn  #{ turn } " +
+		$logger.turn(true) { "start #{ diff_start_d } turn:  #{ turn } " +
 			"limit/go/gets = #{ turnlimit_d }/#{ diff_go_d }/#{ diff_gets_d } " +
-			" - maxout #{ hist_to_s }; last call #{ diff }, last go #{ diff_go_d }" }
+			" - maxout #{ hist_to_s }; last call #{ diff }" }
 
 		@turn = turn
 		@open = true

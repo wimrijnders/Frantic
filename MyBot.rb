@@ -170,7 +170,7 @@ class Strategy < BaseStrategy
 			sq = ai.map[ l[0] ][ l[1] ]
 			$logger.info { "Targetting hill #{ sq }" }
 
-			# Determine if there are defenders
+			# Determine if there are enemy ants defending 
 			if ai.defensive?
 				defenders = BaseStrategy.nearby_ants_region sq, ai.enemy_ants
 				$logger.info "Defensive mode and #{ defenders.length } defenders for hill #{ sq}. Not razing."
@@ -179,17 +179,28 @@ class Strategy < BaseStrategy
 
 
 			# Make list of ants which are available for attacking the hill
+			# Note that collectives are added as well, we don't differentiate
 			available_ants = []
 			ai.my_ants.each do |ant|
-				next unless ant.can_raze?
+				next if ant.has_order :RAZE, sq
 
-				# Insert some randomness, so that not all ants hit the
-				# first hill in the list
-				next if rand(2) == 0
+				d = Distance.new sq, ant.square
+
+				# If ant is in view of hill, it must attack
+				# Even if it is razing elsewhere
+				unless d.in_view?
+					next unless ant.can_raze?
+				
+					# For the rest, insert some randomness,
+					# so that not all ants hit the
+					# first hill in the list
+					next if rand(2) == 0
+				end
 
 				available_ants << ant
 			end
 
+			# Following needed for starting the path search to the hills!
 			nearby_ants = BaseStrategy.nearby_ants_region sq, available_ants, true, -1
 
 			nearby_ants.each do |ant|
@@ -266,7 +277,7 @@ class Strategy < BaseStrategy
 
 			Collective.complete_collectives ai
 
-			if not ai.kamikaze?  and not enough_collectives ai
+			if not ai.kamikaze? # and not enough_collectives ai
 				Collective.create_collectives ai unless ai.kamikaze? 
 			end
 
@@ -307,7 +318,7 @@ class Strategy < BaseStrategy
 
 
 		ai.turn.check_maxed_out
-		if ai.kamikaze? and ai.enemy_ants.length > 0  and not ai.turn.maxed_out?
+		if ai.kamikaze? and ai.enemy_ants.length > 0 # and not ai.turn.maxed_out?
 			$logger.info "=== Kamikaze Phase ==="
 			$timer.start :Kamikaze_Phase
 

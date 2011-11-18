@@ -5,6 +5,7 @@ class Collective
 	def initialize
 		@ants = []
 		@safe_count = 0
+		@assembly_count = 0
 		@do_reassemble = true
 		@incomplete_count = 0
 		evade_init
@@ -37,7 +38,10 @@ class Collective
 	#
 	def rally ant, count = nil
 		count = size() -1 if count.nil?
-		ant.set_order( leader.square, :ASSEMBLE, relpos(count) ) 
+		unless ant.set_order( leader.square, :ASSEMBLE, relpos(count) ) 
+			# Can't reach assembly location; give up
+			disband
+		end
 	end
 
 	def to_s
@@ -49,10 +53,11 @@ class Collective
 	end
 
 	def move
-		catch (:done) do 
+		catch :done do 
 			return if leader.moved?
 	
 			test_incomplete
+			test_assembly
 			reassemble unless assembled?
 			return if evading
 			test_safe
@@ -234,16 +239,23 @@ class Collective
 
 			coll = ant.collective
 
-			next if coll.assembled?
-
-			if coll.complete? and coll.furthest_follower_distance < 5
-				$logger.info { "#{ coll } followers almost there; not re-recruiting" }
-				next
-			end
+			catch :done do	
+				# Get rid of collectives if population too small
+				if ant.ai.my_ants.length < AntConfig::ASSEMBLE_LIMIT
+					coll.disband
+				end
 			
-			$logger.info "Completing #{ coll }."
+				next if coll.assembled?
+
+				if coll.complete? and coll.furthest_follower_distance < 5
+					$logger.info { "#{ coll } followers almost there; not re-recruiting" }
+					next
+				end
+			
+				$logger.info "Completing #{ coll }."
 	
-			recruit ant
+				recruit ant
+			end
 		end
 	end
 
@@ -286,7 +298,9 @@ class Collective
 			end
 			next if collective_near
 
-			recruit ant
+			catch :done do
+				recruit ant
+			end
 		end
 	end
 
@@ -705,8 +719,36 @@ class Collective
 		else
 			$logger.info "#{ leader.to_s } no attacker"
 
+			unless assembled?
+				check_assembly
 
-			if !leader.ai.defensive? and assembled?
+				if !can_assemble?
+					# Location is not good, move away
+					random_move
+				else
+					#if not assembled yet, wait for the missing ants to join
+					stay
+				end
+				throw :done
+			end
+
+
+			if leader.first_order :RAZE
+				# WRI TEST: this is a special case, using ant orders
+				# to move collectives.
+				# TODO: Check that this works OK
+				o = leader.get_first_order
+				to = o.handle_liaison( leader.square, leader.ai )
+				d = Distance.new( leader, to ) 
+
+				if d.in_view?
+					$logger.info { "Moving #{ self } to raze target #{ to}, dir #{ d.dir}" }
+					move_intern d.dir
+					throw :done
+				end
+			end
+
+			if !leader.ai.defensive?
 				# We're in place but not attacked.
 				# go pick a fight if possible
 				$logger.info "picking a fight"
@@ -733,30 +775,6 @@ class Collective
 						#dir = evade d.dir
 						random_move
 					end
-				end
-			elsif assembled? and leader.first_order :RAZE
-				# WRI TEST: this is a special case, using ant orders
-				# to move collectives.
-				# TODO: Check that this works OK
-				o = leader.get_first_order
-				to = o.handle_liaison( leader.square, leader.ai )
-				d = Distance.new( leader, to ) 
-
-				#if d.in_view?
-
-					$logger.info { "Moving #{ self } to raze target #{ to}, dir #{ d.dir}" }
-					move_intern d.dir
-					throw :done
-				#end
-			else
-				check_assembly
-
-				if !can_assemble?
-					# Location is not good, move away
-					random_move
-				else
-					#if not assembled yet, wait for the missing ants to join
-					stay
 				end
 			end
 		end
@@ -796,7 +814,7 @@ class Collective
 		return false if leader.nil?
 
 		count = 1
-		@ants.each do |a|
+		@ants.clone.each do |a|
 			next if a === leader
 
 			unless a.nil? or a.orders?
@@ -826,7 +844,7 @@ class Collective
 		disband and return if size == 1
 	
 		count = 1	
-		@ants.each do |a|
+		@ants.clone.each do |a|
 			if leader.nil?
 				leader = a 
 				leader.clear_orders
@@ -840,6 +858,7 @@ class Collective
 			count += 1
 		end
 	
+		@assembly_count = 0
 	end
 
 	def test_incomplete
@@ -850,6 +869,22 @@ class Collective
 		end
 
 		if @incomplete_count > AntConfig::INCOMPLETE_LIMIT
+			disband
+		end
+	end
+
+
+	def test_assembly
+		$logger.info "called"
+
+		if filled? and assembled? false
+			@assembly_count = 0
+		else
+			@assembly_count += 1
+		end
+
+		if @assembly_count > AntConfig::ASSEMBLY_LIMIT
+			$logger.info "#{ self }- assembly taking too long"
 			disband
 		end
 	end

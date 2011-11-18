@@ -541,6 +541,10 @@ end
 		@collective.assembled? false
 	end
 
+	def collective_follower?
+		collective? and collective_assembled? and not collective_leader?
+	end
+
 	def set_collective c 
 		@collective = c
 	end

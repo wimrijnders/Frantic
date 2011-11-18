@@ -322,10 +322,9 @@ class Fibers
 					next
 				end
 
-				# run at least once, to be able to reset the state
 				begin 
-					$ai.turn.check_time_limit
 					f.resume
+					$ai.turn.check_time_limit
 				rescue FiberError
 					$logger.info(true) { "Thread probably died...." }
 					# Help it out of its misery

@@ -75,6 +75,8 @@ class Logger
 	end
 
 
+	def start; @start; end
+
 	def log= val
 		@log = val
 	end
