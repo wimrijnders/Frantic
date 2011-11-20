@@ -1,4 +1,5 @@
 #!/usr/local/bin/ruby
+require '../Config'
 
 #
 # Configuration options
@@ -6,8 +7,8 @@
 
 live    = true
 bot_num = nil 
-turns   = 1000 
-flags   = "--turntime=700" #--serial" # "--nolaunch"
+turns   = AntConfig::NUM_TURNS 
+flags   = "--turntime=#{ AntConfig::TURN_TIME }" #--serial" # "--nolaunch"
 
 
 #
@@ -53,6 +54,11 @@ map = map.to_i if is_number? map
 
 bots = [
 	"ruby ../MyBot.rb",					# Frantic - latest version
+	"ruby ../frantic13/MyBot.rb",		# Frantic - previous version
+	"ruby ../frantic05/MyBot.rb",		# Frantic - previous version
+	"ruby ../frantic04/MyBot.rb",		# Frantic - previous version
+	"ruby ../frantic03/MyBot.rb",		# Frantic - previous version
+
 	"ruby ../Twitcher.rb",
 	"ruby ../Inertia.rb",
 	"python2.7 sample_bots/python/HunterBot.py",

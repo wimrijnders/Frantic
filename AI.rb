@@ -167,10 +167,10 @@ class AI
 
 						# Bad idea, unfortunately; got a peak of > 600ms here
 						# Let the GC do its thing and hope for the best.
-						#$logger.info "garbage collecting"
-						#$timer.start( :garbage_collect ) {
-						#	GC.start	
-						#}
+						$logger.info "garbage collecting"
+						$timer.start( :garbage_collect ) {
+							GC.start	
+						}
 
 						@turn.check_time_limit
 
@@ -208,6 +208,10 @@ class AI
 
 				$timer.end :total
 
+$logger.debug {
+	$logger.info(true) { "Hello! This runs in a debug block" }
+}
+
 				$logger.stats(true) { 
 					str = ""
 
@@ -220,6 +224,7 @@ class AI
 					$timer.display + "\n" + 
 					$pointcache.status + "\n" +
 					"GC count: #{ GC.count }\n" +
+					AntObject.status + "\n" + 
 					$fibers.status
 				}
 			end

@@ -1,9 +1,13 @@
 
 
 module AntConfig
+	# Testbot config
+	NUM_TURNS		= 100	# Max number of turns per game
+	TURN_TIME		= 800	# Num msec per bot per turn
+
 
 	LOG_OUTPUT      = false	# Output logging info to stdout
-	LOG_STATUS      = true	# Log status info only if LOG_OUTPUT is false
+	LOG_STATUS      = true	# if LOG_OUTPUT is false, log status info only
 
 	DEFENSIVE_LIMIT = 20	# Number of ants needed to be present
 							# before ants start attacking as well
@@ -14,7 +18,8 @@ module AntConfig
 	THROTTLE_LIMIT  = 130 
 
 	KAMIKAZE_LIMIT  = -1	# There's too many ants, getting close to
-							# timeout. Take extreme measures to bring down the population 
+							# timeout. Take extreme measures to bring
+							# down the population 
 							# -1 for no limit
 
 	FOOD_LIMIT      = 5     # Max number of food items per turn

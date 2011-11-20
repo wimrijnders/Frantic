@@ -1,5 +1,5 @@
 
-class Distance
+class Distance  < AntObject
 	attr_accessor :row, :col
 
 	# Lesson learnt: need to set explicitly for class var's
@@ -12,6 +12,7 @@ class Distance
 	end
 
 	def initialize from, to = nil
+		super
 
 		if to.nil?
 			if from.respond_to? :row
@@ -41,6 +42,7 @@ class Distance
 
 		normalize
 		#$logger.info { "Distance init #{ @row }, #{ @col }" }
+
 	end
 
 

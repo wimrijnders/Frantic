@@ -2,7 +2,7 @@
 class Food
 	attr_accessor :coord, :active
 
-	COUNTER_LIMIT = 20
+	COUNTER_LIMIT = 10
 
 	def initialize coord
 		@coord = coord
@@ -67,45 +67,6 @@ class Food
 			@counter -= 1
 			return false
 		end
-
-
-# Following disabled due to performance issues (timeouts), and not 
-# really necessary
-if false
-		# Make a list of all the current orders for foraging.
-		# Keep track of the forage order sequence.
-		forages = {}
-		sq_search = nil
-		@ants.each do | ant |
-			# Note that this is square of food
-			sq_search = ant.ai.map[ row ][ col] if sq_search.nil?
-
-			$logger.info "Testing #{ ant }"
-
-			list = ant.find_orders :FORAGE, sq_search
-
-			list.each_pair do |sq,v|
-				k = sq.row.to_s + "_" + sq.col.to_s
-				if forages[k].nil? or forages[k] > v
-					forages[k] = v
-				end
-			end
-		end
-
-		$logger.info {
-			str =""
-			forages.each_pair do |k,v|
-				str << "    #{ k }: #{v}\n"
-			end
-
-			"Food #{ @coord}, found following foraging actions:\n#{ str }"
-		}
-
-		# Check score of current food
-		k = @coord[0].to_s + "_" + @coord[1].to_s
-
-		forages[ k ].nil? or forages[ k ] >= 2
-end
 	end
 
 end

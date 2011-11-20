@@ -75,6 +75,14 @@ class Logger
 	end
 
 
+	# A debug block just runs a block without 
+	# showing any output
+	def debug str = nil, &bl
+		str = "dummy" if str.nil?
+		@validate.call @log, str, bl
+	end
+
+
 	def start; @start; end
 
 	def log= val
@@ -138,6 +146,7 @@ class Logger
 
 		#@@ai.stdout.puts str 
 		#@@ai.stdout.flush
+		nil
 	end
 
 

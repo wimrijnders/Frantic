@@ -1,3 +1,28 @@
+class AntObject 
+	@@finalize_count = 0
+	
+
+    def initialize dummy1, dummy2 = nil
+		# Only do this is debug-status mode
+		$logger.debug(true) {
+        	ObjectSpace.define_finalizer(self,
+					self.class.method(:finalize).to_proc)
+		}
+    end
+
+	# Not called when not in debug 
+    def self.finalize(id)
+		@@finalize_count += 1
+
+        #$logger.info(true) {  "Object #{id} dying at #{Time.new}" }
+    end
+
+	def self.status 
+		"Num finalized: #{ @@finalize_count }"
+	end
+end
+
+
 
 def right dir
 	newdir = case dir
