@@ -97,6 +97,7 @@ class PointCache
 
 
 	def	determine_move from, to
+$logger.info "entered"
 		next_sq = $region.path_direction from, to
 
 		if false === next_sq
@@ -108,7 +109,7 @@ class PointCache
 			return nil
 		end
 
-		d = Distance.new( from, next_sq)
+		d = Distance.get( from, next_sq)
 		move = d.dir from, true
 
 		$logger.info "Determined move #{ move }"
@@ -118,6 +119,7 @@ class PointCache
 
 
 	def set from, to, distance, item, invalid = false, move = nil
+$logger.info "entered move #{ move }"
 		raise "#{from} not a square" if not from.is_a? Square
 		raise "#{to} not a square" if not to.is_a? Square
 
@@ -156,11 +158,14 @@ class PointCache
 
 
 		unless found 
+$logger.info "not found"
+
 			# Assume direct path
-			d = Distance.new from, to
+			d = Distance.get from, to
 			distance = d.dist
 			move = d.dir if move.nil?
 
+$logger.info "has_direct_path"
 			if has_direct_path from, to
 				# It really is a direct path!
 				invalid = false
@@ -168,9 +173,11 @@ class PointCache
 				invalid = true
 			end
 		else
+$logger.info "found"
 			move = determine_move from, to if move.nil?
 		end
 
+$logger.info "result"
 		result = [distance, item, move, invalid ]
 
 		#$logger.info {
@@ -260,6 +267,7 @@ class PointCache
 
 
 	def get_sorted from, to, valid_first = false
+$logger.info "entered"
 
 
 		# Following to take ants into account
@@ -286,6 +294,7 @@ class PointCache
 		list = []
 
 		to.each do |a|
+$logger.info "to ant: #{ a}"
 			if a.respond_to? :square
 				sq_to = a.square
 			else
@@ -298,6 +307,7 @@ class PointCache
 
 			$ai.turn.check_maxed_out
 		end
+$logger.info "done get"
 
 		# Sort list on distance; if specified, give precedence to valid
 		# cache items
@@ -312,6 +322,7 @@ class PointCache
 				 a[1][0] <=> b[1][0]
 			end
 		}
+$logger.info "done sort"
 
 		$ai.turn.check_maxed_out
 
@@ -330,6 +341,7 @@ class PointCache
 			ret << [ l[0], l[1][0] ]
 		end
 
+$logger.info "done"
 		ret
 	end
 

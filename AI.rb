@@ -223,6 +223,7 @@ $logger.debug {
 					str +
 					$timer.display + "\n" + 
 					$pointcache.status + "\n" +
+					"Distance cache: " + Distance.status + "\n" +
 					"GC count: #{ GC.count }\n" +
 					AntObject.status + "\n" + 
 					$fibers.status
@@ -524,7 +525,7 @@ $logger.debug {
 
 				list = []
 				@enemy_ants.each do |a|
-					d = Distance.new b,a
+					d = Distance.get b,a
 					if d.dist == 1
 						list << a
 					end

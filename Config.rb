@@ -2,11 +2,11 @@
 
 module AntConfig
 	# Testbot config
-	NUM_TURNS		= 100	# Max number of turns per game
+	NUM_TURNS		= 500	# Max number of turns per game
 	TURN_TIME		= 800	# Num msec per bot per turn
 
 
-	LOG_OUTPUT      = false	# Output logging info to stdout
+	LOG_OUTPUT      = true	# Output logging info to stdout
 	LOG_STATUS      = true	# if LOG_OUTPUT is false, log status info only
 
 	DEFENSIVE_LIMIT = 20	# Number of ants needed to be present

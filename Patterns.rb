@@ -196,7 +196,7 @@ class Hypothesis
 			targets << ai.map[ (intersect[0] - diff[0] ) % ai.rows ][ ( intersect[1] - diff[1]) % ai.cols ]
 		elsif which == :ROT90 
 			# rot90
-			d = Distance.new sym, source
+			d = Distance.get sym, source
 			turn = right d	
 			coord = [ sym[0] + turn[0], sym[1] + turn[1] ]
 			targets << ai.map[ coord[0] % ai.rows ][ coord[1] % ai.cols ]
@@ -207,7 +207,7 @@ class Hypothesis
 			targets << ai.map[ coord[0] % ai.rows ][ coord[1] % ai.cols ]
 		elsif which == :ROT180
 			# rot 180
-			d = Distance.new sym, source
+			d = Distance.get sym, source
 			turn = right2 d
 			coord = [ sym[0] + turn[0], sym[1] + turn[1] ]
 			targets << ai.map[ coord[0] % ai.rows ][ coord[1] % ai.cols ]
@@ -451,7 +451,7 @@ class RotHypothesis < Hypothesis
 		end
 
 		@rot_points[start..final].clone.each do |point|
-			d = Distance.new( point, source )
+			d = Distance.get( point, source )
 
 			do_test source, d, point
 		end

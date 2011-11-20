@@ -119,7 +119,7 @@ def closest_ant_view l, ai
 	cur_dist = nil
 
 	ants.each do |ant|
-		d = Distance.new ant, l
+		d = Distance.get ant, l
 		dist = d.dist
 
 		if !cur_dist || dist < cur_dist

@@ -376,7 +376,7 @@ end
 	# Move ant in the direction of the specified square
 	# 
 	def move_to to
-		d = Distance.new( @square, to)
+		d = Distance.get( @square, to)
 		move d.dir( @square), to
 	end
 
@@ -477,7 +477,7 @@ end
 	def enemies_in_view
 		neighbors = []
 		@enemies.each do |a|
-			adist = Distance.new( pos, a[0].pos)
+			adist = Distance.get( pos, a[0].pos)
 			break unless adist.in_view?
 
 			neighbors << a[0]
@@ -499,7 +499,7 @@ end
 		#
 		# Note: we use direct distance here, even if there are paths.
 		#       This is because view distances work with direct distances 
-		d = Distance.new self, @enemies[0][0]
+		d = Distance.get self, @enemies[0][0]
 
 		unless d.nil?
 			if d.in_view? and Distance.direct_path?( self.square, @enemies[0][0]) #  d.clear_view @square
@@ -639,7 +639,7 @@ end
 			next unless l.attacked?
 			next if l.collective?	# Collectives can fend for themselves
 	
-			d = Distance.new self, l.pos	
+			d = Distance.get self, l.pos	
 	
 			# Only help out if current ant has no order,
 			# or ant in distress is nearer

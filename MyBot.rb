@@ -115,7 +115,7 @@ class Strategy < BaseStrategy
 		
 			attackers = []
 			near_enemies.each do |enemy|
-				d = Distance.new square, enemy 
+				d = Distance.get square, enemy 
 
 				next if d.nil? or not d.in_view?
 
@@ -129,7 +129,7 @@ class Strategy < BaseStrategy
 				defenders = []
 				near_friends = BaseStrategy.nearby_ants_region square, ai.my_ants, true 
 				near_friends.each do |ant|
-					next if Distance.new( ant, square).dist > 15
+					next if Distance.get( ant, square).dist > 15
 
 					defenders << ant
 					unless ant.has_order  :DEFEND_HILL
@@ -184,7 +184,7 @@ class Strategy < BaseStrategy
 			ai.my_ants.each do |ant|
 				next if ant.has_order :RAZE, sq
 
-				d = Distance.new sq, ant.square
+				d = Distance.get sq, ant.square
 
 				# If ant is in view of hill, it must attack
 				# Even if it is razing elsewhere
@@ -361,7 +361,7 @@ if false
 				# Don't harvest too close to own hills
 				too_close = false
 				ai.hills.each_friend do |sq|
-					d = Distance.new sq, ant.square
+					d = Distance.get sq, ant.square
 					if d.in_view?
 						too_close = true
 						break

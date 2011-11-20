@@ -21,7 +21,7 @@ class AttackDistance
 		@dir = nil
 
 		if prev
-			calc_dir Distance.new prev.dist, dist
+			calc_dir Distance.get prev.dist, dist
 
 			unless too_far?
 				@advancing = prev.longest_dist.abs > longest_dist.abs
@@ -30,7 +30,7 @@ class AttackDistance
 	end
 	
 	def adjust dir
-		@dist.adjust dir
+		@dist = @dist.adjust dir
 	end
 
 	#

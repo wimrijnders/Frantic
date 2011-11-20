@@ -146,10 +146,7 @@ class Collective
 		if filled?
 			# Check if new recruit is nearer to the leader than one
 			# of the current members
-			# BUG: [1...size].each do |n|
-			#    - member below became an array of ants
-			#        TODO: Examine why
-			dista = Distance.new leader, a
+			dista = Distance.get leader, a
 
 			# Pick best member to replace
 			bestn = nil
@@ -160,7 +157,7 @@ class Collective
 
 				next if in_location? member, n
 
-				distn = Distance.new leader, member
+				distn = Distance.get leader, member
 
 				if dista.dist < distn.dist	
 					if bestdist.nil? or distn.dist < bestdist
@@ -342,7 +339,7 @@ class Collective
 		guess = []
 		harmless = true
 		leader.enemies_in_view.each do |e|
-			adist = Distance.new( leader.pos, e.pos)
+			adist = Distance.get( leader.pos, e.pos)
 			break unless adist.in_peril?
 
 			harmless &&= ( e.twitch? or e.stay? )
@@ -427,7 +424,7 @@ class Collective
 		friend_hits = {}
 		guess.each_index do |e|
 			move.each_index do |f|
-				dist = Distance.new( guess[e], move[f])
+				dist = Distance.get( guess[e], move[f])
 				#$logger.info "dist: #{ dist }, #{ dist.dist}"
 				if dist.in_attack_range?
 					#$logger.info "In attack range"
@@ -487,7 +484,7 @@ class Collective
 
 		found_dist = nil
 		@ants[1..-1].each do |ant|
-			d = Distance.new leader, ant
+			d = Distance.get leader, ant
 
 			if found_dist.nil? or d.dist > found_dist
 				found_dist = d.dist
@@ -736,10 +733,9 @@ class Collective
 			if leader.first_order :RAZE
 				# WRI TEST: this is a special case, using ant orders
 				# to move collectives.
-				# TODO: Check that this works OK
 				o = leader.get_first_order
 				to = o.handle_liaison( leader.square, leader.ai )
-				d = Distance.new( leader, to ) 
+				d = Distance.get( leader, to ) 
 
 				if d.in_view?
 					$logger.info { "Moving #{ self } to raze target #{ to}, dir #{ d.dir}" }
@@ -754,7 +750,7 @@ class Collective
 				$logger.info "picking a fight"
 				d = nil 
 				enemy = leader.closest_enemy
-				d = Distance.new( leader, enemy ) unless enemy.nil?
+				d = Distance.get( leader, enemy ) unless enemy.nil?
 
 				# If more or less close, go for it
 				if d and d.dist < AntConfig::FIGHT_DISTANCE 
@@ -1093,7 +1089,7 @@ class Collective2 < Collective
 	
 	def assemble
 		if filled?
-			d = Distance.new @ants[0], @ants[1]
+			d = Distance.get @ants[0], @ants[1]
 
 			if d.dist == 1
 				if d.row == 0

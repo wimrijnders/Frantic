@@ -43,7 +43,7 @@ class Pathinfo
 			cur = @@region.get_liaison path[n], path[n+1]
 
 			unless prev.nil?
-				dist = Distance.new prev, cur
+				dist = Distance.get prev, cur
 				total += dist.dist
 			end
 
@@ -67,15 +67,15 @@ class Pathinfo
 		total = 0
 		if @path.nil? or @path.length < 2
 			# There is no path; calculate distance between from and to
-			dist = Distance.new @from, @to
+			dist = Distance.get @from, @to
 			total += dist.dist
 		else
 			cur = @@region.get_liaison @path[0], @path[1]
-			dist = Distance.new @from, cur
+			dist = Distance.get @from, cur
 			total += dist.dist
 
 			cur = @@region.get_liaison @path[-2], @path[-1]
-			dist = Distance.new cur, @to
+			dist = Distance.get cur, @to
 			total += dist.dist
 
 			total += @path_dist
@@ -747,7 +747,7 @@ private
 
 
 	def clear_path from, liaison
-		d = Distance.new( liaison, from )
+		d = Distance.get( liaison, from )
 
 		# Must be next to liaison
 		return false if d.row.abs > 1 or d.col.abs> 1

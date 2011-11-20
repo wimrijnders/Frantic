@@ -150,8 +150,8 @@ module Orders
 			if a.order == :FORAGE and b.order == :FORAGE
 
 				# Nearest food first
-				#adist = Distance.new( self.pos, a.square)
-				#bdist = Distance.new( self.pos, b.square)
+				#adist = Distance.get( self.pos, a.square)
+				#bdist = Distance.get( self.pos, b.square)
 				#adist.dist <=> bdist.dist
 
 				itema = items[a] 
@@ -312,7 +312,7 @@ module Orders
 	def order_distance
 		return nil unless orders?
 
-		Distance.new pos, @orders[0].square
+		Distance.get pos, @orders[0].square
 	end
 
 
@@ -413,7 +413,7 @@ module Orders
 			#$logger.info "Checking order #{ order_order } on #{ order_sq}"
 
 			if order_order == :ATTACK
-				d = Distance.new self.square, order_sq 
+				d = Distance.get self.square, order_sq 
 				if d.in_view?
 					unless !ai.map[ order_sq.row][ order_sq.col].ant.nil? and
 					       ai.map[ order_sq.row][ order_sq.col].ant.enemy?
@@ -426,7 +426,7 @@ module Orders
 			end
 
 			if order_order == :DEFEND_HILL
-				d = Distance.new self.square, order_sq 
+				d = Distance.get self.square, order_sq 
 
 				# Use of in_peril in order to get closer to hill than in_view
 				if d.in_peril?
@@ -483,7 +483,7 @@ module Orders
 
 				closest = closest_ant_view [ sq.row, sq.col], @ai
 				unless closest.nil?
-					d = Distance.new closest, sq
+					d = Distance.get closest, sq
 
 					if d.in_view? 
 						if !@ai.map[ sq.row ][sq.col].food?
@@ -518,7 +518,7 @@ module Orders
 
 				closest = closest_ant_view [ sq.row, sq.col], @ai
 				unless closest.nil?
-					d = Distance.new closest, sq
+					d = Distance.get closest, sq
 
 					if d.in_view? 
 						result = @ai.hills.active? [ sq.row, sq.col]
@@ -546,7 +546,7 @@ module Orders
 			# check if harvest target is water
 			if order_order == :HARVEST and evading?
 				sq = order_sq
-				d = Distance.new self, sq
+				d = Distance.get self, sq
 
 				# Use of in_danger here is not because of attack, but because
 				# we want to get closer to the target square than in_view
@@ -598,6 +598,7 @@ module Orders
 		true
 	end
 
+
 	#
 	# Return true if after check, we are still continuing with orders
 	#
@@ -611,8 +612,8 @@ module Orders
 					# cancel order
 					break unless @orders[0].order == :FORAGE
 	
-					da = Distance.new( pos, @orders[0].square )
-					de = Distance.new( e.pos, @orders[0].square )
+					da = Distance.get( pos, @orders[0].square )
+					de = Distance.get( e.pos, @orders[0].square )
 	
 					if da.dist > de.dist
 						# we lucked out - skip this order

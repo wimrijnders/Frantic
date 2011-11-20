@@ -9,7 +9,7 @@ class Move
 
 		@dir = nil
 		if prev
-			dist = Distance.new prev, pos
+			dist = Distance.get prev, pos
 			calc_dir dist
 		end
 	end
@@ -100,16 +100,16 @@ class MoveHistory
 		# as advancing when directly in front of leader
 		if straight_line?
 			if first and @list[-2]
-				dist1 = Distance.new pos, first.pos
-				dist2 = Distance.new pos, @list[-2].pos
+				dist1 = Distance.get pos, first.pos
+				dist2 = Distance.get pos, @list[-2].pos
 			end
 
 			return dist1.longest_dist.abs < dist2.longest_dist.abs
 		end
 
 		if first and @list[-2]
-			dist1 = Distance.new pos, first.pos
-			dist2 = Distance.new pos, @list[-2].pos
+			dist1 = Distance.get pos, first.pos
+			dist2 = Distance.get pos, @list[-2].pos
 
 			return dist1.dist.abs < dist2.dist.abs
 		end

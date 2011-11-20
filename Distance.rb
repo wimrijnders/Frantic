@@ -1,6 +1,11 @@
 
 class Distance  < AntObject
 	attr_accessor :row, :col
+	attr_reader :dist
+
+	@@cache = {}
+	@@hit = 0
+	@@miss = 0
 
 	# Lesson learnt: need to set explicitly for class var's
 	@@ai = nil
@@ -14,35 +19,82 @@ class Distance  < AntObject
 	def initialize from, to = nil
 		super
 
+		@row, @col = Distance.relpos from, to
+
+
+		recalc
+		#$logger.info { "Distance init #{ @row }, #{ @col }" }
+	end
+
+
+	#
+	# Calculate all derived variables.
+	# 
+	# This needs to be done every time row, col values change
+	def recalc
+		normalize
+
+		@dist = @row.abs + @col.abs
+	end
+
+
+	def self.relpos from, to
 		if to.nil?
 			if from.respond_to? :row
-				@row = from.row
-				@col = from.col
+				row = from.row
+				col = from.col
 			else
-				@row = from[0]
-				@col = from[1]
+				row = from[0]
+				col = from[1]
 			end
 		else
 			if to.respond_to? :row
-				@row = to.row
-				@col = to.col
+				row = to.row
+				col = to.col
 			else
-				@row = to[0]
-				@col = to[1]
+				row = to[0]
+				col = to[1]
 			end
 	
 			if from.respond_to? :row
-				@row -= from.row
-				@col -= from.col
+				row -= from.row
+				col -= from.col
 			else
-				@row -= from[0]
-				@col -= from[1]
+				row -= from[0]
+				col -= from[1]
 			end
 		end
 
-		normalize
-		#$logger.info { "Distance init #{ @row }, #{ @col }" }
+		[row, col ]
+	end
 
+
+	def self.get from, to = nil
+		row, col = Distance.relpos from, to
+	
+
+		# read from cache
+		r = @@cache[ row ]
+		unless r.nil?
+			c = r[ col ]
+			unless c.nil?
+				@@hit += 1
+				return c
+			end
+		end
+
+		# Not present in cache; add new distance
+		@@miss += 1
+		if r.nil?
+			r = @@cache[ row ] = {}
+		end
+
+		# Following returns value
+		r[ col ] = Distance.new [row, col]
+	end
+
+	def self.status
+		"Hit: #{ @@hit }; miss: #{ @@miss }"
 	end
 
 
@@ -70,16 +122,12 @@ class Distance  < AntObject
 		end
 	end
 
-	def dist
-		@row.abs + @col.abs
-	end
-
 	def invert
-		Distance.new [0,0], [ -self.row, -self.col ]
+		Distance.get [0,0], [ -self.row, -self.col ]
 	end
 
 	def clone
-		Distance.new [0,0], [ self.row, self.col ]
+		Distance.get [0,0], [ self.row, self.col ]
 	end
 
 
@@ -170,7 +218,7 @@ class Distance  < AntObject
 
 	def clear_view square
 		sq = square
-		d = Distance.new self
+		d = Distance.get self
 
 		while d.dist > 0 and not d.in_attack_range?
 			dir = d.dir
@@ -218,7 +266,7 @@ class Distance  < AntObject
 	def self.get_walk from, to
 		raise "from and to are equal: #{ from }-#{to}" if from == to
 
-		d = Distance.new from, to
+		d = Distance.get from, to
 		sq = from
 
 		result = []
@@ -231,16 +279,7 @@ class Distance  < AntObject
 			result << [ sq, dir, d.dist ]
 
 			sq = next_sq 
-			case dir
-			when :N
-				d.row += 1
-			when :E
-				d.col -= 1
-			when :S
-				d.row -= 1
-			when :W
-				d.col += 1
-			end
+			d = d.adjust dir
 		end
 
 		if d.dist == 0
@@ -389,16 +428,20 @@ class Distance  < AntObject
 	# Adjust distance for direction followed
 	#
 	def adjust dir
+		row, col = @row, @col
+
 		case dir
 		when :N
-			@row += 1
+			row += 1
 		when :E
-			@col -= 1
+			col -= 1
 		when :S
-			@row -= 1
+			row -= 1
 		when :W
-			@col += 1
+			col += 1
 		end
+
+		Distance.get [row, col]
 	end
 
 	def to_s
