@@ -1,7 +1,9 @@
 
 class Distance  < AntObject
 	attr_accessor :row, :col
-	attr_reader :dist
+
+	# Derived values
+	attr_reader :dist, :attack_dir, :longest_dist, :shortest_dir
 
 	@@cache = {}
 	@@hit = 0
@@ -13,7 +15,15 @@ class Distance  < AntObject
 	@@peril_radius2 = nil
 
 	def self.set_ai ai
+		$logger.info { "entered" }
+
 		@@ai = ai
+
+		@@danger_radius2 = (@@ai.attackradius + Math.sqrt(2) ) ** 2
+		$logger.info "danger_radius2: #{ @@danger_radius2 }"
+
+		@@peril_radius2 = (@@ai.attackradius + 2*Math.sqrt(2) ) ** 2
+		$logger.info "peril_radius2: #{ @@peril_radius2 }"
 	end
 
 	def initialize from, to = nil
@@ -27,46 +37,23 @@ class Distance  < AntObject
 	end
 
 
+	def in_view?;         @in_view;         end
+	def in_attack_range?; @in_attack_range; end
+
 	#
-	# Calculate all derived variables.
-	# 
-	# This needs to be done every time row, col values change
-	def recalc
-		normalize
+	# Check if we are close to being attacked.
+	#
+	# Following adds 1 square around viewradius2 == 5, 
+	# it seems like a good heuristic. Other viewradiuses
+	# are untested.
+	#
+	def in_danger?; $logger.info "called"; @in_danger; end
 
-		@dist = @row.abs + @col.abs
-	end
 
-
-	def self.relpos from, to
-		if to.nil?
-			if from.respond_to? :row
-				row = from.row
-				col = from.col
-			else
-				row = from[0]
-				col = from[1]
-			end
-		else
-			if to.respond_to? :row
-				row = to.row
-				col = to.col
-			else
-				row = to[0]
-				col = to[1]
-			end
-	
-			if from.respond_to? :row
-				row -= from.row
-				col -= from.col
-			else
-				row -= from[0]
-				col -= from[1]
-			end
-		end
-
-		[row, col ]
-	end
+	#
+	# Same as in_danger, but adds two squares around viewradius2 == 5
+	#
+	def in_peril?; $logger.info "called"; @in_peril; end
 
 
 	def self.get from, to = nil
@@ -93,51 +80,16 @@ class Distance  < AntObject
 		r[ col ] = Distance.new [row, col]
 	end
 
+
 	def self.status
 		"Hit: #{ @@hit }; miss: #{ @@miss }"
 	end
 
 
-	def normalize
-		ai = @@ai
-
-		# If the distance is greater than half the width/height,
-		# try the other side of the torus
-		rows = ai.rows
-		if @row.abs > rows/2
-			if @row > 0
-				@row -= rows
-			else
-				@row += rows
-			end
-		end
-
-		cols = ai.cols	
-		if @col.abs > cols/2
-			if @col > 0
-				@col -= cols
-			else
-				@col += cols
-			end
-		end
-	end
-
 	def invert
 		Distance.get [0,0], [ -self.row, -self.col ]
 	end
 
-	def clone
-		Distance.get [0,0], [ self.row, self.col ]
-	end
-
-
-	def in_view?
-		( @row*@row + @col*@col ) <= @@ai.viewradius2
-	end
-
-	def in_attack_range?
-		( @row*@row + @col*@col ) <= @@ai.attackradius2
-	end
 
 	#
 	# Convert distance into compass direction
@@ -216,34 +168,6 @@ class Distance  < AntObject
 		ret_dir
 	end
 
-	def clear_view square
-		sq = square
-		d = Distance.get self
-
-		while d.dist > 0 and not d.in_attack_range?
-			dir = d.dir
-
-			if sq.neighbor( dir).water?
-				return d.in_attack_range?
-			end
-
-			sq = sq.neighbor( dir)
-			case dir
-			when :N
-				d.row += 1
-			when :E
-				d.col -= 1
-			when :S
-				d.row -= 1
-			when :W
-				d.col += 1
-			end
-		end
-
-		d.in_attack_range?
-		#true
-	end
-
 
 	def self.direct_path? from, to
 		walk = Distance.get_walk from, to
@@ -291,11 +215,175 @@ class Distance  < AntObject
 		result
 	end
 
+
+	def longest_dir 
+		if row.abs == col.abs
+			# randomize selection here, to avoid twitches
+			# for collectives
+			select = [true,false][ rand(2) ]
+		else
+			select = row.abs > col.abs
+		end
+
+		if select
+			if row > 0
+				return :S
+			else
+				return :N
+			end
+		else
+			if col > 0
+				return :E
+			else
+				return :W
+			end
+		end
+	end
+
+	#
+	# Adjust distance for direction followed
+	#
+	def adjust dir
+		row, col = @row, @col
+
+		case dir
+		when :N
+			row += 1
+		when :E
+			col -= 1
+		when :S
+			row -= 1
+		when :W
+			col += 1
+		end
+
+		Distance.get [row, col]
+	end
+
+
+	def to_s
+		"distance ( #{ row }, #{col} )"
+	end
+
+	private
+
+	#
+	# Calculate all derived variables.
+	# 
+	# This needs to be done every time row, col values change
+	def recalc
+		normalize
+
+		# Precalculate as much as possible
+
+		@dist = @row.abs + @col.abs
+
+		@attack_dir = calc_attack_dir 
+
+		radius = @row*@row + @col*@col
+		$logger.info "radius: #{ radius }"
+		@in_view         = ( radius <= @@ai.viewradius2 )
+		@in_attack_range = ( radius <= @@ai.attackradius2 )
+		@in_peril        = ( radius <= @@peril_radius2 )
+		@in_danger       = ( radius <= @@danger_radius2 )
+
+
+		dist = nil
+		if @row.abs > @col.abs
+			dist = row
+		else
+			dist = col
+		end
+		@longest_dist = dir
+	
+		@shortest_dir = calc_shortest_dir
+	end
+
+
+	def calc_shortest_dir
+		if row.abs < col.abs
+			return nil if row == 0
+
+			if row > 0
+				dir = :S
+			else
+				dir = :N
+			end
+		else
+			return nil if col == 0
+
+			if col > 0
+				dir = :E
+			else
+				dir = :W
+			end
+		end
+
+		dir
+	end
+
+
+	def self.relpos from, to
+		if to.nil?
+			if from.respond_to? :row
+				row = from.row
+				col = from.col
+			else
+				row = from[0]
+				col = from[1]
+			end
+		else
+			if to.respond_to? :row
+				row = to.row
+				col = to.col
+			else
+				row = to[0]
+				col = to[1]
+			end
+	
+			if from.respond_to? :row
+				row -= from.row
+				col -= from.col
+			else
+				row -= from[0]
+				col -= from[1]
+			end
+		end
+
+		[row, col ]
+	end
+
+
+	def normalize
+		ai = @@ai
+
+		# If the distance is greater than half the width/height,
+		# try the other side of the torus
+		rows = ai.rows
+		if @row.abs > rows/2
+			if @row > 0
+				@row -= rows
+			else
+				@row += rows
+			end
+		end
+
+		cols = ai.cols	
+		if @col.abs > cols/2
+			if @col > 0
+				@col -= cols
+			else
+				@col += cols
+			end
+		end
+	end
+
+
 	#
 	# Following is a good approach if the ant attacking has buddies.
 	# A single ant has less chance.
 	#
-	def attack_dir 
+	def calc_attack_dir 
 		# As long as we are too far away to receive damage, lessen the distance
 		return longest_dir if not in_peril? 
 
@@ -329,123 +417,6 @@ class Distance  < AntObject
 				return :W
 			end
 		end
-	end
-
-	def longest_dir 
-		if row.abs == col.abs
-			# randomize selection here, to avoid twitches
-			# for collectives
-			select = [true,false][ rand(2) ]
-		else
-			select = row.abs > col.abs
-		end
-
-		if select
-			if row > 0
-				return :S
-			else
-				return :N
-			end
-		else
-			if col > 0
-				return :E
-			else
-				return :W
-			end
-		end
-	end
-
-
-	def longest_dist
-		if row.abs > col.abs
-			row
-		else
-			col
-		end
-	end
-
-
-	def shortest_dir
-		if row.abs < col.abs
-			return nil if row == 0
-
-			if row > 0
-				dir = :S
-			else
-				dir = :N
-			end
-		else
-			return nil if col == 0
-
-			if col > 0
-				dir = :E
-			else
-				dir = :W
-			end
-		end
-
-		dir
-	end
-
-
-
-	#
-	# Check if we are close to being attacked.
-	#
-	# Following adds 1 square around viewradius2 == 5, 
-	# it seems like a good heuristic. Other viewradiuses
-	# are untested.
-	#
-	def in_danger?
-		if @@danger_radius2.nil?
-			# Lazy fetch, because values are prob not 
-			# present when AI is added to this class
-			@@danger_radius2 = (@@ai.attackradius + Math.sqrt(2) ) ** 2
-			$logger.info "danger_radius2: #{ @@danger_radius2 }"
-		end
-
-		$logger.info "in_danger radius2: #{ ( @row*@row + @col*@col ) }"
-		( @row*@row + @col*@col ) <= @@danger_radius2
-	end
-
-	#
-	# Same as in_danger, but adds two squares around viewradius2 == 5
-	#
-	def in_peril?
-		if @@peril_radius2.nil?
-			# Lazy fetch, because values are prob not 
-			# present when AI is added to this class
-			@@peril_radius2 = (@@ai.attackradius + 2*Math.sqrt(2) ) ** 2
-			$logger.info "peril_radius2: #{ @@peril_radius2 }"
-		end
-
-		$logger.info "in_peril radius2: #{ ( @row*@row + @col*@col ) }"
-		( @row*@row + @col*@col ) <= @@peril_radius2
-	end
-
-
-	#
-	# Adjust distance for direction followed
-	#
-	def adjust dir
-		row, col = @row, @col
-
-		case dir
-		when :N
-			row += 1
-		when :E
-			col -= 1
-		when :S
-			row -= 1
-		when :W
-			col += 1
-		end
-
-		Distance.get [row, col]
-	end
-
-	def to_s
-		"distance ( #{ row }, #{col} )"
 	end
 end
 

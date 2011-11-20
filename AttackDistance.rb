@@ -15,7 +15,7 @@ class AttackDistance
 
 
 	def initialize dist, prev
-		@dist = dist.clone
+		@dist = dist
 
 		@advancing = nil
 		@dir = nil

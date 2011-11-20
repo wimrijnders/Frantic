@@ -165,11 +165,14 @@ class AI
 
 						@turn.check_time_limit
 
-						# Bad idea, unfortunately; got a peak of > 600ms here
-						# Let the GC do its thing and hope for the best.
-						$logger.info "garbage collecting"
-						$timer.start( :garbage_collect ) {
-							GC.start	
+						$logger.debug(true) {
+
+							# Bad idea, unfortunately; got a peak of > 600ms here
+							# Only used for debugging porpoises
+							$logger.info "garbage collecting"
+							$timer.start( :garbage_collect ) {
+								GC.start	
+							}
 						}
 
 						@turn.check_time_limit
@@ -687,12 +690,12 @@ end
 $ai=AI.new
 $logger = Logger.new $ai
 $timer = Timer.new
-Distance.set_ai $ai
 Coord.set_ai $ai
 
 $ai.setup do |ai|
 	$logger.info "Doing setup"
 
+	Distance.set_ai ai
 	ai.harvesters = Harvesters.new ai.rows, ai.cols, ai.viewradius2
 	$region = Region.new ai
 	Pathinfo.set_region $region

@@ -502,7 +502,7 @@ end
 		d = Distance.get self, @enemies[0][0]
 
 		unless d.nil?
-			if d.in_view? and Distance.direct_path?( self.square, @enemies[0][0]) #  d.clear_view @square
+			if d.in_view? and Distance.direct_path?( self.square, @enemies[0][0])
 				$logger.info { "ant #{ @square.to_s } attacked by #{ @enemies[0][0] }!" }
 
 				@attack_distance = d
