@@ -631,24 +631,25 @@ module Orders
 		orders?
 	end
 
-	def find_orders what, sq = nil
+	def find_orders what, sq = nil, first_only = false
 		list = {}
 
 		count = 0
 		@orders.each do |n|
-			#$logger.info { "Testing #{ what }, #{ sq } against #{ n.order },#{ n.square }" }
 			if n.order == what
-				$logger.info { "found #{ what }" }
+				#$logger.info { "found #{ what }" }
 
 				if sq
 					# Search for specific target only 
-					$logger.info { "Testing #{ sq } against #{ n.square }" }
 					if sq == n.square 
+						$logger.info { "Found order #{ what } on #{ n.square }" }
 						list[ sq ] = count
 						break
 					end
 				else
+					$logger.info { "Found order #{ what }" }
 					list[ n.square ] = count
+					break if first_only
 				end
 			end
 
@@ -659,7 +660,7 @@ module Orders
 	end
 
 	def has_order what, sq = nil
-		list = find_orders what, sq
+		list = find_orders what, sq, true
 
 		list.length > 0
 	end

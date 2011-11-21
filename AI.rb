@@ -220,6 +220,7 @@ class AI
 					end
 
 					str +
+					"Num ants: #{ my_ants.length }; enemies: #{ @enemy_ants.length }\n" +
 					$timer.display + "\n" + 
 					$pointcache.status + "\n" +
 					"Distance cache: " + Distance.status + "\n" +
