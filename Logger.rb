@@ -25,7 +25,7 @@ class Logger
 				str = bl.call
 			end
 
-			if str.nil? or str.length == 0
+			if str.nil? or not str.respond_to? :length or str.length == 0
 				str = nil
 			end
 			str

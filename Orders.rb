@@ -398,7 +398,7 @@ module Orders
 
 		# If right next to enemy, stay put and ignore orders
 		# This happens when razing hills.
-		unless neighbor_enemies( 1 ).empty?
+		if neighbor_enemies?(1)
 			$logger.info { " #{ self } right next to enemy, staying and ignoring orders." }
 			stay
 			return true

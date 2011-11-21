@@ -211,10 +211,6 @@ class AI
 
 				$timer.end :total
 
-$logger.debug {
-	$logger.info(true) { "Hello! This runs in a debug block" }
-}
-
 				$logger.stats(true) { 
 					str = ""
 
@@ -313,10 +309,12 @@ $logger.debug {
 				square.ant=nil
 			end
 		end
-	
+
+if false	
 		@my_ants.each do |a|
 			a.enemies = []
 		end
+end
 	
 		@new_enemy_ants=[]
 		@food.start_turn
@@ -376,10 +374,8 @@ $logger.debug {
 					sq.visited += 1
 				else
 					$logger.info { "New enemy ant at #{ sq }, owner #{ owner }." }
-					a= EnemyAnt.new owner, sq, self
-
-					sq.ant = a
-					@new_enemy_ants.push a
+					enemy = EnemyAnt.new owner, sq, self
+					add_enemy sq, enemy
 				end
 			when 'd'
 				if owner==0
@@ -390,12 +386,12 @@ $logger.debug {
 						sq.moved_here.die
 						my_ants.delete sq.moved_here
 					else
-						$logger.info { "Dead ant at #{ sq } unexpected!" }
+						$logger.info { "WARNING: Dead ant at #{ sq } unexpected!" }
 					end
 				else
 					$logger.info { "Enemy ant died at #{ sq }, owner #{ owner }." }
-					sq.ant = EnemyAnt.new owner, sq, self, false
-					@new_enemy_ants.push sq.ant 
+					enemy = EnemyAnt.new owner, sq, self, false
+					add_enemy sq, enemy
 				end
 
 			when 'r'
@@ -417,6 +413,8 @@ $logger.debug {
 		@map.each do |row|
 			row.each do |square|
 				unless square.moved_here.nil?
+					square.moved_here.reset_turn
+
 					# For some reason, can't create a method within ant
 					# which handles these resets. It screws up the movement
 					square.moved_here.moved=false
@@ -654,6 +652,7 @@ $logger.debug {
 		@enemy_ants = new_enemy_ants
 
 
+if false
 	if turn.maxed_urgent?
 		# Screw the new enemies situation; retain the data from the previous
 		# move and hope this helps a bit
@@ -667,6 +666,57 @@ $logger.debug {
 			}
 		}
 	end
+end
+
+		# NOTE: turn.maxed_urgent? not used here
+
+		$timer.start( :sort_enemies_view ) {
+			enemies2 = {}
+			@enemy_ants.each do |e|
+				ants = []
+				$region.all_quadrant( e.square) do |sq|
+					next unless sq.ant and sq.ant.mine?
+					a = sq.ant
+
+					# Don't sort enemies for collective followers
+					next if a.collective_follower?
+
+					item = $pointcache.get a.square, e.square
+
+					if enemies2[a].nil?
+						enemies2[a] = [] 
+					end
+					enemies2[a] << [ e, item ] unless item.nil?
+
+					ants << a
+				end
+
+				# Let the backburner thread handle searching the path
+				sq_ants   = Region.ants_to_squares ants
+				Region.add_searches e.square, sq_ants
+			end
+
+			my_ants.each do |a|
+				enemies = enemies2[a]
+				next if enemies.nil? or enemies.length == 0
+
+				PointCache.sort_valid enemies
+
+				# Output has distance info only
+				enemies.each do |l|
+					a.enemies << [ l[0], l[1][0] ]
+				end
+	
+				$logger.info {
+					str = "After sort:\n"
+					a.enemies.each do |result|
+						str << "#{ result }\n"
+					end
+
+					str
+				}
+			end
+		}
 
 	end
 
@@ -674,6 +724,29 @@ $logger.debug {
 		@map.each do |row|
 			row.each do |square|
 				yield square 
+			end
+		end
+	end
+
+	def add_enemy sq, enemy
+		if sq.ant.nil?
+			sq.ant = enemy 
+			@new_enemy_ants.push sq.ant 
+		else
+			if @hills.hill? sq
+				$logger.info { "Two ants defined on hill #{ sq }" }
+				if enemy.dead? and sq.ant.alive?
+					$logger.info "Current ant alive, keeping that one."
+				elsif enemy.alive? and sq.ant.dead?
+					$logger.info "Current ant dead, replacing."
+					@new_enemy_ants.delete sq.ant
+					sq.ant = enemy 
+					@new_enemy_ants.push enemy 
+				else
+					$logger.info { "WARNING: Two live ants defined on hill #{ sq }. Keeping current." }
+				end
+			else
+				$logger.info { "WARNING: Dead enemy ant at #{ sq } on same spot as other ant!" }
 			end
 		end
 	end

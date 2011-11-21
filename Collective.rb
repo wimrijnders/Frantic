@@ -364,15 +364,15 @@ class Collective
 
 		# Note that we don't bother with orientation so close to conflict	
 
+		lam.call :N
+		lam.call :E
+		lam.call :S
+		lam.call :W
 		if harmless
 			$logger.info { "#{ self } attackers harmless; staying is not an option" }
 		else
 			moves[ :STAY ] = @ants.collect { |a| a.square }
 		end
-		lam.call :N
-		lam.call :E
-		lam.call :S
-		lam.call :W
 
 		$logger.info { "possible moves: #{ moves }" }
 		return false if moves.length == 0
@@ -391,11 +391,12 @@ class Collective
 				( dead[0] == 0 and best_dead[0] > 0 ) or
 				( dead[0] < best_dead[0] )
 
-				best_dir = dir
+				best_dir = [dir]
 				best_dead = dead
 				count = 1
 			else 
 				if dead[0] == best_dead[0] and dead[1] == best_dead[1] 
+					best_dir << dir
 					count += 1
 				end
 			end
@@ -407,13 +408,39 @@ class Collective
 			elsif count == moves.length
 				"All moves are valid"
 			else
-				"Best move: #{ best_dir }; friends dead: #{ best_dead[0] }, enemies dead: #{ best_dead[1] }"
+				"Best moves: #{ best_dir }; friends dead: #{ best_dead[0] }, enemies dead: #{ best_dead[1] }"
 			end
 		}
 
-		# In the case of all moves valid or no moves at all, let the old logic handle it.
-		return false if best_dir.nil? or count == moves.length
-		best_dir
+		if best_dir.nil?
+			# Let the old logic handle it.
+			return false
+		elsif count == 1
+			# Only one option 
+			return best_dir[0]
+		else
+			# Multiple options
+			# Let the old logic handle it.
+			return false
+		end
+
+		# NOTE: this currently not reached due to returns in previous block
+if false
+		# Select a move which brings you closer to the (first) enemy
+		best_dist = nil
+		best_dir2 = nil
+		best_dir.each do |dir|
+			d = Distance.get moves[dir][0], enemies[0] 
+
+			if best_dist.nil? or best_dist > d.dist
+				best_dist = d.dist
+				best_dir2 = dir
+			end
+		end
+
+		$logger.info { "Selection direction #{ best_dir2 }" }
+		best_dir2
+end
 	end
 
 

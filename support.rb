@@ -2,7 +2,7 @@ class AntObject
 	@@finalize_count = 0
 	
 
-    def initialize dummy1, dummy2 = nil
+    def initialize dummy1, dummy2 = nil, dummy3 = nil, dummy4 = nil
 		# Only do this is debug-status mode
 		$logger.debug(true) {
         	ObjectSpace.define_finalizer(self,

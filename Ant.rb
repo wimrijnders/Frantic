@@ -1,6 +1,6 @@
 
 # Represents a single ant.
-class Ant
+class Ant < AntObject
 	@@id_counter = 0
 
 	# Owner of this ant. If it's 0, it's your ant.
@@ -12,6 +12,8 @@ class Ant
 	attr_accessor :alive, :ai
 
 	def initialize alive, owner, square, ai
+		super
+
 		@alive, @owner, @square, @ai = alive, owner, square, ai
 
 		@id = @@id_counter
@@ -462,23 +464,21 @@ end
 	end
 
 
-	def neighbor_enemies dist
-		neighbors = []
-		@enemies.each do |a|
-			break if a[1] > dist
+	def neighbor_enemies? dist
+		# enemies list is sorted, just check the first
+		return false if @enemies.nil? or @enemies.length == 0
 
-			neighbors << a[0]
-		end
-
-		neighbors
+		@enemies[0][1] < dist
 	end
 
 
 	def enemies_in_view
+		# all enemies are in view
+
 		neighbors = []
 		@enemies.each do |a|
-			adist = Distance.get( pos, a[0].pos)
-			break unless adist.in_view?
+			#adist = Distance.get( pos, a[0].pos)
+			#break unless adist.in_view?
 
 			neighbors << a[0]
 		end
@@ -486,24 +486,27 @@ end
 		neighbors
 	end
 
-
+if false
 	def add_enemies enemies
 		@enemies = $region.get_neighbors_sorted self, enemies
 	end
+end
 
 
 	def check_attacked
 		@attack_distance = nil
-		return false unless @enemies[0]
+
+		enemy = closest_enemy 
+		return false if enemy.nil? 
 
 		#
 		# Note: we use direct distance here, even if there are paths.
 		#       This is because view distances work with direct distances 
-		d = Distance.get self, @enemies[0][0]
+		d = Distance.get self, enemy
 
 		unless d.nil?
-			if d.in_view? and Distance.direct_path?( self.square, @enemies[0][0])
-				$logger.info { "ant #{ @square.to_s } attacked by #{ @enemies[0][0] }!" }
+			if d.in_view? and Distance.direct_path?( self.square, enemy )
+				$logger.info { "ant #{ @square.to_s } attacked by #{ enemy }!" }
 
 				@attack_distance = d
 				return true
@@ -520,8 +523,10 @@ end
 	# TODO: Why does this screw up movement?
 	#
 	def reset_turn
-		moved = false
-		moved_to = nil
+		$logger.info "Entered"
+		#moved = false
+		#moved_to = nil
+		@enemies = []
 	end
 
 

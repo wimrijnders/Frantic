@@ -3,7 +3,7 @@ class Distance  < AntObject
 	attr_accessor :row, :col
 
 	# Derived values
-	attr_reader :dist, :attack_dir, :longest_dist, :shortest_dir
+	attr_reader :dist, :longest_dist, :shortest_dir
 
 	@@cache = {}
 	@@hit = 0
@@ -18,6 +18,8 @@ class Distance  < AntObject
 		$logger.info { "entered" }
 
 		@@ai = ai
+
+		$logger.info "attackradius2: #{ @@ai.attackradius2 }"
 
 		@@danger_radius2 = (@@ai.attackradius + Math.sqrt(2) ) ** 2
 		$logger.info "danger_radius2: #{ @@danger_radius2 }"
@@ -47,13 +49,13 @@ class Distance  < AntObject
 	# it seems like a good heuristic. Other viewradiuses
 	# are untested.
 	#
-	def in_danger?; $logger.info "called"; @in_danger; end
+	def in_danger?; @in_danger; end
 
 
 	#
 	# Same as in_danger, but adds two squares around viewradius2 == 5
 	#
-	def in_peril?; $logger.info "called"; @in_peril; end
+	def in_peril?; @in_peril; end
 
 
 	def self.get from, to = nil
@@ -260,9 +262,22 @@ class Distance  < AntObject
 		Distance.get [row, col]
 	end
 
+	
+
+	#
+	# Following is a good approach if the ant attacking has buddies.
+	# A single ant has less chance.
+	#
+	def attack_dir
+		# As long as we are too far away to receive damage, lessen the distance
+		return longest_dir if not in_peril? 
+
+		@attack_dir
+	end
+
 
 	def to_s
-		"distance ( #{ row }, #{col} )"
+		"distance( #{ row }, #{col} )"
 	end
 
 	private
@@ -281,7 +296,7 @@ class Distance  < AntObject
 		@attack_dir = calc_attack_dir 
 
 		radius = @row*@row + @col*@col
-		$logger.info "radius: #{ radius }"
+		#$logger.info "radius: #{ radius }"
 		@in_view         = ( radius <= @@ai.viewradius2 )
 		@in_attack_range = ( radius <= @@ai.attackradius2 )
 		@in_peril        = ( radius <= @@peril_radius2 )
@@ -294,7 +309,7 @@ class Distance  < AntObject
 		else
 			dist = col
 		end
-		@longest_dist = dir
+		@longest_dist = dist
 	
 		@shortest_dir = calc_shortest_dir
 	end
@@ -378,14 +393,7 @@ class Distance  < AntObject
 		end
 	end
 
-
-	#
-	# Following is a good approach if the ant attacking has buddies.
-	# A single ant has less chance.
-	#
 	def calc_attack_dir 
-		# As long as we are too far away to receive damage, lessen the distance
-		return longest_dir if not in_peril? 
 
 		# Move sideways to optimize the attack force.
 		# eg. more ants will hit the enemy at the same time

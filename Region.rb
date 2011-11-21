@@ -728,6 +728,15 @@ private
 		str
 	end
 
+	def all_quadrant square
+		quadrant {|x,y| 
+			yield square.rel [ -x,  y ]
+			yield square.rel [  y,  x ]
+			yield square.rel [  x, -y ]
+			yield square.rel [ -y, -x ]
+		}
+	end
+
 
 	def find_regions square
 		return if square.done_region

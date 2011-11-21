@@ -327,9 +327,8 @@ class Strategy < BaseStrategy
 				#next if ant.moved?
 
 				# if not doing anything else, move towards  the nearest enemy
-				if ant.enemies and ant.enemies.length > 0
-					#enemy = ant.enemies[ Random.rand( ant.enemies.length ) ][0]
-					enemy = ant.enemies[ 0 ][0]
+				enemy = ant.closest_enemy
+				unless enemy.nil?
 					ant.set_order enemy.square, :ATTACK
 				end
 			end
@@ -356,7 +355,7 @@ if false
 				#
 				## Don't harvest if other ants around
 				#next if ant.neighbor_friends( 10).length > 0
-				#next if ant.neighbor_enemies( 10).length > 0
+				#next if ant.neighbor_enemies?( 10)
 
 				# Don't harvest too close to own hills
 				too_close = false

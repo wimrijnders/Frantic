@@ -309,19 +309,7 @@ $logger.info "to ant: #{ a}"
 		end
 $logger.info "done get"
 
-		# Sort list on distance; if specified, give precedence to valid
-		# cache items
-		list.sort! { |a,b| 
-			if valid_first and a[1][3] and not b[1][3]
-				 # a invalid, b not	
-				 1
-			elsif valid_first and not a[1][3] and b[1][3]
-				 # b invalid, a not	
-				-1
-			else
-				 a[1][0] <=> b[1][0]
-			end
-		}
+		PointCache.sort_valid list, valid_first
 $logger.info "done sort"
 
 		$ai.turn.check_maxed_out
@@ -343,6 +331,23 @@ $logger.info "done sort"
 
 $logger.info "done"
 		ret
+	end
+
+
+	# Sort list on distance; if specified, give precedence to valid
+	# cache items
+	def self.sort_valid list, valid_first = true
+		list.sort! { |a,b| 
+			if valid_first and a[1][3] and not b[1][3]
+				 # a invalid, b not	
+				 1
+			elsif valid_first and not a[1][3] and b[1][3]
+				 # b invalid, a not	
+				-1
+			else
+				 a[1][0] <=> b[1][0]
+			end
+		}
 	end
 
 
@@ -388,6 +393,7 @@ $logger.info "done"
 	# If full_only set, only store path if full path walked
 	#
 	# return true if full path walked
+	#
 	def set_walk from, to, lastpoint = nil, full_only = false
 		return false if from == to
 

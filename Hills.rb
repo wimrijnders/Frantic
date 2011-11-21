@@ -67,6 +67,12 @@ class Hills
 		end
 	end
 
+	def hill? square
+		key = square.row.to_s + "_" + square.col.to_s
+		not @list[key].nil?
+	end
+		
+
 	def each_enemy
 		@list.clone.each_pair do |key, item|
 			owner = item[0]
