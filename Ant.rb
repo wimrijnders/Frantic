@@ -128,6 +128,7 @@ class MyAnt < Ant
 
 		@attack_distance = nil
 		@enemies = [] 
+		@friends = [] 
 
 		@default_i = @@default_index
 		@default = [ :N, :E, :S, :W ][ @@default_index ]
@@ -143,9 +144,7 @@ class MyAnt < Ant
 
 
 	def default
-		
 		return :STAY if stuck?
-
 
 		# if next to a wall, run into it on purpose
 		[ :N, :E, :S, :W ].each do |dir|
@@ -282,9 +281,43 @@ end
 		@moved
 	end
 
-	def can_pass? newdir
-		square.neighbor(newdir).passable?
+	def can_pass? newdir, do_cur_ant = true
+		square.neighbor(newdir).passable? do_cur_ant
 	end
+
+	# Generate all possible movements of this ant 
+	def all_moves harmless
+		moves = {} 
+
+		if moved? or next_to_enemy?
+			moves[ :STAY ] = square
+			return moves
+		end
+
+		lam = lambda do |dir| 
+			# Test movement of collective
+			if can_pass? dir, false
+				moves[ dir ] = square.neighbor dir
+			end
+		end
+
+		# Note that we don't bother with orientation so close to conflict	
+
+		if harmless
+			$logger.info { "#{ self } attackers harmless; staying is not an option" }
+		else
+			moves[ :STAY ] = square
+		end
+		lam.call :N
+		lam.call :E
+		lam.call :S
+		lam.call :W
+
+		$logger.info { "possible moves: #{ moves }" }
+
+		moves
+	end
+
 
 	#
 	# Check if ant can not move at all
@@ -421,6 +454,7 @@ end
 	# 
 
 	def make_friends
+		# Not called any more; sorting done externally,see :sort_friends_view
 		if @friends.nil?
 			$logger.info "Sorting friends."
 			@friends = $region.get_neighbors_sorted self, ai.my_ants
@@ -523,10 +557,12 @@ end
 	# TODO: Why does this screw up movement?
 	#
 	def reset_turn
-		$logger.info "Entered"
+		#$logger.info "Entered"
+
 		#moved = false
 		#moved_to = nil
 		@enemies = []
+		@friends = []
 	end
 
 
@@ -704,6 +740,13 @@ end
 		has_order :HARVEST
 	end
 
+	def next_to_enemy?
+		[ :N, :E, :S, :W ].each do |dir|
+			sq = square.neighbor(dir)
+			return true if sq.ant? and sq.ant.enemy?
+		end
+		false
+	end
 
 	def to_s
 		str = ""

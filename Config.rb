@@ -3,7 +3,7 @@
 module AntConfig
 	# Testbot config
 	NUM_TURNS		= 1000	# Max number of turns per game
-	TURN_TIME		= 2000	# Num msec per bot per turn
+	TURN_TIME		= 6000	# Num msec per bot per turn
 
 
 	LOG_OUTPUT      = true	# Output logging info to stdout

@@ -231,6 +231,12 @@ class Strategy < BaseStrategy
 			end
 		end
 
+		ai.turn.check_maxed_out
+		$logger.info "=== Analyze Phase ==="
+		$timer.start( :analyze ) {
+			Analyze.analyze ai
+		}
+
 
 		$timer.start( :check_attacked ) {
 			check_attacked ai	
@@ -336,7 +342,6 @@ class Strategy < BaseStrategy
 			$timer.end :Kamikaze_Phase
 		end
 
-if false
 		ai.turn.check_maxed_out
 		$logger.info "=== Enlist Phase ==="
 		$timer.start :Enlist_Phase
@@ -355,7 +360,7 @@ if false
 				#
 				## Don't harvest if other ants around
 				#next if ant.neighbor_friends( 10).length > 0
-				#next if ant.neighbor_enemies?( 10)
+				next if ant.neighbor_enemies? 10
 
 				# Don't harvest too close to own hills
 				too_close = false
@@ -373,7 +378,7 @@ if false
 			end
 		end
 		$timer.end :Enlist_Phase
-end
+
 
 		ai.turn.check_maxed_out
 		$logger.info "=== Second Move Collective Phase ==="

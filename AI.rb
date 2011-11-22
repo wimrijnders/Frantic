@@ -9,7 +9,7 @@ require 'Square.rb'
 require 'Evasion.rb'
 require 'Orders.rb'
 require 'Distance.rb'
-#require 'AttackDistance.rb'
+require 'Analyze.rb'
 require 'MoveHistory.rb'
 require 'Collective.rb'
 require 'Harvesters.rb'
@@ -307,16 +307,11 @@ class AI
 		@map.each do |row|
 			row.each do |square|
 				square.food=false
-				square.ant=nil
+				square.ant = nil
 			end
 		end
 
-if false	
-		@my_ants.each do |a|
-			a.enemies = []
-		end
-end
-	
+
 		@new_enemy_ants=[]
 		@food.start_turn
 		@hills.start_turn
@@ -408,6 +403,7 @@ end
 		ret
 	end
 
+
 	def turn_end
 
 		# reset the moved ants 
@@ -421,7 +417,6 @@ end
 					square.moved_here.moved=false
 					square.moved_here.moved_to=nil
 					square.moved_here.prev_move = square.moved_here.moved_to
-					square.moved_here.friends=nil
 					square.moved_here.abspos=nil
 					square.moved_here = nil
 				end
@@ -435,6 +430,11 @@ end
 
 		$timer.start( :detect_enemies ) {
 			detect_enemies @new_enemy_ants
+		}
+
+		$timer.start( :sort_friends_view ) {
+			friends = sort_view my_ants
+			add_sorted_view friends, false
 		}
 	end
 	
@@ -608,6 +608,8 @@ end
 						b.transfer_state a
 					end
 
+					# TODO: for some reason, ants do not get cleaned
+					#       up on hills here. Find out why!
 					@enemy_ants.delete a
 					found_some = true
 				end
@@ -672,54 +674,78 @@ end
 		# NOTE: turn.maxed_urgent? not used here
 
 		$timer.start( :sort_enemies_view ) {
-			enemies2 = {}
-			@enemy_ants.each do |e|
-				ants = []
-				$region.all_quadrant( e.square) do |sq|
-					next unless sq.ant and sq.ant.mine?
-					a = sq.ant
-
-					# Don't sort enemies for collective followers
-					next if a.collective_follower?
-
-					item = $pointcache.get a.square, e.square
-
-					if enemies2[a].nil?
-						enemies2[a] = [] 
-					end
-					enemies2[a] << [ e, item ] unless item.nil?
-
-					ants << a
-				end
-
-				# Let the backburner thread handle searching the path
-				sq_ants   = Region.ants_to_squares ants
-				Region.add_searches e.square, sq_ants
-			end
-
-			my_ants.each do |a|
-				enemies = enemies2[a]
-				next if enemies.nil? or enemies.length == 0
-
-				PointCache.sort_valid enemies
-
-				# Output has distance info only
-				enemies.each do |l|
-					a.enemies << [ l[0], l[1][0] ]
-				end
-	
-				$logger.info {
-					str = "After sort:\n"
-					a.enemies.each do |result|
-						str << "#{ result }\n"
-					end
-
-					str
-				}
-			end
+			enemies2 = sort_view @enemy_ants
+			add_sorted_view enemies2
 		}
 
 	end
+
+	def add_sorted_view in_neighbors, do_enemies = true
+		$logger.info "entered"
+
+		my_ants.each do |a|
+			neighbors = in_neighbors[a]
+			next if neighbors.nil? or neighbors.length == 0
+
+			PointCache.sort_valid neighbors
+
+			if do_enemies
+				list = a.enemies
+			else
+				list = a.friends
+			end
+			list = [] if list.nil?
+
+			# Output has distance info only
+			neighbors.each do |l|
+				list << [ l[0], l[1][0] ]
+			end
+	
+			$logger.info {
+				str = "After sort:\n"
+				list.each do |result|
+					str << "#{ result }\n"
+				end
+
+				str
+			}
+		end
+	end
+
+
+	def sort_view from_list
+		$logger.info "entered"
+
+		neighbors = {}
+		from_list.each do |e|
+			ants = []
+			$region.all_quadrant( e.square) do |sq|
+				next unless sq.ant and sq.ant.mine?
+				a = sq.ant
+
+				# Don't sort enemies for collective followers
+				next if a.collective_follower?
+
+				item = $pointcache.get a.square, e.square
+				next if item.nil?
+
+				if neighbors[a].nil?
+					neighbors[a] = [] 
+				end
+				neighbors[a] << [ e, item ]
+
+				ants << a
+			end
+
+			# Let the backburner thread handle searching the path
+			sq_ants   = Region.ants_to_squares ants
+			Region.add_searches e.square, sq_ants
+		end
+
+		$logger.info { "result: #{ neighbors } " }
+		neighbors
+	end
+
 
 	def all_squares
 		@map.each do |row|

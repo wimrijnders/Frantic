@@ -59,11 +59,11 @@ class Square
 	#
 	# In addition, no other friendly ant should have moved here.
 	#
-	def passable?
+	def passable? do_cur_ant = true
 
 		return false if water? or food? or moved_here? 
 
-		if ant?
+		if do_cur_ant and ant? 
 			return false if @ant.enemy?
 
 			# If there was an ant there,
