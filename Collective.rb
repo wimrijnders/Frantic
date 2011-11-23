@@ -361,6 +361,11 @@ class Collective
 		lam.call :S
 		lam.call :W
 
+		if moves.empty?
+			$logger.info "We are stuck, apparently; staying anyway."
+			moves[ :STAY ] = square
+		end
+
 		$logger.info { "possible moves: #{ moves }" }
 
 		moves

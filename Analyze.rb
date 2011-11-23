@@ -3,6 +3,8 @@ class Analyze
 	@@hits_cache = nil
 	@@cache_hits = 0
 	@@cache_misses = 0
+	@@cache_hits1 = 0
+	@@cache_misses1 = 0
 
 	def self.guess_enemy_moves in_enemies
 		enemies = []
@@ -123,6 +125,11 @@ class Analyze
 			ant_combis= []
 			combinations = []
 			moves.each do |m|
+				# Following happened if ant/collective was stuck and staying was 'not an option'.
+				# Now :STAY is added when no other moves valid, but this safeguard is included
+				# just to be pedantically sure
+				next if m[1].empty?
+
 				ant = m[0]
 				ant_combis << ant
 				if combinations.empty?
@@ -221,20 +228,42 @@ class Analyze
 		end
 	end
 
-	def self.init_hits_cache
+
+	def self.init_hits_cache movelist, guess
 		@@hits_cache = {}
 		@@cache_hits = 0
 		@@cache_misses = 0
+		@@cache_hits1 = 0
+		@@cache_misses1 = 0
+
+		# TODO: load possible moves per ant instead of all combinations here below
+
+		# preload the cache with the possible moves
+		#$logger.info "guess: #{ guess} "
+		#$logger.info "movelist: #{ movelist} "
+		movelist.each do |item|
+			moves = item[1]
+			moves.each_index do |i|
+				move = moves[i]
+
+				Analyze.get_hits_single i, [ move ], guess
+			end
+		end
+
+		$logger.info { "after preload: #{ hits_cache_status } " }
 	end
+
 
 	def self.hits_cache_status
-		"Hits cache: hits #{ @@cache_hits }, misses #{ @@cache_misses }"
+		"Hits cache: hits/misses single: #{ @@cache_hits }/#{ @@cache_misses }; " +
+			"multi: #{ @@cache_hits1 }/#{ @@cache_misses1 }"
 	end
 
-	def self.get_hits index, move, guess
-		unless @@hits_cache[index].nil? or @@hits_cache[index][move].nil?
+
+	def self.get_hits_single index, moves, guess
+		unless @@hits_cache[index].nil? or @@hits_cache[index][moves].nil?
 			@@cache_hits += 1
-			@@hits_cache[index][move]
+			@@hits_cache[index][moves]
 		else
 			@@cache_misses += 1
 
@@ -242,6 +271,7 @@ class Analyze
 			friend_hits = {}
 			sum_dist = 0
 
+		moves.each do |move|
 			guess.each_index do |e|
 				dist = Distance.get( guess[e], move)
 				sum_dist += dist.dist
@@ -261,14 +291,66 @@ class Analyze
 					end
 				end
 			end
+		end
 
 			if @@hits_cache[index].nil? 
 				@@hits_cache[index] = {}
 			end
 
-			@@hits_cache[index][move] = [ friend_hits, enemy_hits, sum_dist ]
+			@@hits_cache[index][moves] = [ friend_hits, enemy_hits, sum_dist ]
 		end
 	end
+
+
+	def self.get_hits2 index, moves, guess
+		unless @@hits_cache[index].nil? or @@hits_cache[index][moves].nil?
+			@@cache_hits1 += 1
+			@@hits_cache[index][moves]
+		else
+			@@cache_misses1 += 1
+
+			if moves.length == 1
+				return Analyze.get_hits_single index, moves, guess
+			end 
+
+			enemy_hits = {}
+			friend_hits = {}
+			sum_dist = 0
+
+			f_hits, e_hits, s_dist = Analyze.get_hits index, moves[0..-2], guess
+			enemy_hits.merge! e_hits
+			friend_hits.merge! f_hits
+			sum_dist += s_dist
+
+			f_hits2, e_hits2, s_dist2 = Analyze.get_hits_single (index + moves.length() -1), [ moves[-1] ], guess
+			enemy_hits.merge!(e_hits2)  { |k,oldval,newval| (oldval + newval) }
+			friend_hits.merge!(f_hits2) { |k,oldval,newval| (oldval + newval) }
+			sum_dist += s_dist2
+
+			if @@hits_cache[index].nil? 
+				@@hits_cache[index] = {}
+			end
+
+			@@hits_cache[index][moves] = [ friend_hits, enemy_hits, sum_dist ]
+		end
+	end
+
+
+	def self.get_hits index, moves, guess
+		enemy_hits = {}
+		friend_hits = {}
+		sum_dist = 0
+		moves.each_index do |f|
+			f_hits, e_hits, s_dist = Analyze.get_hits_single f, [ moves[f] ], guess
+
+			enemy_hits.merge!(e_hits)  { |k,oldval,newval| (oldval + newval) }
+			friend_hits.merge!(f_hits) { |k,oldval,newval| (oldval + newval) }
+			sum_dist += s_dist
+		end
+
+		[ friend_hits, enemy_hits, sum_dist ]
+	end
+
 
 
 	def self.analyze_hits guess, move
@@ -277,22 +359,13 @@ class Analyze
 		end
 
 		# Now, analyze the hits between the ants
-		# Note that no distinction is made between various enemies
-		enemy_hits = {}
-		friend_hits = {}
-		sum_dist = 0
-		move.each_index do |f|
-			f_hits, e_hits, s_dist = Analyze.get_hits f, move[f], guess
-
-			enemy_hits.merge!(e_hits)  { |k,oldval,newval| (oldval + newval) }
-			friend_hits.merge!(f_hits) { |k,oldval,newval| (oldval + newval) }
-			sum_dist += s_dist
-		end
+		# No distinction is made between various enemies
+		friend_hits, enemy_hits, sum_dist = Analyze.get_hits 0, move, guess
 
 		return [0,0, sum_dist] if enemy_hits.length == 0
 		
-		$logger.info { "enemy hit results: #{ enemy_hits }" }
-		$logger.info { "friend hit results: #{ friend_hits }" }
+		#$logger.info { "enemy hit results: #{ enemy_hits }" }
+		#$logger.info { "friend hit results: #{ friend_hits }" }
 
 		# Analyze
 		enemy_dead = 0
@@ -332,7 +405,7 @@ class Analyze
 		#moves = moves.sort_by { rand }
 
 		# Init the cache
-		Analyze.init_hits_cache
+		Analyze.init_hits_cache moves, guess
 
 		moves.each do |item|
 			dir  = item[0]
@@ -340,13 +413,16 @@ class Analyze
 
 			# Skip items in which friends kill each other.
 			if move.length != move.uniq.length
-				$logger.info "WARNING: friends are killing each other."
+				#$logger.info "WARNING: friends are killing each other."
 				next
 			end 
 
-			#$logger.info "Analyzing direction #{ dir }"
 			dead = Analyze.analyze_hits guess, move
-			$logger.info { "Analyzed: #{ dir }; friends dead: #{ dead[0] }, enemies dead: #{ dead[1] }, best_dist: #{ dead[2] }" }
+
+			$logger.info {
+				"Analyzed: #{ dir }; friends dead: #{ dead[0] }, enemies dead: #{ dead[1] }, " +
+				"best_dist: #{ dead[2] }"
+			}
 
 			# If you got 'em all without losing anything, don't 
 			# bother looking further
