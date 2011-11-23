@@ -1,5 +1,9 @@
 class Analyze
 
+	@@hits_cache = nil
+	@@cache_hits = 0
+	@@cache_misses = 0
+
 	def self.guess_enemy_moves in_enemies
 		enemies = []
 		guess = []
@@ -155,8 +159,8 @@ class Analyze
 
 				# Need to do some move arbitration here, because adjacent ants can 
 				# block each other
-				# TODO: ensure that the following loop breaks out on problems
 				all_moved = false	# to get in the loop
+				block_count = 0
 				until all_moved
 					all_moved = true
 
@@ -167,18 +171,27 @@ class Analyze
 						next if ant.moved?
 
 						unless dir == :STAY or ant.can_pass? dir
-							$logger.info "Ant blocked!"
+							$logger.info "#{ant } blocked!"
 
 							if ant.square.neighbor(dir).ant?
 								other_ant = ant.square.neighbor(dir).ant
 								unless ant_combis.include? other_ant
 									$logger.info "Idiot ant in the way; giving up."
 									ant.move :STAY
+									block_count = 0
 									next
 								end
 							end
 
+							if block_count > 10
+								$logger.info "Can't move #{ ant }; giving up."
+								ant.move :STAY
+								block_count = 0
+								next
+							end
+
 							all_moved = false
+							block_count += 1
 							next
 						end
 
@@ -186,6 +199,7 @@ class Analyze
 						#       incorrection direction in neighbor()
 						# Perhaps because :STAY was not handled properly for collectives
 						ant.move dir
+						block_count = 0
 					end
 				end
 			end
@@ -207,6 +221,55 @@ class Analyze
 		end
 	end
 
+	def self.init_hits_cache
+		@@hits_cache = {}
+		@@cache_hits = 0
+		@@cache_misses = 0
+	end
+
+	def self.hits_cache_status
+		"Hits cache: hits #{ @@cache_hits }, misses #{ @@cache_misses }"
+	end
+
+	def self.get_hits index, move, guess
+		unless @@hits_cache[index].nil? or @@hits_cache[index][move].nil?
+			@@cache_hits += 1
+			@@hits_cache[index][move]
+		else
+			@@cache_misses += 1
+
+			enemy_hits = {}
+			friend_hits = {}
+			sum_dist = 0
+
+			guess.each_index do |e|
+				dist = Distance.get( guess[e], move)
+				sum_dist += dist.dist
+
+				#$logger.info "dist: #{ dist }, #{ dist.dist}"
+				if dist.in_attack_range?
+					#$logger.info "In attack range"
+					if enemy_hits[e].nil?
+						enemy_hits[e] = [index]
+					else
+						enemy_hits[e] << index 
+					end
+					if friend_hits[index].nil?
+						friend_hits[index] = [e]
+					else
+						friend_hits[index] << e
+					end
+				end
+			end
+
+			if @@hits_cache[index].nil? 
+				@@hits_cache[index] = {}
+			end
+
+			@@hits_cache[index][move] = [ friend_hits, enemy_hits, sum_dist ]
+		end
+	end
+
 
 	def self.analyze_hits guess, move
 		unless move.kind_of? Array
@@ -218,32 +281,18 @@ class Analyze
 		enemy_hits = {}
 		friend_hits = {}
 		sum_dist = 0
-		guess.each_index do |e|
-			move.each_index do |f|
-				dist = Distance.get( guess[e], move[f])
-				sum_dist += dist.dist
+		move.each_index do |f|
+			f_hits, e_hits, s_dist = Analyze.get_hits f, move[f], guess
 
-				#$logger.info "dist: #{ dist }, #{ dist.dist}"
-				if dist.in_attack_range?
-					#$logger.info "In attack range"
-					if enemy_hits[e].nil?
-						enemy_hits[e] = [f]
-					else
-						enemy_hits[e] << f
-					end
-					if friend_hits[f].nil?
-						friend_hits[f] = [e]
-					else
-						friend_hits[f] << e
-					end
-				end
-			end
+			enemy_hits.merge!(e_hits)  { |k,oldval,newval| (oldval + newval) }
+			friend_hits.merge!(f_hits) { |k,oldval,newval| (oldval + newval) }
+			sum_dist += s_dist
 		end
 
 		return [0,0, sum_dist] if enemy_hits.length == 0
 		
-		#$logger.info { "enemy hit results: #{ enemy_hits }" }
-		#$logger.info { "friend hit results: #{ friend_hits }" }
+		$logger.info { "enemy hit results: #{ enemy_hits }" }
+		$logger.info { "friend hit results: #{ friend_hits }" }
 
 		# Analyze
 		enemy_dead = 0
@@ -281,6 +330,9 @@ class Analyze
 
 		# Throw the list around a bit
 		#moves = moves.sort_by { rand }
+
+		# Init the cache
+		Analyze.init_hits_cache
 
 		moves.each do |item|
 			dir  = item[0]
@@ -342,14 +394,18 @@ class Analyze
 			end
 		end
 
-		$logger.info { 
+		$logger.info {
+			str = ""
+ 
 			if best_dir.nil?
-				"No best move!"
+				str = "No best move!"
 			elsif count == moves.length
-				"All moves are valid"
+				str = "All moves are valid"
 			else
-				"Best moves: #{ best_dir }; friends dead: #{ best_dead[0] }, enemies dead: #{ best_dead[1] }, best_dist: #{ best_dead[2] }"
+				str = "Best moves: #{ best_dir }; friends dead: #{ best_dead[0] }, enemies dead: #{ best_dead[1] }, best_dist: #{ best_dead[2] }"
 			end
+
+			str + "\n" + Analyze.hits_cache_status
 		}
 
 		[count, best_dir]
