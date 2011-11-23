@@ -679,7 +679,10 @@ end
 
 						# for good measure, move in the opposite direction of
 						# the enemy ant; there may be more coming.
-						move_intern reverse( enemy.dir )
+						# BAD IDEA; better to concentrate on next goal in next turn
+						#move_intern reverse( enemy.dir )
+
+						stay
 						throw :done
 
 						# TODO: Perhaps concentrate on the next closest ant

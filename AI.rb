@@ -680,6 +680,7 @@ end
 
 	end
 
+
 	def add_sorted_view in_neighbors, do_enemies = true
 		$logger.info "entered"
 

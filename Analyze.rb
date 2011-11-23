@@ -17,6 +17,7 @@ class Analyze
 		[ harmless, enemies, guess]
 	end
 
+
 	def self.analyze ai
 		done = []
 		ai.my_ants.each do |ant|
@@ -46,17 +47,17 @@ class Analyze
 				end
 			end
 
-			enemies = ant.enemies_in_view 
+			enemies_in_view = ant.enemies_in_view 
 
 			# Also collect enemies of friends
 			friends.each do |f|
 				#$logger.info { "Enemies of friend #{ f}: #{ f.enemies_in_view }" }
-				enemies += f.enemies_in_view
+				enemies_in_view += f.enemies_in_view
 			end
-			enemies.uniq!
+			enemies_in_view.uniq!
 
 			#$logger.info { "Friends of #{ ant }: #{ friends }" }
-			$logger.info { "Enemies of #{ ant }: #{ enemies }" }
+			$logger.info { "Enemies of #{ ant }: #{ enemies_in_view }" }
 
 			if ant.collective_leader?  and ant.collective.assembled?( false)
 				friends.insert 0, ant.collective
@@ -70,21 +71,32 @@ class Analyze
 			# Split into fighting ants and ants close by
 			friends_peril = []
 			friends_close = []
+			enemies = []
 
 			friends.each do |ant2|
-				e = ant2.closest_enemy
-				if not e.nil?
+				found = false
+				in_peril = false
+				ant2.enemies_in_view.each do |e|
+					found = true
+
 					d = Distance.get ant2, e
 					if d.in_peril?
-						friends_peril << ant2
+						friends_peril << ant2 unless in_peril
+						enemies << e
+						in_peril = true
 					else
-						friends_close << ant2
+						break
 					end
-				else
+				end
+				if found and not in_peril
 					friends_close << ant2
 				end
 			end
 
+			enemies.uniq!
+			friends_peril.uniq!
+
+			$logger.info { "Enemies in peril: #{ enemies }" }
 			$logger.info { "Friends in peril: #{ friends_peril }" }
 			$logger.info { "Friends close: #{ friends_close }" }
 
@@ -141,7 +153,7 @@ class Analyze
 			unless best_dir.nil?
 				# Select the first move
 
-				# Need to do some move arbitration here, because adjacent ant can 
+				# Need to do some move arbitration here, because adjacent ants can 
 				# block each other
 				# TODO: ensure that the following loop breaks out on problems
 				all_moved = false	# to get in the loop
@@ -319,6 +331,14 @@ class Analyze
 						count += 1
 					end
 				end
+			end
+
+			# Stop on first item which kills enemies without losses
+			# This kind of invalidates this loop, never mind. This loop
+			# needs to be optimized badly
+			if best_dead[0] == 0 and best_dead[1] > 0
+				$logger.info "Killing without being killed"
+				break
 			end
 		end
 
