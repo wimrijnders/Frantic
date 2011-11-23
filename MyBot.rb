@@ -232,15 +232,17 @@ class Strategy < BaseStrategy
 		end
 
 		ai.turn.check_maxed_out
+		$timer.start( :check_attacked ) {
+			check_attacked ai	
+		}
+
+
+		ai.turn.check_maxed_out
 		$logger.info "=== Analyze Phase ==="
 		$timer.start( :analyze ) {
 			Analyze.analyze ai
 		}
 
-
-		$timer.start( :check_attacked ) {
-			check_attacked ai	
-		}
 
 		ai.turn.check_maxed_out
 		#if ai.turn.maxed_urgent?

@@ -24,6 +24,8 @@ class Analyze
 			next if ant.moved?
 			next unless ant.attacked?
 			next if done.include? ant
+		
+			ai.turn.check_maxed_out
 
 			# Collect all neighboring ants
 			friends = []
@@ -48,7 +50,7 @@ class Analyze
 
 			# Also collect enemies of friends
 			friends.each do |f|
-				$logger.info { "Enemies of friend #{ f}: #{ f.enemies_in_view }" }
+				#$logger.info { "Enemies of friend #{ f}: #{ f.enemies_in_view }" }
 				enemies += f.enemies_in_view
 			end
 			enemies.uniq!
@@ -91,7 +93,7 @@ class Analyze
 			#
 			# Analyze the attack
 			#
-			return if friends_peril.empty?
+			next if friends_peril.empty?
 
 			harmless, out_enemies, guess = Analyze.guess_enemy_moves enemies 
 
@@ -138,10 +140,41 @@ class Analyze
 			count, best_dir = Analyze.determine_best_move guess, combinations
 			unless best_dir.nil?
 				# Select the first move
-				ant_combis.each_index do |i|
-					# TODO: this sometimes goes wrong with > 1 ant
-					#       incorrection direction in neighbor()
-					ant_combis[i].move best_dir[0][i]
+
+				# Need to do some move arbitration here, because adjacent ant can 
+				# block each other
+				# TODO: ensure that the following loop breaks out on problems
+				all_moved = false	# to get in the loop
+				until all_moved
+					all_moved = true
+
+					ant_combis.each_index do |i|
+						ant = ant_combis[i]
+						dir = best_dir[0][i]
+
+						next if ant.moved?
+
+						unless dir == :STAY or ant.can_pass? dir
+							$logger.info "Ant blocked!"
+
+							if ant.square.neighbor(dir).ant?
+								other_ant = ant.square.neighbor(dir).ant
+								unless ant_combis.include? other_ant
+									$logger.info "Idiot ant in the way; giving up."
+									ant.move :STAY
+									next
+								end
+							end
+
+							all_moved = false
+							next
+						end
+
+						# TODO: this sometimes goes wrong with > 1 ant
+						#       incorrection direction in neighbor()
+						# Perhaps because :STAY was not handled properly for collectives
+						ant.move dir
+					end
 				end
 			end
 
@@ -220,7 +253,8 @@ class Analyze
 				end
 			end 
 		end
-		$logger.info { "Conflict result : friends dead: #{ friend_dead }, enemies dead: #{ enemy_dead }" }
+		$logger.info { "Conflict result: dead friends: #{ friend_dead }, " +
+			"enemies: #{ enemy_dead }, sum_dist: #{ sum_dist}" }
 
 		[ friend_dead, enemy_dead, sum_dist]
 	end
@@ -253,6 +287,7 @@ class Analyze
 			# If you got 'em all without losing anything, don't 
 			# bother looking further
 			# Not really a good idea, ants keep moving in the same direction
+			# predetermined by order which moves are put in list
 			if dead[0] == 0 and dead[1] == guess.length
 				$logger.info "Gonna get them all!"
 				best_dir = [dir]
@@ -262,7 +297,6 @@ class Analyze
 			end
 
 			if  best_dir.nil? or
-				#( dead[0] <= best_dead[0] and dead[1] >= best_dead[1] ) or
 				# Maximize the difference in body count
 				( (best_dead[1] - best_dead[0] ) < ( dead[1] - dead[0] ) ) or
 				( dead[0] < best_dead[0] )

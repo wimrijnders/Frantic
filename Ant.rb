@@ -59,7 +59,7 @@ class EnemyAnt < Ant
 	def transfer_state ant
 		@state = ant.state
 
-		@state.add ant.square
+		@state.add self.square
 	end
 
 	def init_state

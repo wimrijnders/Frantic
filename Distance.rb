@@ -59,6 +59,7 @@ class Distance  < AntObject
 
 
 	def self.get from, to = nil
+		# Perhaps TODO: normalize the values
 		row, col = Distance.relpos from, to
 	
 

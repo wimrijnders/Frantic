@@ -701,14 +701,14 @@ end
 				list << [ l[0], l[1][0] ]
 			end
 	
-			$logger.info {
-				str = "After sort:\n"
-				list.each do |result|
-					str << "#{ result }\n"
-				end
-
-				str
-			}
+			#$logger.info {
+			#	str = "After sort:\n"
+			#	list.each do |result|
+			#		str << "#{ result }\n"
+			#	end
+#
+			#	str
+			#}
 		end
 	end
 
@@ -742,7 +742,7 @@ end
 			Region.add_searches e.square, sq_ants
 		end
 
-		$logger.info { "result: #{ neighbors } " }
+		#$logger.info { "result: #{ neighbors } " }
 		neighbors
 	end
 

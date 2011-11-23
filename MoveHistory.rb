@@ -50,14 +50,14 @@ class MoveHistory
 	# Number of moves that need to be present in the 
 	# list, before we can make an educated guess about
 	# the movement of the enemy.
-	TURN_LIMIT = 5
+	TURN_LIMIT = 4
 
 	def initialize
 		@list = []
 	end
 
 	def first
-		if @list.length > 1 
+		if @list.length > 0 
 			@list[-1]
 		else
 			nil
@@ -172,7 +172,12 @@ class MoveHistory
 
 
 	def to_s
+		#pos = @list.reverse.collect { |d| d.pos }
+		#dir = @list.reverse.collect { |d| d.dir }
+
 		str = "History list length: #{ @list.length }. "
+		#str << pos.join( "," )
+		#str << dir.join( ":" )
 		str << "Staying" if stay?
 		str << "Twitching" if twitch?
 		str << "Straight line" if straight_line?

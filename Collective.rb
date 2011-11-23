@@ -488,6 +488,31 @@ end
 	end
 
 
+	def can_pass? dir, water_only = false
+		return true if dir == :STAY
+
+		list = pass_check(dir)
+		if list.empty? 
+			return false
+		end
+
+
+		ok = true
+		list.each do |n|
+			a = @ants[n]
+			next if a.nil?	# TODO: if ant is missing, can we still pass?
+			next unless in_location? a, n
+
+			#if water_only
+			#	ok =false and break if a.square.neighbor(dir).water?
+			#else
+				ok =false and break unless a.can_pass?( dir, !water_only )
+			#end
+		end
+
+		ok
+	end
+
 	private
 
 	def leader
@@ -518,31 +543,6 @@ end
 		return true	
 	end
 
-	def can_pass? dir, water_only = false
-
-		return true if dir == :STAY
-
-		list = pass_check(dir)
-		if list.empty? 
-			return false
-		end
-
-
-		ok = true
-		list.each do |n|
-			a = @ants[n]
-			next if a.nil?	# TODO: if ant is missing, can we still pass?
-			next unless in_location? a, n
-
-			#if water_only
-			#	ok =false and break if a.square.neighbor(dir).water?
-			#else
-				ok =false and break unless a.can_pass?( dir, !water_only )
-			#end
-		end
-
-		ok
-	end
 
 
 	def order dir
