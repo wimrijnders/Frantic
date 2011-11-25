@@ -287,6 +287,9 @@ end
 
 	# Generate all possible movements of this ant 
 	def all_moves harmless
+		# NOTE: harmless test disabled
+		harmless = false
+
 		moves = {} 
 
 		if moved? or next_to_enemy?

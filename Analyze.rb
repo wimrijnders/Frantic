@@ -1,3 +1,11 @@
+class Array
+
+	def uniq?
+		self == self.uniq
+	end
+
+end
+
 class Analyze
 
 	@@hits_cache = nil
@@ -46,123 +54,135 @@ class Analyze
 					if c.assembled?( false)
 						friends << c 
 					else
+						# Only handle leader if not assembled.
 						friends << f
 					end
 				else
 					friends << f
 				end
 			end
+			#$logger.info { "Friends of #{ ant }: #{ friends }" }
 
+			# Collect enemies in view of self and near friends
 			enemies_in_view = ant.enemies_in_view 
 
-			# Also collect enemies of friends
 			friends.each do |f|
 				#$logger.info { "Enemies of friend #{ f}: #{ f.enemies_in_view }" }
 				enemies_in_view += f.enemies_in_view
 			end
 			enemies_in_view.uniq!
+			#$logger.info { "Enemies of #{ ant }: #{ enemies_in_view }" }
 
-			#$logger.info { "Friends of #{ ant }: #{ friends }" }
-			$logger.info { "Enemies of #{ ant }: #{ enemies_in_view }" }
 
+			# Make current ant part of the friends group
 			if ant.collective_leader?  and ant.collective.assembled?( false)
 				friends.insert 0, ant.collective
 			else
 				friends.insert 0, ant
 			end
 
-			# TODO: for collectives, add the individual ants
+			# Remember who we handled, so we don'r re-iterate over them
 			done += friends
 
 			# Split into fighting ants and ants close by
+			friends_danger = []
 			friends_peril = []
-			friends_close = []
-			enemies = []
+			friends_close = []		# Not used yet
+			enemies_danger = []
+			enemies_peril = []		# Not used yet
 
 			friends.each do |ant2|
 				found = false
-				in_peril = false
+				added = false
 				ant2.enemies_in_view.each do |e|
 					found = true
 
 					d = Distance.get ant2, e
-					if d.in_peril?
-						friends_peril << ant2 unless in_peril
-						enemies << e
-						in_peril = true
+					if d.in_danger?
+						friends_danger << ant2
+						enemies_danger << e
+						added = true
+					elsif d.in_peril?
+						friends_peril << ant2
+						enemies_peril << e
+						added = true
 					else
 						break
 					end
 				end
-				if found and not in_peril
+				if found and not added
 					friends_close << ant2
 				end
 			end
 
-			enemies.uniq!
+			# Clean up the doubles in the list
+			enemies_danger.uniq!
+			enemies_peril.uniq!
+			enemies_peril -= enemies_danger
+			friends_danger.uniq!
 			friends_peril.uniq!
+			friends_peril -= friends_danger
 
-			$logger.info { "Enemies in peril: #{ enemies }" }
+			$logger.info { "Enemies in danger: #{ enemies_danger }" }
+			next if enemies_danger.empty? # No conflict, don't bother analyzing
+			$logger.info { "Enemies in peril: #{ enemies_peril }" }
+			$logger.info { "Friends in danger: #{ friends_danger }" }
 			$logger.info { "Friends in peril: #{ friends_peril }" }
-			$logger.info { "Friends close: #{ friends_close }" }
+			#$logger.info { "Friends close: #{ friends_close }" }
 
 
 
 			#
 			# Analyze the attack
 			#
-			next if friends_peril.empty?
 
-			harmless, out_enemies, guess = Analyze.guess_enemy_moves enemies 
+			harmless, out_enemies, guess = Analyze.guess_enemy_moves enemies_danger 
 
 			moves = [] 
-			friends_peril.each do |ant4|
+			(friends_danger + friends_peril).each do |ant4|
 				moves <<  [ ant4, ant4.all_moves( harmless) ]
 			end
 			#$logger.info { "All possible moves: #{ moves }" }
 
-			# Try all possible combinations
-			ant_combis= []
-			combinations = []
-			moves.each do |m|
-				# Following happened if ant/collective was stuck and staying was 'not an option'.
-				# Now :STAY is added when no other moves valid, but this safeguard is included
-				# just to be pedantically sure
-				next if m[1].empty?
+			# Init the cache
+			Analyze.init_hits_cache moves, guess
 
-				ant = m[0]
-				ant_combis << ant
-				if combinations.empty?
-					m[1].each_pair do |dir, sq |
-						unless sq.kind_of? Array
-							sqs = [sq]
-						else
-							sqs = sq
-						end
-						combinations  << [ [ dir ], sqs ]
+			# Do the analysis for the fighting ants
+			best_moves = Analyze.determine_best_move guess, friends_danger
+
+
+			unless best_moves.nil?
+				# Select the first good move
+	
+				# 
+				# Ensure that peril ants are not blocking
+				#
+	
+				best_move = nil
+				ant_combis = friends_danger
+				best_moves.each do |m|	
+					# Friends in peril should just get out of the way
+					ret = Analyze.ensure_safe friends_peril, m
+
+					if ret === true
+						# All is well; use current move
+						best_move = m
+						break
+					elsif not ret.nil?
+						# Move conflict, but we have a solution
+						best_move = m
+						ant_combis += friends_peril
+						break
 					end
-				else
-					new_combis = []
-					combinations.each do |c|
-						m[1].each_pair do |dir, sq |
-							unless sq.kind_of? Array
-								sqs = [sq]
-							else
-								sqs = sq
-							end
-
-							new_combis << [ c[0] + [dir], c[1] + sqs]
-						end
-					end
-
-					combinations = new_combis
 				end
-			end
-			#$logger.info { "All combinations for #{ ant_combis }: #{ combinations }" }
+				if best_move.nil?
+					$logger.info "WARNING: No satisfactory move; using the first"
+					best_move = best_moves[0]
+				end
 
-			count, best_dir = Analyze.determine_best_move guess, combinations
-			unless best_dir.nil?
-				# Select the first move
+				#
+				# Move the ants
+				#
 
 				# Need to do some move arbitration here, because adjacent ants can 
 				# block each other
@@ -171,9 +191,15 @@ class Analyze
 				until all_moved
 					all_moved = true
 
+					prev_was_collective =  false
+					move_index = 0
 					ant_combis.each_index do |i|
 						ant = ant_combis[i]
-						dir = best_dir[0][i]
+
+						move = best_move[move_index + i]
+
+						dir = Distance.get(ant, move).dir
+						$logger.info { "dir: #{ dir }" }
 
 						next if ant.moved?
 
@@ -190,7 +216,7 @@ class Analyze
 								end
 							end
 
-							if block_count > 10
+							if block_count > 3
 								$logger.info "Can't move #{ ant }; giving up."
 								ant.move :STAY
 								block_count = 0
@@ -207,10 +233,13 @@ class Analyze
 						# Perhaps because :STAY was not handled properly for collectives
 						ant.move dir
 						block_count = 0
+
 					end
 				end
 			end
 
+
+if false
 			# Move in to help
 			friends_close.each do |ant3|
 				next if ant3.moved?
@@ -226,6 +255,7 @@ class Analyze
 				end
 			end
 		end
+end
 	end
 
 
@@ -236,21 +266,61 @@ class Analyze
 		@@cache_hits1 = 0
 		@@cache_misses1 = 0
 
-		# TODO: load possible moves per ant instead of all combinations here below
-
 		# preload the cache with the possible moves
-		#$logger.info "guess: #{ guess} "
-		#$logger.info "movelist: #{ movelist} "
-		movelist.each do |item|
-			moves = item[1]
-			moves.each_index do |i|
-				move = moves[i]
-
-				Analyze.get_hits_single i, [ move ], guess
+		$logger.info "movelist: #{ movelist} "
+		movelist.each do |moves|
+			ant = moves[0]
+			moves[1].each_value do |move|
+				if move.kind_of? Array
+					$logger.info { "move #{move} is Array" }
+					tmp = move
+				else
+					tmp = [ move ]
+				end
+				Analyze.get_hits_single ant.id, tmp, guess
 			end
 		end
 
 		$logger.info { "after preload: #{ hits_cache_status } " }
+	end
+
+
+	def self.killing_friends? ants, result, ants_in_results = true
+		#$logger.info "entered"
+		list = []
+		count = 0
+
+		if ants_in_results 
+			ants.each do |ant|
+				item = @@hits_cache[ ant.id ][ result[count] ]
+
+				list += item[3]
+				count += 1
+			end
+		else
+			$logger.info "ants not in results"
+
+			# Test for ants which are not in the moves list
+			# note that they must be in the cache
+			ants.each do |ant|
+				item = @@hits_cache[ ant.id ][ ant.pos ]
+
+				list += item[3]
+				count += 1
+			end
+
+			list += result
+		end
+
+		#$logger.info { "list: #{ list }" }
+
+		ret = !list.uniq?
+
+		if ret
+			$logger.info { "ret: #{ ret }" }
+		end
+
+		ret
 	end
 
 
@@ -261,9 +331,13 @@ class Analyze
 
 
 	def self.get_hits_single index, moves, guess
-		unless @@hits_cache[index].nil? or @@hits_cache[index][moves].nil?
+		# multiple moves are from collectives
+		# Use only the first move as key
+		key = moves[0]
+
+		unless @@hits_cache[index].nil? or @@hits_cache[index][key].nil?
 			@@cache_hits += 1
-			@@hits_cache[index][moves]
+			@@hits_cache[index][key]
 		else
 			@@cache_misses += 1
 
@@ -271,7 +345,10 @@ class Analyze
 			friend_hits = {}
 			sum_dist = 0
 
+		count = 0
+		sub_index = 1.0*index
 		moves.each do |move|
+
 			guess.each_index do |e|
 				dist = Distance.get( guess[e], move)
 				sum_dist += dist.dist
@@ -280,68 +357,45 @@ class Analyze
 				if dist.in_attack_range?
 					#$logger.info "In attack range"
 					if enemy_hits[e].nil?
-						enemy_hits[e] = [index]
+						enemy_hits[e] = [sub_index]
 					else
-						enemy_hits[e] << index 
+						enemy_hits[e] << sub_index 
 					end
-					if friend_hits[index].nil?
-						friend_hits[index] = [e]
+					if friend_hits[sub_index].nil?
+						friend_hits[sub_index] = [e]
 					else
-						friend_hits[index] << e
+						friend_hits[sub_index] << e
 					end
 				end
 			end
+
+			#Each move gets its own index
+			# Note that there is now a max of 10 
+			count += 1
+			sub_index += 1.0*count/10 
+			raise "Count too large" if count >= 10
 		end
 
 			if @@hits_cache[index].nil? 
 				@@hits_cache[index] = {}
 			end
 
-			@@hits_cache[index][moves] = [ friend_hits, enemy_hits, sum_dist ]
+			# Moves part at end so that we can keep track of followers in collective
+			# Note that the key is always in this array
+			@@hits_cache[index][key] = [ friend_hits, enemy_hits, sum_dist, moves ]
 		end
 	end
 
 
-	def self.get_hits2 index, moves, guess
-		unless @@hits_cache[index].nil? or @@hits_cache[index][moves].nil?
-			@@cache_hits1 += 1
-			@@hits_cache[index][moves]
-		else
-			@@cache_misses1 += 1
-
-			if moves.length == 1
-				return Analyze.get_hits_single index, moves, guess
-			end 
-
-			enemy_hits = {}
-			friend_hits = {}
-			sum_dist = 0
-
-			f_hits, e_hits, s_dist = Analyze.get_hits index, moves[0..-2], guess
-			enemy_hits.merge! e_hits
-			friend_hits.merge! f_hits
-			sum_dist += s_dist
-
-			f_hits2, e_hits2, s_dist2 = Analyze.get_hits_single (index + moves.length() -1), [ moves[-1] ], guess
-			enemy_hits.merge!(e_hits2)  { |k,oldval,newval| (oldval + newval) }
-			friend_hits.merge!(f_hits2) { |k,oldval,newval| (oldval + newval) }
-			sum_dist += s_dist2
-
-			if @@hits_cache[index].nil? 
-				@@hits_cache[index] = {}
-			end
-
-			@@hits_cache[index][moves] = [ friend_hits, enemy_hits, sum_dist ]
-		end
-	end
-
-
-	def self.get_hits index, moves, guess
+	# Pre: moves is aray of moves
+	def self.get_hits ants, moves, guess
 		enemy_hits = {}
 		friend_hits = {}
 		sum_dist = 0
 		moves.each_index do |f|
-			f_hits, e_hits, s_dist = Analyze.get_hits_single f, [ moves[f] ], guess
+			ant = ants[f]
+
+			f_hits, e_hits, s_dist = Analyze.get_hits_single ant.id, [ moves[f] ], guess
 
 			enemy_hits.merge!(e_hits)  { |k,oldval,newval| (oldval + newval) }
 			friend_hits.merge!(f_hits) { |k,oldval,newval| (oldval + newval) }
@@ -353,14 +407,14 @@ class Analyze
 
 
 
-	def self.analyze_hits guess, move
+	def self.analyze_hits guess, ants, move
 		unless move.kind_of? Array
 			move = [ move ]
 		end
 
 		# Now, analyze the hits between the ants
 		# No distinction is made between various enemies
-		friend_hits, enemy_hits, sum_dist = Analyze.get_hits 0, move, guess
+		friend_hits, enemy_hits, sum_dist = Analyze.get_hits ants, move, guess
 
 		return [0,0, sum_dist] if enemy_hits.length == 0
 		
@@ -394,35 +448,190 @@ class Analyze
 	end
 
 
-	def self.determine_best_move guess, moves
+	#
+	# Select moves which do actual damage first.
+	#
+	def self.hits_bodycount index
+		$logger.info "entered"
+
+		hits = @@hits_cache[index]
+
+		$logger.info { "hits: #{ hits }" }
+
+		raise "ERROR: hits nil; should never happen!" if hits.nil?
+
+		list = hits.to_a.sort { |aa,bb|
+			a = aa[1]
+			b = bb[1]
+
+			# damage items first
+			if a[0].empty? and not b[0].empty?
+				1
+			elsif not a[0].empty? and b[0].empty?
+				-1
+			# After that, sort on smallest distance
+			else 
+				a[2] <=> b[2]
+			end
+		}
+
+		list = list.collect {|a| a[0] }
+		
+		$logger.info { "Result: #{ list }" }
+
+		list
+	end
+
+
+	#
+	# Select moves which do no damage first.
+	#
+	def self.hits_safe index
+		$logger.info "entered"
+
+		hits = @@hits_cache[index]
+
+		$logger.info { "hits: #{ hits }" }
+
+		raise "ERROR: hits nil; should never happen!" if hits.nil?
+
+		list = hits.to_a.sort { |aa,bb|
+			a = aa[1]
+			b = bb[1]
+
+			# Safe items first
+			if a[0].empty? and not b[0].empty?
+				-1
+			elsif not a[0].empty? and b[0].empty?
+				1
+			# After that, sort on smallest distance
+			else 
+				a[2] <=> b[2]
+			end
+		}
+
+		list = list.collect {|a| a[0] }
+		
+		$logger.info { "Result: #{ list }" }
+
+		list
+	end
+
+
+	def self.iterate_bodycount index, ants, result
+		$logger.info "entered; index #{ index }, ants: #{ ants}, result #{ result }"
+		if index == ants.length 
+			$logger.info "yielding"
+			yield result
+			return
+		end
+
+		ant = ants[index]
+
+		Analyze.hits_bodycount( ant.id ).each do |h|
+			temp = result + [h]
+			#$logger.info "temp #{ temp }"
+
+			# Don't handle moves in which friends occupy same square
+			next if Analyze.killing_friends? ants[0..index], temp
+
+			Analyze.iterate_bodycount( (index+1), ants, temp ) { |r| yield r }
+		end
+	end
+
+
+	def self.iterate_safe index, ants, result
+		$logger.info "entered; index #{ index }, ants: #{ ants}, result #{ result }"
+		if index == ants.length 
+			$logger.info "yielding"
+			yield result
+			return
+		end
+
+		ant = ants[index]
+
+		Analyze.hits_safe( ant.id ).each do |h|
+			temp = result + [h]
+			#$logger.info "temp #{ temp }"
+
+			# Don't handle moves in which friends occupy same square
+			if Analyze.killing_friends? ants[0..index], temp, false
+				$logger.info "friends are being killed."
+				next 
+			end
+
+			Analyze.iterate_safe( (index+1), ants, temp ) { |r| yield r }
+		end
+	end
+
+
+	def self.iterate_moves ants
+		$logger.info "entered"
+
+		Analyze.iterate_bodycount( 0, ants, [] ) { |r| yield r }
+
+		#moves.each do |item|
+		#	yield item[1]
+		#end
+	end
+
+
+	def self.ensure_safe ants, moves
+		return true if ants.length < 1
+		$logger.info "entered; #{ants} - moves #{moves}"
+
+		# Do we have a move conflict?
+		tmp = ants.collect { |a| a.pos }
+		tmp += moves
+		if tmp.uniq?
+			$logger.info "No move conflict"
+			return true
+		end
+
+		# Yes, move the peril ants
+		Analyze.iterate_safe( 0, ants, moves ) { |r|
+			# Break on the first legal move
+			$logger.info "conflict solved: #{ result}"
+			return result
+		}
+
+		# Bummer; no good moves
+		$logger.info "conflict no solution!"
+		nil
+	end
+
+
+	def self.determine_best_move guess, ants
 		# calculate the body count for all possible moves
 		# Select the best result
-		best_dir = nil
+		best_move = nil
 		best_dead = nil
-		count = 0
 
-		# Throw the list around a bit
-		#moves = moves.sort_by { rand }
 
-		# Init the cache
-		Analyze.init_hits_cache moves, guess
+		Analyze.iterate_moves( ants ) do |move|
+			$logger.info { "move: #{ move }" }
 
-		moves.each do |item|
-			dir  = item[0]
-			move = item[1]
-
-			# Skip items in which friends kill each other.
 			if move.length != move.uniq.length
-				#$logger.info "WARNING: friends are killing each other."
-				next
+				# Should not happen any more; this test is handled elsewhere
+				raise "WARNING: friends are killing each other."
 			end 
 
-			dead = Analyze.analyze_hits guess, move
+			dead = Analyze.analyze_hits guess, ants, move
 
 			$logger.info {
-				"Analyzed: #{ dir }; friends dead: #{ dead[0] }, enemies dead: #{ dead[1] }, " +
+				"Analyzed #{move}: friends dead: #{ dead[0] }, enemies dead: #{ dead[1] }, " +
 				"best_dist: #{ dead[2] }"
 			}
+
+
+			# zero-result territory; it probably won't get any better
+			# than this, so stop
+			if dead[0] == 0 and dead[1] == 0
+				$logger.info "No deaths in this conflict."
+				best_move = [move] 
+				best_dead = dead
+				break
+			end
 
 			# If you got 'em all without losing anything, don't 
 			# bother looking further
@@ -430,20 +639,18 @@ class Analyze
 			# predetermined by order which moves are put in list
 			if dead[0] == 0 and dead[1] == guess.length
 				$logger.info "Gonna get them all!"
-				best_dir = [dir]
+				best_move = [move] 
 				best_dead = dead
-				count = 1
 				break
 			end
 
-			if  best_dir.nil? or
+			if  best_dead.nil? or
 				# Maximize the difference in body count
 				( (best_dead[1] - best_dead[0] ) < ( dead[1] - dead[0] ) ) or
 				( dead[0] < best_dead[0] )
 
-				best_dir = [dir]
+				best_move = [move]
 				best_dead = dead
-				count = 1
 			else 
 				if dead[0] == best_dead[0] and dead[1] == best_dead[1] 
 					# All things being equal, minimize distance to enemies
@@ -451,12 +658,10 @@ class Analyze
 					#$logger.info { "dead[2] < best_dead[2]: #{ dead[2] } < #{ best_dead[2] } =  #{ dead[2] < best_dead[2] }" }
 
 					if dead[2] < best_dead[2]
-						best_dir = [dir]
+						best_move = [move] 
 						best_dead = dead
-						count = 1
 					elsif dead[2] == best_dead[2]
-						best_dir << dir
-						count += 1
+						best_move << move 
 					end
 				end
 			end
@@ -473,17 +678,15 @@ class Analyze
 		$logger.info {
 			str = ""
  
-			if best_dir.nil?
+			if best_dead.nil?
 				str = "No best move!"
-			elsif count == moves.length
-				str = "All moves are valid"
 			else
-				str = "Best moves: #{ best_dir }; friends dead: #{ best_dead[0] }, enemies dead: #{ best_dead[1] }, best_dist: #{ best_dead[2] }"
+				str = "Best moves: #{ best_move }; friends dead: #{ best_dead[0] }, enemies dead: #{ best_dead[1] }, best_dist: #{ best_dead[2] }"
 			end
 
 			str + "\n" + Analyze.hits_cache_status
 		}
 
-		[count, best_dir]
+		best_move
 	end
 end

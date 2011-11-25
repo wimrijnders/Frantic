@@ -2,6 +2,9 @@ $:.unshift File.dirname($0)
 #######################################
 # TODO
 #
+# - Determine new symmetries of cell maps
+# - Get rid of wall following as default move; stupid ants are going around in circles in the random maps.
+#
 # - IMPORTANT: Defend your hill; some players (include me!) are good at targetting
 #   these.
 #		- Especially, throw up a defence if enemy close.
@@ -9,23 +12,10 @@ $:.unshift File.dirname($0)
 # - Make defensive collectives less scared; if they can surely winning, attack or at the least hold ground
 # - NB: improve detection of enemy moves - especially snakes like with GoSouth
 #
-# - All searches to the thread
-# - Allow unlimited depth searches -> store all interim results in cache
-# - Region mapping thru ant movement also with symmetry
-#     - same with food, if you please.
+# - Perhaps: use pattern symmetry to detect food.
 # - Better raze attack. Currently, the horde is unorganized and tends to attack all hills at once.
-# - attack in collective-2's if at all possible
 # - Improve evasion (pathfinding?)
-# - Help symmetry tests with results of confirmed symmetries
 # - Pathfinder evasion for collectives
-# - !!! Deal with region going around corners (or even wrapping around!)
-# - evasion: choose best direction
-#     - ie. the direction which brings you closer to the target
-#
-# Games to beat:
-# Both with 3xGoSouth
-# 		open 
-# 		h 4 1
 #
 #======================================
 #

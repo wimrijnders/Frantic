@@ -93,6 +93,10 @@ elsif map == 'open'
 elsif map[0] == 'm'
 	map = "0" + map if map.length ==1
 	mapfile  = "maps/maze/maze_#{nump}p_#{ num }.map"
+elsif map[0] == 'c'
+	num = "0" + num if num.length ==1
+	map = "0" + map if map.length ==1
+	mapfile  = "maps/cell/cell_maze_p#{nump}_#{ num }.map"
 elsif map[0] == 'h'
 	map = "0" + map if map.length ==1
 	mapfile  = "maps/multi_hill_maze/maze_#{ nump }p_#{ num }.map"

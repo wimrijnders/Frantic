@@ -21,10 +21,21 @@ class Distance  < AntObject
 
 		$logger.info "attackradius2: #{ @@ai.attackradius2 }"
 
-		@@danger_radius2 = (@@ai.attackradius + Math.sqrt(2) ) ** 2
+		#
+		# danger_radius contains the squares form which you can be attacked
+		# in 1 move.
+		# Radius for normal attackradius of 5 is 17, which is exact.
+		#
+		# Given calculation is a sort of safeguard for if the radius might change
+		@@danger_radius2 = ( Math.sqrt(@@ai.attackradius2() -1 ) + 2  ) ** 2 + 1
 		$logger.info "danger_radius2: #{ @@danger_radius2 }"
 
-		@@peril_radius2 = (@@ai.attackradius + 2*Math.sqrt(2) ) ** 2
+		#
+		# same as peril radius, but contains squares from which you can be attacked in
+		# moves. for attackradius 5 the value is 37. This is not exact, contains some
+		# extra squares on the diagonal sides.
+		# Again, safeguard calculation
+		@@peril_radius2 = ( Math.sqrt(@@ai.attackradius2() -1 ) + 4  ) ** 2 + 1
 		$logger.info "peril_radius2: #{ @@peril_radius2 }"
 	end
 
@@ -32,7 +43,6 @@ class Distance  < AntObject
 		super
 
 		@row, @col = Distance.relpos from, to
-
 
 		recalc
 		#$logger.info { "Distance init #{ @row }, #{ @col }" }
@@ -59,7 +69,6 @@ class Distance  < AntObject
 
 
 	def self.get from, to = nil
-		# Perhaps TODO: normalize the values
 		row, col = Distance.relpos from, to
 	
 
@@ -98,6 +107,8 @@ class Distance  < AntObject
 	# Convert distance into compass direction
 	#
 	def dir square = nil, land_only = false
+		return :STAY if @row == 0 and @col == 0
+
 		ret_dir = nil
 	
 		rdif = @row
@@ -288,7 +299,6 @@ class Distance  < AntObject
 	# 
 	# This needs to be done every time row, col values change
 	def recalc
-		normalize
 
 		# Precalculate as much as possible
 
@@ -366,32 +376,34 @@ class Distance  < AntObject
 			end
 		end
 
-		[row, col ]
+		Distance.normalize row, col
 	end
 
 
-	def normalize
+	def self.normalize row, col
 		ai = @@ai
 
 		# If the distance is greater than half the width/height,
 		# try the other side of the torus
 		rows = ai.rows
-		if @row.abs > rows/2
-			if @row > 0
-				@row -= rows
+		if row.abs > rows/2
+			if row > 0
+				row -= rows
 			else
-				@row += rows
+				row += rows
 			end
 		end
 
 		cols = ai.cols	
-		if @col.abs > cols/2
-			if @col > 0
-				@col -= cols
+		if col.abs > cols/2
+			if col > 0
+				col -= cols
 			else
-				@col += cols
+				col += cols
 			end
 		end
+
+		[ row, col ]
 	end
 
 	def calc_attack_dir 

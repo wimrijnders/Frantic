@@ -334,6 +334,9 @@ class Collective
 
 	# Generate all possible movements of current collective
 	def all_moves harmless
+		# NOTE: harmless test disabled
+		harmless = false
+
 		moves = {} 
 
 		if leader.moved? or next_to_enemy?
@@ -383,11 +386,11 @@ class Collective
 		in_enemies = []
 		leader.enemies_in_view.each do |e|
 			adist = Distance.get( leader.pos, e.pos)
-			break unless adist.in_peril?
+			break unless adist.in_danger?
 
 			in_enemies << e
 		end
-		$logger.info { "Enemies in peril distance: #{ in_enemies }" }
+		$logger.info { "Enemies in danger distance: #{ in_enemies }" }
 		return false if in_enemies.empty?
 
 		harmless, enemies, guess = Analyze.guess_enemy_moves in_enemies 
@@ -397,14 +400,18 @@ class Collective
 		moves = all_moves harmless
 		return false if moves.length == 0
 
-		count, best_dir = Analyze.determine_best_move guess, moves.to_a
+		# Init the cache
+		Analyze.init_hits_cache moves, guess
 
-		if best_dir.nil?
+		best_moves = Analyze.determine_best_move guess, [ self ]
+
+		if best_moves.nil?
 			# Let the old logic handle it.
 			return false
 		elsif count == 1
 			# Only one option 
-			return best_dir[0]
+			dir = Distance.new(self.pos, best_moves[0]).dir
+			return dir 
 		else
 			# Multiple options
 			# Let the old logic handle it.
@@ -458,25 +465,14 @@ end
 	# Ant compatibility
 	#
 
-	def enemies_in_view
-		leader.enemies_in_view
-	end
+	def id;     leader.id; end
+	def row;    leader.row; end
+	def col;    leader.col; end
+	def pos;    leader.pos; end
+	def moved?; leader.moved?; end
 
-	def closest_enemy
-		leader.closest_enemy
-	end
-
-	def row
-		leader.row
-	end
-
-	def col
-		leader.col
-	end
-
-	def moved?
-		leader.moved?
-	end
+	def enemies_in_view; leader.enemies_in_view; end
+	def closest_enemy;   leader.closest_enemy; end
 
 	def move_to sq
 		d = Distance.get leader.square, sq
@@ -644,6 +640,7 @@ end
 				end
 			else
 				dir = analyze_attack
+				$logger.info { "analyze_attack returned #{dir}" }
 				unless dir === false
 					if dir == :STAY
 						stay
@@ -687,6 +684,8 @@ end
 						# BAD IDEA; better to concentrate on next goal in next turn
 						#move_intern reverse( enemy.dir )
 
+						# TODO: following is wasteful if there is only
+						#       one enemy; find a better solution
 						stay
 						throw :done
 
