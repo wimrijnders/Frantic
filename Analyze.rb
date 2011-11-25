@@ -267,12 +267,12 @@ end
 		@@cache_misses1 = 0
 
 		# preload the cache with the possible moves
-		$logger.info "movelist: #{ movelist} "
+		#$logger.info "movelist: #{ movelist} "
 		movelist.each do |moves|
 			ant = moves[0]
 			moves[1].each_value do |move|
 				if move.kind_of? Array
-					$logger.info { "move #{move} is Array" }
+					#$logger.info { "move #{move} is Array" }
 					tmp = move
 				else
 					tmp = [ move ]
@@ -280,6 +280,19 @@ end
 				Analyze.get_hits_single ant.id, tmp, guess
 			end
 		end
+
+		$logger.info {
+			str = ""
+			@@hits_cache.each_pair do |k,v|
+				str2 = ""
+				v.each_pair do |k2,v2|
+					str2 << "      #{ k2 }=>#{ v2 }\n"
+				end
+				str << "   #{ k }=> {\n#{ str2 }   }\n"
+			end
+
+			"hits_cache: {\n#{ str }}"
+		}
 
 		$logger.info { "after preload: #{ hits_cache_status } " }
 	end
@@ -325,8 +338,8 @@ end
 
 
 	def self.hits_cache_status
-		"Hits cache: hits/misses single: #{ @@cache_hits }/#{ @@cache_misses }; " +
-			"multi: #{ @@cache_hits1 }/#{ @@cache_misses1 }"
+		"Hits cache: hits/misses single: #{ @@cache_hits }/#{ @@cache_misses }" 
+			#"multi: #{ @@cache_hits1 }/#{ @@cache_misses1 }"
 	end
 
 
@@ -376,13 +389,13 @@ end
 			raise "Count too large" if count >= 10
 		end
 
-			if @@hits_cache[index].nil? 
-				@@hits_cache[index] = {}
-			end
+		if @@hits_cache[index].nil? 
+			@@hits_cache[index] = {}
+		end
 
-			# Moves part at end so that we can keep track of followers in collective
-			# Note that the key is always in this array
-			@@hits_cache[index][key] = [ friend_hits, enemy_hits, sum_dist, moves ]
+		# Moves part at end so that we can keep track of followers in collective
+		# Note that the key is always in this array
+		@@hits_cache[index][key] = [ friend_hits, enemy_hits, sum_dist, moves ]
 		end
 	end
 
@@ -441,8 +454,8 @@ end
 				end
 			end 
 		end
-		$logger.info { "Conflict result: dead friends: #{ friend_dead }, " +
-			"enemies: #{ enemy_dead }, sum_dist: #{ sum_dist}" }
+		#$logger.info { "Conflict result: dead friends: #{ friend_dead }, " +
+		#	"enemies: #{ enemy_dead }, sum_dist: #{ sum_dist}" }
 
 		[ friend_dead, enemy_dead, sum_dist]
 	end
@@ -452,11 +465,11 @@ end
 	# Select moves which do actual damage first.
 	#
 	def self.hits_bodycount index
-		$logger.info "entered"
+		#$logger.info "entered"
 
 		hits = @@hits_cache[index]
 
-		$logger.info { "hits: #{ hits }" }
+		#$logger.info { "hits: #{ hits }" }
 
 		raise "ERROR: hits nil; should never happen!" if hits.nil?
 
@@ -519,9 +532,9 @@ end
 
 
 	def self.iterate_bodycount index, ants, result
-		$logger.info "entered; index #{ index }, ants: #{ ants}, result #{ result }"
+		#$logger.info "entered; index #{ index }, ants: #{ ants}, result #{ result }"
 		if index == ants.length 
-			$logger.info "yielding"
+			#$logger.info "yielding #{ result }"
 			yield result
 			return
 		end
@@ -619,7 +632,8 @@ end
 			dead = Analyze.analyze_hits guess, ants, move
 
 			$logger.info {
-				"Analyzed #{move}: friends dead: #{ dead[0] }, enemies dead: #{ dead[1] }, " +
+				"analyzed: friends dead: #{ dead[0] }, " +
+				" enemies dead: #{ dead[1] }, " +
 				"best_dist: #{ dead[2] }"
 			}
 
@@ -635,7 +649,7 @@ end
 
 			# If you got 'em all without losing anything, don't 
 			# bother looking further
-			# Not really a good idea, ants keep moving in the same direction
+			# Consequence: ants keep moving in the same direction
 			# predetermined by order which moves are put in list
 			if dead[0] == 0 and dead[1] == guess.length
 				$logger.info "Gonna get them all!"
@@ -654,8 +668,6 @@ end
 			else 
 				if dead[0] == best_dead[0] and dead[1] == best_dead[1] 
 					# All things being equal, minimize distance to enemies
-
-					#$logger.info { "dead[2] < best_dead[2]: #{ dead[2] } < #{ best_dead[2] } =  #{ dead[2] < best_dead[2] }" }
 
 					if dead[2] < best_dead[2]
 						best_move = [move] 

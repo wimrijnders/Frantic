@@ -493,9 +493,7 @@ end
 		return true if dir == :STAY
 
 		list = pass_check(dir)
-		if list.empty? 
-			return false
-		end
+		return false if list.empty? 
 
 
 		ok = true
@@ -970,7 +968,7 @@ class Collective4 < Collective
 	end
 
 	def pass_check dir
-		$logger.info { "dir #{ dir }" }
+		#$logger.info { "dir #{ dir }" }
 
 		unless [:N, :E, :S, :W].include? dir
 			$logger.info { "ERROR: dir #{ dir } not valid" }
@@ -1027,7 +1025,7 @@ class Collective2 < Collective
 	end
 
 	def pass_check dir
-		$logger.info { "dir #{ dir }" }
+		#$logger.info { "dir #{ dir }" }
 
 		unless [:N, :E, :S, :W].include? dir
 			$logger.info { "ERROR: dir #{ dir } not valid" }
@@ -1190,7 +1188,7 @@ class Collective3 < Collective
 
 
 	def pass_check dir
-		$logger.info { "dir #{ dir }" }
+		#$logger.info { "dir #{ dir }" }
 
 		unless [:N, :E, :S, :W].include? dir
 			$logger.info { "ERROR: dir #{ dir } not valid" }
