@@ -14,7 +14,7 @@ class Analyze
 	@@cache_hits1 = 0
 	@@cache_misses1 = 0
 
-	def self.guess_enemy_moves in_enemies
+	def self.guess_enemy_moves in_enemies, square
 		enemies = []
 		guess = []
 		harmless = true
@@ -22,7 +22,7 @@ class Analyze
 			harmless &&= ( e.twitch? or e.stay? )
 			enemies << e 
 
-			guess << e.guess_next_pos
+			guess << e.guess_next_pos( square )
 		end
 		return false if guess.length == 0
 
@@ -33,7 +33,12 @@ class Analyze
 
 
 	def self.analyze ai
+
+		# Remember who we handled, so we don'r re-iterate over them
+		# Note that only collective leaders are stored here, not entire
+		# collectives
 		done = []
+
 		ai.my_ants.each do |ant|
 			next if ant.collective_follower?
 			next if ant.moved?
@@ -42,6 +47,12 @@ class Analyze
 		
 			ai.turn.check_maxed_out
 
+			friends_danger = []
+			friends_peril = []
+			friends_close = []		# Not used yet
+			enemies_danger = []
+			enemies_peril = []		# Not used yet
+
 			# Collect all neighboring ants
 			friends = []
 			ant.friends.each do |item|
@@ -49,16 +60,27 @@ class Analyze
 
 				next if f.collective_follower?
 
+				friend = nil
 				if f.collective_leader?
 					c = f.collective
 					if c.assembled?( false)
-						friends << c 
+						friend = c 
 					else
 						# Only handle leader if not assembled.
-						friends << f
+						friend = f
 					end
 				else
-					friends << f
+					friend = f
+				end
+
+				# Don't add ants to the core group if too far away
+				d = Distance.get friend,ant 
+				if d.in_peril?
+					friends << friend
+					# Only add ants to done list, not collectives
+					done << f
+				else 
+					friends_close << friend
 				end
 			end
 			#$logger.info { "Friends of #{ ant }: #{ friends }" }
@@ -80,17 +102,11 @@ class Analyze
 			else
 				friends.insert 0, ant
 			end
+			# Only add ants to done list, not collectives
+			done << ant 
 
-			# Remember who we handled, so we don'r re-iterate over them
-			done += friends
 
 			# Split into fighting ants and ants close by
-			friends_danger = []
-			friends_peril = []
-			friends_close = []		# Not used yet
-			enemies_danger = []
-			enemies_peril = []		# Not used yet
-
 			friends.each do |ant2|
 				found = false
 				added = false
@@ -111,6 +127,8 @@ class Analyze
 					end
 				end
 				if found and not added
+					# TODO: these ants were already added
+					#       to the done-list; they shouldn't be there
 					friends_close << ant2
 				end
 			end
@@ -136,7 +154,10 @@ class Analyze
 			# Analyze the attack
 			#
 
-			harmless, out_enemies, guess = Analyze.guess_enemy_moves enemies_danger 
+			# Note: we are using the coords of the original ants as param
+			# Better would be to determine the shortest distance between an enemy and a friend
+			# TODO: sort this out.
+			harmless, out_enemies, guess = Analyze.guess_enemy_moves enemies_danger, ant.square 
 
 			moves = [] 
 			(friends_danger + friends_peril).each do |ant4|
@@ -153,6 +174,10 @@ class Analyze
 
 			unless best_moves.nil?
 				# Select the first good move
+
+if false
+	# This code can run wild if there are many, many friends in peril
+	# Disabled for the time being till we get a better solution
 	
 				# 
 				# Ensure that peril ants are not blocking
@@ -179,6 +204,11 @@ class Analyze
 					$logger.info "WARNING: No satisfactory move; using the first"
 					best_move = best_moves[0]
 				end
+else
+				# Just pick the first and hope for the best
+				best_move = best_moves[0]
+				ant_combis = friends_danger
+end
 
 				#
 				# Move the ants
@@ -207,8 +237,8 @@ class Analyze
 							$logger.info "#{ant } blocked!"
 
 							if ant.square.neighbor(dir).ant?
-								other_ant = ant.square.neighbor(dir).ant
-								unless ant_combis.include? other_ant
+								other = ant.square.neighbor(dir).ant
+								unless ant_combis.include? other
 									$logger.info "Idiot ant in the way; giving up."
 									ant.move :STAY
 									block_count = 0
@@ -254,8 +284,8 @@ if false
 					ant3.move_to enemies[0].square 
 				end
 			end
-		end
 end
+		end
 	end
 
 
@@ -488,6 +518,17 @@ end
 			end
 		}
 
+		# WRI TEST TODO: do hurting moves only
+		# We run the risk of having no moves at all - this is just a test
+		tmp = list.clone.delete_if { |a| a[1][0].empty? }
+
+		# if no hurting moves present, just return the first move
+		if tmp.nil? or tmp.empty?
+			list = list[0..0]
+		else
+			list = tmp
+		end
+
 		list = list.collect {|a| a[0] }
 		
 		$logger.info { "Result: #{ list }" }
@@ -553,7 +594,7 @@ end
 	end
 
 
-	def self.iterate_safe index, ants, result
+	def self.iterate_safe index, ants, result, ants_in_results = false
 		$logger.info "entered; index #{ index }, ants: #{ ants}, result #{ result }"
 		if index == ants.length 
 			$logger.info "yielding"
@@ -568,12 +609,12 @@ end
 			#$logger.info "temp #{ temp }"
 
 			# Don't handle moves in which friends occupy same square
-			if Analyze.killing_friends? ants[0..index], temp, false
+			if Analyze.killing_friends? ants[0..index], temp, ants_in_results
 				$logger.info "friends are being killed."
 				next 
 			end
 
-			Analyze.iterate_safe( (index+1), ants, temp ) { |r| yield r }
+			Analyze.iterate_safe( (index+1), ants, temp, ants_in_results ) { |r| yield r }
 		end
 	end
 
@@ -604,8 +645,8 @@ end
 		# Yes, move the peril ants
 		Analyze.iterate_safe( 0, ants, moves ) { |r|
 			# Break on the first legal move
-			$logger.info "conflict solved: #{ result}"
-			return result
+			$logger.info "conflict solved: #{ r }"
+			return r
 		}
 
 		# Bummer; no good moves
@@ -613,6 +654,16 @@ end
 		nil
 	end
 
+	def self.play_safe?
+		ret = $ai.my_ants.length < AntConfig::ANALYZE_LIMIT
+
+		unless ret
+			$logger.info "Ants gonna hurt!" unless @showed_hurt_message
+			@showed_hurt_message = true
+		end
+
+		ret
+	end
 
 	def self.determine_best_move guess, ants
 		# calculate the body count for all possible moves
@@ -661,7 +712,7 @@ end
 			if  best_dead.nil? or
 				# Maximize the difference in body count
 				( (best_dead[1] - best_dead[0] ) < ( dead[1] - dead[0] ) ) or
-				( dead[0] < best_dead[0] )
+				( Analyze.play_safe? and dead[0] < best_dead[0] )
 
 				best_move = [move]
 				best_dead = dead
@@ -680,11 +731,25 @@ end
 
 			# Stop on first item which kills enemies without losses
 			# This kind of invalidates this loop, never mind. This loop
-			# needs to be optimized badly
+			# needs to be optimized badly.
 			if best_dead[0] == 0 and best_dead[1] > 0
 				$logger.info "Killing without being killed"
 				break
 			end
+		end
+
+		if best_dead.nil? or 
+			( Analyze.play_safe? and best_dead[0] >= best_dead[1] ) or
+			( not Analyze.play_safe? and best_dead[0] > best_dead[1] ) 
+			$logger.info "Opting for best safe move"
+
+			Analyze.iterate_safe( 0, ants, [], true ) { |r|
+				# Break on the first legal move
+				$logger.info "safe move: #{ r }"
+				best_move = [ r ]
+				best_dead = [ 0, 0, -1 ]
+				break
+			}
 		end
 
 		$logger.info {

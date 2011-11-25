@@ -56,6 +56,9 @@ bots = [
 	"ruby ../MyBot.rb",					# Frantic - latest version
 
 	"ruby ../GoSouth.rb",
+	"ruby ../GoSouth.rb",
+	"ruby ../GoSouth.rb",
+
 	"ruby ../Twitcher.rb",
 	"ruby ../Inertia.rb",
 	"python2.7 sample_bots/python/HunterBot.py",

@@ -94,8 +94,8 @@ class EnemyAnt < Ant
 	end 
 
 
-	def guess_next_pos
-		dir = @state.guess_dir
+	def guess_next_pos sq_in = nil
+		dir = @state.guess_dir sq_in
 
 		if dir == :STAY
 			square
@@ -293,7 +293,7 @@ end
 		moves = {} 
 
 		if moved? or next_to_enemy?
-			moves[ :STAY ] = square
+			moves[ :STAY ] = pos
 			return moves
 		end
 

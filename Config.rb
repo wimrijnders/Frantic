@@ -15,6 +15,10 @@ module AntConfig
 	AGGRESIVE_LIMIT = 30	# At this number, the ant will
 							# choose fights sooner 
 
+	ANALYZE_LIMIT	= 60	# After this number of ants, analyze will
+							# give preferences to hurting instead of
+							# playing safe
+
 	THROTTLE_LIMIT  = 130 
 
 	KAMIKAZE_LIMIT  = -1	# There's too many ants, getting close to

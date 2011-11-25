@@ -194,7 +194,7 @@ class MoveHistory
 		straight_line? or twitch?  or stay?
 	end
 
-	def guess_dir
+	def guess_dir square = nil
 		if straight_line?
 			dir
 		elsif twitch?
@@ -202,11 +202,21 @@ class MoveHistory
 		elsif stay?
 			:STAY
 		elsif dir.nil?
-			# Assume ant stays still and hope, really hope for the best
-			:STAY 
+			# If specified, assume worst move for us (ie advancing)
+			unless square.nil? or first.nil?
+				Distance.get( first.pos, square).dir	
+			else
+				# Assume ant stays still and hope, really hope for the best
+				:STAY 
+			end
 		else
-			# Assume ant continues previous movement and hope for the best
-			dir	
+			# ditto
+			unless square.nil? or first.nil?
+				Distance.get( first.pos, square).dir	
+			else
+				# Assume ant continues previous movement and hope for the best
+				dir	
+			end
 		end
 	end
 end

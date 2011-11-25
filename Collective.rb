@@ -340,7 +340,7 @@ class Collective
 		moves = {} 
 
 		if leader.moved? or next_to_enemy?
-			moves[ :STAY ] = @ants.collect { |a| a.square }
+			moves[ :STAY ] = @ants.collect { |a| a.pos }
 			return moves
 		end
 
@@ -393,7 +393,7 @@ class Collective
 		$logger.info { "Enemies in danger distance: #{ in_enemies }" }
 		return false if in_enemies.empty?
 
-		harmless, enemies, guess = Analyze.guess_enemy_moves in_enemies 
+		harmless, enemies, guess = Analyze.guess_enemy_moves in_enemies, leader.pos
 
 		return false if guess.length == 0
 
@@ -401,16 +401,16 @@ class Collective
 		return false if moves.length == 0
 
 		# Init the cache
-		Analyze.init_hits_cache moves, guess
+		Analyze.init_hits_cache [[self, moves ]], guess
 
 		best_moves = Analyze.determine_best_move guess, [ self ]
 
 		if best_moves.nil?
 			# Let the old logic handle it.
 			return false
-		elsif count == 1
+		elsif best_moves.length == 1
 			# Only one option 
-			dir = Distance.new(self.pos, best_moves[0]).dir
+			dir = Distance.new(self.pos, best_moves[0][0]).dir
 			return dir 
 		else
 			# Multiple options
