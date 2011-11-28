@@ -214,7 +214,8 @@ class Hypothesis
 		elsif which == :SLICE
 			point = [ (source.row + sym[0] ) % ai.rows, ( source.col + sym[1] ) % ai.cols ]
 
-			while point[0] != source.row and point[1] != source.col
+			# Iterate until we reach the original source again
+			while !( point[0] == source.row and point[1] == source.col )
 				targets << ai.map[ point[0] ][ point[1] ]
 
 				point = [ (point[0] + sym[0] ) % ai.rows, ( point[1] + sym[1] ) % ai.cols ]
@@ -743,11 +744,11 @@ class Patterns
 		# At least 2 players
 		# assume not more than 16 players
 		row_dims.delete_if { |r| r[0] < 2 or r[0] >= 16 }
-		#logger.info { "Row dimensions possible values: #{ row_dims }" }
+		$logger.info { "Row dimensions possible values: #{ row_dims }" }
 
 		col_dims = factors_of cols
 		col_dims.delete_if { |r| r[0] < 2 or r[0] >= 16 }
-		#$logger.info { "Col dimensions possible values: #{ col_dims }" }
+		$logger.info { "Col dimensions possible values: #{ col_dims }" }
 
 		# Combine workable values
 		dims = []
@@ -763,15 +764,44 @@ class Patterns
 		$logger.info { "Workable values: #{ dims }" }
 
 		# Define the tests for slices
+		slice_tests = []
 		dims.each  do |dim|
 			# Coords in one direction may be multiples up to (not including) number of players
-			(1...(dim[0])).each do | factor |
-				@tests << SliceHyp.new( self, :SLICE, :ALL, :rot0, dim[0], dim[1], factor*dim[2] )
+			(0...(dim[0])).each do | rfactor |
+				(0...(dim[0])).each do | factor |
+					next if rfactor == 0 and factor == 0
+
+					test = SliceHyp.new( self, :SLICE, :ALL, :rot0, dim[0], rfactor*dim[1], factor*dim[2] )
+
+					unless test_double test, slice_tests
+						slice_tests << test 
+					end
+				end
 			end
 		end
 
+		@tests += slice_tests
+
+
 		$logger.info "done"
 	end
+
+	# Pre: all tests are slices
+	def test_double t2, tests
+		tests.clone.each do |t|
+			#$logger.info { "Testing #{t2 } against #{t }" }
+
+			if t.row_inc == t2.row_inc and t.col_inc == t2.col_inc
+				$logger.info { "#{t2 } double; removing" }
+
+				return true
+			end
+
+		end
+
+		false
+	end
+
 
 	def match_tests source
 		@tests.each do |test|
@@ -871,7 +901,7 @@ class Patterns
 
 
 	def handle_confirm test
-		$logger.info "#{ test } is confirmed"
+		$logger.info(true) {  "#{ test } is confirmed" }
 
 		# Kill of the competing tests with incompatible symmetry
 		$logger.info "remove incompatible symmetry tests"

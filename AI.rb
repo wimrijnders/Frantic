@@ -44,8 +44,12 @@ class AI
 
 	# Radii, unsquared. Floats.
 	attr_accessor :viewradius, :attackradius, :spawnradius
-	
-	# Following vailable only after game's over.
+
+	attr_accessor :furthest
+		
+	#
+	# Following available only after game's over.
+	#
 
 	# Number of players.
 	attr_accessor :players
@@ -152,6 +156,7 @@ class AI
 				$timer.start :total
 
 				$timer.start( :read ) { over = read_turn }
+				$logger.info "done read_turn"
 
 				unless over 
 					$timer.start :turn
@@ -159,6 +164,7 @@ class AI
 					catch :maxed_out do
 						$timer.start( :yield )    { 
 							$timer.start( :turn_end ) { turn_end }
+							$logger.info "done turn_end"
 
 							yield self
 						}
@@ -321,6 +327,7 @@ class AI
 		$timer.start :loop
 
 		until((rd=@stdin.gets.strip)=='go')
+$logger.info { "3" }
 			$timer.start :loop_intern
 
 			_, type, row, col, owner = *rd.match(/(w|f|a|d|h) (\d+) (\d+)(?: (\d+)|)/)
@@ -432,10 +439,12 @@ class AI
 			detect_enemies @new_enemy_ants
 		}
 
+if false
 		$timer.start( :sort_friends_view ) {
 			friends = sort_view my_ants
 			add_sorted_view friends, false
 		}
+end
 	end
 	
 	
@@ -714,6 +723,48 @@ end
 	end
 
 
+	def nearest_view square
+		ants = neighbor_ants square
+		unless ants[0].nil?
+			ants[0][0]
+		else
+			nil
+		end
+	end
+
+
+	def neighbor_ants square
+		ants = []
+		$region.all_quadrant( square) do |sq|
+			next unless sq.ant and sq.ant.mine?
+			a = sq.ant
+
+			if square == sq 
+				$logger.info "WARNING: source square also present in result" 
+			end
+
+			item = $pointcache.get square, sq
+			next if item.nil?
+
+			ants << [ a, item ]
+		end
+		PointCache.sort_valid ants
+
+		$logger.info { "ants: #{ ants }" }
+
+		# Output has distance info only
+		ants2 = []
+		ants.each do |l|
+			ants2 << [ l[0], l[1][0] ]
+		end
+
+		$logger.info { "ants2: #{ ants2 }" }
+
+		ants2
+	end
+
+
+
 	def sort_view from_list
 		$logger.info "entered"
 
@@ -725,7 +776,7 @@ end
 				a = sq.ant
 
 				# Don't sort enemies for collective followers
-				next if a.collective_follower?
+				#next if a.collective_follower?
 
 				item = $pointcache.get a.square, e.square
 				next if item.nil?
@@ -755,6 +806,7 @@ end
 			end
 		end
 	end
+
 
 	def add_enemy sq, enemy
 		if sq.ant.nil?

@@ -1,8 +1,8 @@
 
 class Food
-	attr_accessor :coord, :active
-
 	COUNTER_LIMIT = 10
+
+	attr_accessor :coord, :active
 
 	def initialize coord
 		@coord = coord
@@ -21,6 +21,10 @@ class Food
 
 	def col
 		@coord[1]
+	end
+
+	def square 
+		$ai.map[ @coord[0] ][ @coord[1] ]
 	end
 
 	def add_ant ant

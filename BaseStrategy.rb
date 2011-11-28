@@ -93,7 +93,8 @@ class BaseStrategy
 			l.reset
 	
 			$timer.start( :closest_ant_region ) {
-				ant = BaseStrategy.closest_ant_region sq, ai
+#				ant = BaseStrategy.closest_ant_region sq, ai
+				ant = ai.nearest_view l.square
 
 				unless ant.nil?
 					if ant.set_order sq, :FORAGE

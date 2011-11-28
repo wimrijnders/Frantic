@@ -114,7 +114,8 @@ class MyAnt < Ant
 	attr_accessor :moved_to, :prev_move, 
 		:abspos # absolute position relative to leader, if part of collective
 	
-	attr_accessor :collective, :friends, :enemies
+	attr_accessor :collective, :enemies
+	attr_writer   :friends
 
 	#attr_accessor :trail
 
@@ -146,6 +147,15 @@ class MyAnt < Ant
 	def default
 		return :STAY if stuck?
 
+if false
+		# if nothing better to do, move to the furthest ant location.
+		unless orders? or @ai.furthest.nil? or has_order :GOTO
+			set_order @ai.furthest.pos, :GOTO
+			$logger.info { "#{ self } moving out to #{ @ai.furthest.pos }" }
+		end
+end
+
+if false
 		# if next to a wall, run into it on purpose
 		[ :N, :E, :S, :W ].each do |dir|
 			if square.neighbor( dir).water?
@@ -155,6 +165,7 @@ class MyAnt < Ant
 				return dir
 			end
 		end
+end
 
 if @default.nil?
 		# Pick a random next move - not the move back if you can help it
@@ -284,6 +295,7 @@ end
 	def can_pass? newdir, do_cur_ant = true
 		square.neighbor(newdir).passable? do_cur_ant
 	end
+
 
 	# Generate all possible movements of this ant 
 	def all_moves harmless
@@ -465,7 +477,8 @@ end
 		# Not called any more; sorting done externally,see :sort_friends_view
 		if @friends.nil?
 			$logger.info "Sorting friends."
-			@friends = $region.get_neighbors_sorted self, ai.my_ants
+			@friends = ai.neighbor_ants self.square
+			#@friends = $region.get_neighbors_sorted self, ai.my_ants
 
 			@friends.delete self
 		end
@@ -494,6 +507,11 @@ end
 		@friends[0]
 	end
 
+	def friends
+		make_friends
+
+		@friends
+	end
 
 	# 
 	# Enemy ants
@@ -570,7 +588,7 @@ end
 		#moved = false
 		#moved_to = nil
 		@enemies = []
-		@friends = []
+		@friends = nil  #[]
 	end
 
 

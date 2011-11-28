@@ -8,12 +8,17 @@ module Evasion
 
 
 	def evade_init
-		# WRI test- all ants start out with same dir
+		# Test- all ants start out with same dir
+		# Works well with mazes, sucks otherwise
+		#@left = false
 
-		@left = false
+		# Strict alternation not such a good idea, but right/left
+		# runs in sync with NESW - so same dir ants always evade same way.
+		#@left = @@curleft
+		#@@curleft = !@@curleft
 
-#		@left = @@curleft
-		@@curleft = !@@curleft
+		# So let's randomize it a bit
+		@left = [true,false][ rand(2) ]
 	end
 
 	def evade_reset

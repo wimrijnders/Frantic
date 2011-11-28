@@ -125,7 +125,8 @@ module Orders
 		:ASSEMBLE,
 		:DEFEND_HILL,
 		:RAZE,
-		:HARVEST
+		:HARVEST,
+		:GOTO
 	]
 
 	def sort_orders
@@ -238,8 +239,8 @@ module Orders
 			end
 		end
 
-		if what == :EVADE_GOTO
-			clear_order :EVADE_GOTO
+		if [ :EVADE_GOTO, :GOTO ].include? what
+			clear_order what 
 		end
 
 		$logger.info { "Setting order #{ what } on square #{ square.to_s } for #{ self.to_s }" }

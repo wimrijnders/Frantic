@@ -163,8 +163,14 @@ class Strategy < BaseStrategy
 			# Determine if there are enemy ants defending 
 			if ai.defensive?
 				defenders = BaseStrategy.nearby_ants_region sq, ai.enemy_ants
-				$logger.info "Defensive mode and #{ defenders.length } defenders for hill #{ sq}. Not razing."
-				next
+				unless defenders.empty?
+					$logger.info { 
+						"Defensive mode and #{ defenders.length } defenders " +
+						" for hill #{ sq}. Not razing."
+					}
+
+					next
+				end
 			end
 
 
@@ -197,7 +203,10 @@ class Strategy < BaseStrategy
 				ant.set_order sq, :RAZE
 			end unless nearby_ants.nil?
 
-		end if $region
+
+			# Do only one hill per turn
+			break
+		end
 	end
 
 
@@ -262,6 +271,9 @@ class Strategy < BaseStrategy
 			if furthest
 				$logger.info "furthest #{ furthest }."
 				$patterns.add_square furthest.square
+
+				# Note that last filled in value is remembered
+				ai.furthest = furthest
 			end
 			break			# TODO: determine why this is here
 		end
@@ -338,7 +350,7 @@ class Strategy < BaseStrategy
 		$logger.info "=== Enlist Phase ==="
 		$timer.start :Enlist_Phase
 		# Don't harvest if	not enough ants
-		if ai.my_ants.length > 10 and not ai.turn.maxed_out?
+		if ai.my_ants.length > AntConfig::HARVEST_LIMIT and not ai.turn.maxed_out?
 			ai.my_ants.each do |ant|
 				next if ant.orders?
 				next if ant.moved?

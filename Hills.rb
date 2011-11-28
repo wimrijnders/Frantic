@@ -1,3 +1,42 @@
+class Hill
+	COUNTER_LIMIT = 5
+
+	attr_accessor :active
+	attr_reader :owner
+
+
+	def initialize owner
+		$logger.info "initialized hill owner #{ owner}"
+		@owner = owner
+		@active = true
+
+		@counter = 0
+	end
+
+	def set_dead
+		$logger.info "Hill died"
+		@owner = -1
+	end
+
+
+	def should_raze?
+		# Skip self and dead hills
+		unless @owner != 0 and @owner != -1
+			false
+		else
+			if @counter <= 0
+				$logger.info { "Resetting hill counter owner #{ @owner }" }
+				@counter = COUNTER_LIMIT
+
+				true
+			else
+				@counter -= 1
+				false
+			end
+		end
+	end
+end
+
 
 class Hills
 
@@ -6,7 +45,7 @@ class Hills
 	end
 
 	def start_turn
-		@list.each_value {|v| v[1] = false }
+		@list.each_value {|v| v.active = false }
 	end
 
 	#
@@ -19,11 +58,11 @@ class Hills
 
 		if @list[key].nil?
 			$logger.info { "Adding hill at #{ key }." }
-			@list[key] =  [ owner, true ]
+			@list[key] =  Hill.new owner
 			true
 		else
 			$logger.info { "hill at #{ key } already present." }
-			@list[key][1] =  true
+			@list[key].active =  true
 			false
 		end
 	end
@@ -33,7 +72,7 @@ class Hills
 		key = coord[0].to_s + "_" + coord[1].to_s
 
 		unless @list[key].nil?
-			@list[key][1]
+			@list[key].active
 		else
 			nil
 		end
@@ -53,7 +92,7 @@ class Hills
 			$logger.info { "Hill at #{ key } not present, can't remove." }
 		else
 			$logger.info { "Removing hill on #{ key } from list" }
-			@list[key][0] = -1
+			@list[key].set_dead
 		end
 	end
 
@@ -63,55 +102,57 @@ class Hills
 		if @list[key].nil?
 			false
 		else
-			@list[key][0] == 0
+			@list[key].owner == 0
 		end
 	end
+
 
 	def hill? square
 		key = square.row.to_s + "_" + square.col.to_s
 		not @list[key].nil?
 	end
-		
+
+	
+	def key_to_coord key
+		coord = key.split "_"
+		coord[0] = coord[0].to_i
+		coord[1] = coord[1].to_i
+
+		coord
+	end
+	
 
 	def each_enemy
 		@list.clone.each_pair do |key, item|
-			owner = item[0]
+			next unless item.should_raze?
 
-			# Skip self and dead hills
-			next if owner == 0
-			next if owner == -1 
+			owner = item.owner
 
 			$logger.info { "hill owner #{ owner }" }
-			coord = key.split "_"
-			coord[0] = coord[0].to_i
-			coord[1] = coord[1].to_i
 
-			yield owner, coord
+			yield owner, key_to_coord( key )
 		end
 	end
 
 
 	def each_friend
 		@list.clone.each_pair do |key, item|
-			owner = item[0]
+			owner = item.owner
 
 			# Skip enemies and dead hills
 			next if owner == -1 
 			next if owner != 0
 
-			coord = key.split "_"
-			coord[0] = coord[0].to_i
-			coord[1] = coord[1].to_i
-
-			yield Square.coord_to_square coord
+			yield Square.coord_to_square( key_to_coord( key ) )
 		end
 	end
+
 
 	def each_pair 
 		# Adding clone allows to change the @hills
 		# within the called block
 		@list.clone.each_pair do |key, item|
-			owner = item[0]
+			owner = item.owner
 
 			yield key, owner
 		end
