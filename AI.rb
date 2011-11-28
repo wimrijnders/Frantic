@@ -58,7 +58,7 @@ class AI
 	attr_accessor :stdout
 
 	attr_accessor :hills, :harvesters
-	attr_reader :turn
+	attr_reader :turn, :food
 
 	# Initialize a new AI object.
 	# Arguments are streams this AI will read from and write to.
@@ -187,6 +187,7 @@ class AI
 						$timer.start( :fibers_resume ) {
 							$fibers.resume
 						}
+						$logger.info "Done fibers_resume"
 					end
 
 					$logger.info "sending go"
@@ -327,7 +328,6 @@ class AI
 		$timer.start :loop
 
 		until((rd=@stdin.gets.strip)=='go')
-$logger.info { "3" }
 			$timer.start :loop_intern
 
 			_, type, row, col, owner = *rd.match(/(w|f|a|d|h) (\d+) (\d+)(?: (\d+)|)/)
@@ -743,7 +743,10 @@ end
 				$logger.info "WARNING: source square also present in result" 
 			end
 
-			item = $pointcache.get square, sq
+			# Direction is from ants in region to central square
+			# This loads the cache with the correct values for
+			# movement, if the path is valid.
+			item = $pointcache.get sq, square
 			next if item.nil?
 
 			ants << [ a, item ]

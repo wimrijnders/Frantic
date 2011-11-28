@@ -188,7 +188,11 @@ class Distance  < AntObject
 		return false if walk.length == 0
 		walked_full_path = ( walk[-1][0] == to )
 
-		$logger.info { "Direct path between #{ from } and #{ to }" }
+		if walked_full_path 
+			$logger.info { "Direct path between #{ from } and #{ to }" }
+		else
+			$logger.info { "No direct path between #{ from } and #{ to }" }
+		end
 
 		walked_full_path
 	end
@@ -212,10 +216,10 @@ class Distance  < AntObject
 			dir = d.dir
 
 			next_sq = sq.neighbor( dir)
-			break if next_sq.water?
 
 			result << [ sq, dir, d.dist ]
 
+			break if next_sq.water?
 			sq = next_sq 
 			d = d.adjust dir
 		end

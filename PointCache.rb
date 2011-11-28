@@ -119,7 +119,8 @@ $logger.info "entered"
 
 
 	def set from, to, distance, item, invalid = false, move = nil
-$logger.info "entered move #{ move }"
+		$logger.info "entered, move #{ move }"
+
 		raise "#{from} not a square" if not from.is_a? Square
 		raise "#{to} not a square" if not to.is_a? Square
 
@@ -158,26 +159,24 @@ $logger.info "entered move #{ move }"
 
 
 		unless found 
-$logger.info "not found"
+			$logger.info "not found"
 
 			# Assume direct path
 			d = Distance.get from, to
 			distance = d.dist
 			move = d.dir if move.nil?
 
-$logger.info "has_direct_path"
 			if has_direct_path from, to
 				# It really is a direct path!
+				$logger.info "It's a direct path"
 				invalid = false
 			else
 				invalid = true
 			end
 		else
-$logger.info "found"
 			move = determine_move from, to if move.nil?
 		end
 
-$logger.info "result"
 		result = [distance, item, move, invalid ]
 
 		#$logger.info {

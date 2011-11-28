@@ -73,7 +73,9 @@ class Order
 
 	def handle_liaison cur_sq, ai
 		sq = ai.map[ square.row][ square.col ]
-		return sq unless $region 
+		unless $region 
+			return sq 
+		end
 
 		if @liaison
 			# First condition is to keep on moving to final target, 
@@ -87,7 +89,7 @@ class Order
 		unless @liaison
 			liaison  = $region.path_direction cur_sq, sq
 			if liaison.nil?
-				$logger.info { "WARNING: No liason for order #{ order } to target #{ sq }" }
+				$logger.info { "WARNING: No liaison for order #{ order } to target #{ sq }" }
 
 				# We must have drifted off the path - restart search
 				Region.add_searches sq, [ cur_sq ], true 
@@ -411,7 +413,7 @@ module Orders
 		while orders?
 			order_sq    = @orders[0].square
 			order_order = @orders[0].order
-			#$logger.info "Checking order #{ order_order } on #{ order_sq}"
+			$logger.info "Checking order #{ order_order } on #{ order_sq} for #{ self }"
 
 			if order_order == :ATTACK
 				d = Distance.get self.square, order_sq 
@@ -482,6 +484,10 @@ module Orders
 				sq = order_sq
 				str = ""
 
+if false	
+	# No need to determine close ant ; if it is in_view, the food would be active
+	# and therefor visible
+
 				closest = closest_ant_view [ sq.row, sq.col], @ai
 				unless closest.nil?
 					d = Distance.get closest, sq
@@ -510,7 +516,41 @@ module Orders
 				end
 
 				$logger.info { "Food #{ sq } still there: #{ str}" }
+end
+
+				result = @ai.food.active? [ sq.row, sq.col ]
+				if result.nil?
+					# food is already gone. Skip order
+					clear_first_order
+					str << "not in list!"
+					next
+				elsif result
+					str << "yes"
+			
+					d = Distance.get self, sq
+					if d.dist == 1
+						# Special case; sometimes food appears right next to
+						# ant (eg first turn next to an anthill). For some reason
+						# it does not get consumed immediately
+						$logger.info { "#{ self } right next to food #{ sq }." }
+						clear_first_order true
+						stay
+						return true
+					end
+				else
+					d = Distance.get self, sq
+					if d.in_view?
+						str << "no"
+						clear_first_order true
+						next
+					else
+						str << "can't tell, out of view"
+					end
+				end
+				$logger.info { "Food #{ sq } still there: #{ str}" }
 			end
+
+
 
 			# Check if hill still present when in-range
 			if order_order == :RAZE
@@ -534,6 +574,7 @@ module Orders
 
 							clear_first_order
 							@ai.clear_raze sq
+							next
 						end
 					else
 						str << "can't tell, out of view"
@@ -588,13 +629,29 @@ module Orders
 
 		return false if !orders?
 
-		to = @orders[0].handle_liaison( self.square, ai )
-		$logger.info { "#{ to_s } order #{ order_order } to #{ order_sq }, dir #{ to }" }
-		if to.nil? 
-			return false
+
+		item = $pointcache.get self.square, order_sq
+		to = nil
+		unless item.nil? and not item[3]
+			$logger.info "Valid pointcache item detected"
+
+			to = item[2]	# to is a direction
+			move to, order_sq
 		else
-			move_to to
+			to = @orders[0].handle_liaison( self.square, ai )
+
+			if to.nil? 
+				$logger.info "No to-square"
+				return false
+			else
+				to = item[2]	# to is a square
+				move_to to
+			end
 		end
+
+		$logger.info { 
+			"#{ to_s } order #{ order_order } to #{ order_sq }, dir/to #{ to }" 
+		}
 
 		true
 	end

@@ -133,6 +133,10 @@ class Analyze
 				end
 			end
 
+
+
+
+
 			# Clean up the doubles in the list
 			enemies_danger.uniq!
 			enemies_peril.uniq!
@@ -155,18 +159,41 @@ class Analyze
 			#
 
 			# Note: we are using the coords of the original ants as param
-			# Better would be to determine the shortest distance between an enemy and a friend
+			# Better would be to determine the shortest distance between an
+			# enemy and a friend
 			# TODO: sort this out.
 			harmless, out_enemies, guess = Analyze.guess_enemy_moves enemies_danger, ant.square 
+
 
 			moves = [] 
 			(friends_danger + friends_peril).each do |ant4|
 				moves <<  [ ant4, ant4.all_moves( harmless) ]
 			end
-			#$logger.info { "All possible moves: #{ moves }" }
 
 			# Init the cache
 			Analyze.init_hits_cache moves, guess
+			#$logger.info { "All possible moves: #{ moves }" }
+
+			# Remove ants from the danger list if they have no 
+			# influence on the effect of the conflict
+			friends_danger.clone.each do |a|
+				unless Analyze.can_kill? a.id
+					$logger.info {
+						"#{ a } does not influence conflict. " +
+						"Removing from danger list."
+					}
+
+					friends_danger.delete a
+					friends_peril << a
+				end
+			end
+			$logger.info { "Friends in danger post: #{ friends_danger }" }
+			$logger.info { "Friends in peril post: #{ friends_peril }" }
+			if friends_danger.empty?
+				$logger.info { "No friends in danger, not analyzing" }
+				next
+			end
+
 
 			# Do the analysis for the fighting ants
 			best_moves = Analyze.determine_best_move guess, friends_danger
@@ -492,6 +519,24 @@ end
 
 
 	#
+	# Determine if this ant has any influence at all
+	# in the conflict. If none of its moves hurts the
+	# enemy, it has no influence
+	#
+	def self.can_kill? index
+		return false if @@hits_cache[index].nil?
+
+		@@hits_cache[index].each_pair do |k,v|
+			if not v[0].empty?
+				return true
+			end
+		end
+
+		false
+	end
+
+
+	#
 	# Select moves which do actual damage first.
 	#
 	def self.hits_bodycount index
@@ -545,7 +590,7 @@ end
 
 		hits = @@hits_cache[index]
 
-		$logger.info { "hits: #{ hits }" }
+		#$logger.info { "hits: #{ hits }" }
 
 		raise "ERROR: hits nil; should never happen!" if hits.nil?
 

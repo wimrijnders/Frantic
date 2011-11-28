@@ -138,5 +138,16 @@ class FoodList
 			@list.each {|l| l.remove_ant ant }
 		end
 	end
+
+	def active? coord
+		@list.each {|l| 
+			if l.coord == coord
+				return l.active
+			end
+		}
+
+		# Food not present in list
+		nil
+	end
 end
 
