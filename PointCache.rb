@@ -97,7 +97,8 @@ class PointCache
 
 
 	def	determine_move from, to
-$logger.info "entered"
+		$logger.info "entered"
+
 		next_sq = $region.path_direction from, to
 
 		if false === next_sq
@@ -126,39 +127,30 @@ $logger.info "entered"
 
 		found = false
 
-		while true
+		if item.nil?
 			if from.region.nil?
 				$logger.info "#{from} region nil; skipping"
-				break
-			end
-
-			if to.region.nil?
+			elsif to.region.nil?
 				$logger.info "#{to} region nil; skipping"
-				break
+				item = $region.get_path_basic from.region, to.region
 			end
 
-			item = $region.get_path_basic from.region, to.region
+			if distance.nil? and not item.nil?
+				p = Pathinfo.new from, to, item[:path]
 
-			if item.nil?
-				#$logger.info "#{item} item nil; skipping"
-				break
+				if p.path.nil?
+					$logger.info "#{p} path nil; skipping"
+				else
+					distance = p.dist
+				end
 			end
-
-			p = Pathinfo.new from, to, item[:path]
-
-			if p.path.nil?
-				$logger.info "#{p} path nil; skipping"
-				break
-			end
-
-			distance = p.dist
-			found = true
-			invalid = false
-			break
 		end
 
 
-		unless found 
+		if not item.nil? and not distance.nil?
+			move = determine_move from, to if move.nil?
+			invalid = false
+		else
 			$logger.info "not found"
 
 			# Assume direct path
@@ -166,15 +158,13 @@ $logger.info "entered"
 			distance = d.dist
 			move = d.dir if move.nil?
 
-			if has_direct_path from, to
+			if set_walk from, to, nil, true
 				# It really is a direct path!
 				$logger.info "It's a direct path"
 				invalid = false
 			else
 				invalid = true
 			end
-		else
-			move = determine_move from, to if move.nil?
 		end
 
 		result = [distance, item, move, invalid ]
@@ -391,7 +381,7 @@ $logger.info "done"
 	#
 	# If full_only set, only store path if full path walked
 	#
-	# return true if full path walked
+	# return true if full path walked.
 	#
 	def set_walk from, to, lastpoint = nil, full_only = false
 		return false if from == to
@@ -405,11 +395,11 @@ $logger.info "done"
 
 		walked_full_path = ( walk[-1][0] == lastpoint )
 
-		return false if not walked_full_path and full_only
-
 		$logger.info {
 			"walked full path #{ from }-#{to}" if walked_full_path
 		}
+
+		return false if not walked_full_path and full_only
 
 		walk.each do |w|
 			if walked_full_path

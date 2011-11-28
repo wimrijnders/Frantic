@@ -346,6 +346,7 @@ class Strategy < BaseStrategy
 			$timer.end :Kamikaze_Phase
 		end
 
+if false
 		ai.turn.check_maxed_out
 		$logger.info "=== Enlist Phase ==="
 		$timer.start :Enlist_Phase
@@ -382,6 +383,7 @@ class Strategy < BaseStrategy
 			end
 		end
 		$timer.end :Enlist_Phase
+end
 
 
 		ai.turn.check_maxed_out

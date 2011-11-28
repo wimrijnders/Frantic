@@ -1131,6 +1131,7 @@ private
 			to = to.square
 		end
 
+if false
 		pathitem = get_path_basic from.region, to.region
 	
 		unless pathitem.nil?	
@@ -1141,6 +1142,11 @@ private
 		walk = Distance.get_walk from, to
 		if walk.length > 0 and walk[-1][0] == to
 			$logger.info "Found walk for #{ from }-#{to }"
+			return true
+		end
+end
+		unless $pointcache.get( from, to ).nil?
+			$logger.info "There's a path for #{ from }-#{to }"
 			return true
 		end
 

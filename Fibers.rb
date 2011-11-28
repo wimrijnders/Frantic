@@ -323,7 +323,6 @@ class Fibers
 				end
 
 				begin 
-					$logger.info { "running #{ f }" }
 					f.resume
 					$ai.turn.check_time_limit
 				rescue FiberError
@@ -340,7 +339,11 @@ class Fibers
 				end
 
 			}
+
+			$logger.info { "End loop list length: #{ list.length }" }
 		end
+
+		$logger.info { "End" }
 	end
 
 
