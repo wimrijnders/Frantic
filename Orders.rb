@@ -245,6 +245,10 @@ module Orders
 			clear_order what 
 		end
 
+		if [ :FORAGE ].include? what
+			clear_order :EVADE_GOTO 
+		end
+
 		$logger.info { "Setting order #{ what } on square #{ square.to_s } for #{ self.to_s }" }
 
 		# ASSEMBLE overrides the rest of the orders

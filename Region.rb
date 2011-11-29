@@ -640,54 +640,94 @@ private
 
 
 	#
+	# Define square sq as liaison between its own region
+	# and the given region
 	#
-	#
-	def set_region square, x, y
-		sq = square.rel [ x, y ]
-
-		if sq.region.nil?
-			if sq.water?
-				# Set water so that we know it has been scanned
-				sq.region = false
-				return
-			end
-
-			# If no region present, fill one in
-			# Check neighbor regions, and select that if present	
-			regions = neighbor_regions sq
-
-			# Shuffle up in order to avoid very elognated regions
-			regions = regions.sort_by { rand }
-
-			if regions.length > 0
-				regions.each do |region|
-
-					unless sq.region
-						# First region we encounter, we use for current square
-						sq.region = region
-					else
-						# For the rest, we are liaison
-						from = sq.region
-						to   = region
+	def assign_liaison sq, region 
+		from = sq.region
+		to   = region
 	
-						set_liaison from, to, sq
-						set_liaison to, from , sq
-					end
-				end
-			else 
-				# No neighbors, fill in a new region
-				assign_region sq
-			end
-		end
+		set_liaison from, to, sq
+		set_liaison to, from , sq
 	end
 
 
+	#
+	# Assign region to square with given offset from given square
+	#
+	def set_region square, x, y
+		sq = square.rel [ x, y ]
+		
+		return unless sq.region.nil?
+
+		if sq.water?
+			# Set water so that we know it has been scanned
+			sq.region = false
+			return
+		end
+
+		regions = neighbor_regions sq
+
+		if regions.empty?
+			# No neighbors, assign a new region
+			assign_region sq
+			return
+		end
+
+		# Shuffle up in order to avoid very elognated regions
+		#regions = regions.sort_by { rand }
+
+		prefix = region_prefix( sq) 
+
+		# Determine the first neighbor region with the given prefix
+		region = nil
+		regions.each do |r|
+			$logger.info { "testing prefix #{ prefix } against #{ r/1000*1000 }, region #{r}" }
+			if prefix == r/1000*1000
+				region = r
+				break
+			end
+		end
+
+		unless region.nil?
+			$logger.info { "Found #{ region }" }
+			sq.region = region
+			regions.delete region		# Don't liaison to current region
+		else
+			assign_region sq
+		end
+		
+		# Assign liaisons for the new region
+		regions.each do |r|
+			assign_liaison sq, r
+		end
+	end
+
+if false
 	def quadrant
 		dim = @template.length
 		(1...dim).each do |x|
 			(0...dim).each do |y|
 				next unless @template[x][y]
 				yield x, y
+			end
+		end
+	end
+end
+
+	def quadrant
+		dim = @template.length
+		(1...dim).each do |radius|
+			x = radius
+			(0..radius).each do |y|
+				next unless @template[x][y]
+				yield x, y
+			end
+
+			y2 = radius
+			(radius -1).downto(1) do |x2|
+				next unless @template[x2][y2]
+				yield x2, y2
 			end
 		end
 	end
@@ -707,16 +747,22 @@ private
 
 	public
 
+	def region_prefix sq
+		pref_row = sq.row/10 
+		pref_col = sq.col/10 
+		prefix = (pref_row*100 + pref_col)*1000
+	end
+
+
 	def assign_region sq, prefix = nil
 		if prefix.nil?
-			pref_row = sq.row/10 
-			pref_col = sq.col/10 
-			prefix = (pref_row*100 + pref_col)*1000
+			prefix = region_prefix sq
 		end
 
 		sq.region = prefix + @@counter
 		@@counter += 1
 	end
+
 
 	def show_paths	paths
 		str = ""
@@ -1145,8 +1191,9 @@ if false
 			return true
 		end
 end
-		unless $pointcache.get( from, to ).nil?
-			$logger.info "There's a path for #{ from }-#{to }"
+		item =  $pointcache.get( from, to )
+		if not item.nil? and not item[3]
+			$logger.info "There's a known path for #{ from }-#{to }"
 			return true
 		end
 

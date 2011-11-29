@@ -340,22 +340,22 @@ class Fibers
 
 			}
 
-			$logger.info { "End loop list length: #{ list.length }" }
+			#$logger.info { "End loop list length: #{ list.length }" }
 		end
 
-		$logger.info { "End" }
+		#$logger.info { "End" }
 	end
 
 
+	Format1 = "%10s %8s %7s %7s %5s\n"
+	Format  = "%10s %8s %7d %7d %5d\n"
 	def status
-		format1 = "%10s %8s %7s %7s %5s\n"
-		format  = "%10s %8s %7d %7d %5d\n"
 		str = "Fibers:\n" +
-			format1 % [ "Name      ", "status  ", "  count", "yields", "  max" ] +
-			format1 % [ "==========", "========", "  =====", "======", "=====" ]
+			Format1 % [ "Name      ", "status  ", "  count", "yields", "  max" ] +
+			Format1 % [ "==========", "========", "  =====", "======", "=====" ]
 
 		@list.each { |f|
-			str << format % f.stats
+			str << Format % f.stats
 		 }
 
 		str

@@ -88,17 +88,24 @@ class BaseStrategy
 				break
 			end
 
+			l.reset
+
 			ai.turn.check_maxed_out
 
-			l.reset
 	
 			$timer.start( :closest_ant_region ) {
 #				ant = BaseStrategy.closest_ant_region sq, ai
 				ant = ai.nearest_view l.square
 
 				unless ant.nil?
-					if ant.set_order sq, :FORAGE
-						l.add_ant ant
+					# Food is in view; check if still there
+					if l.square.food?
+						if ant.set_order sq, :FORAGE
+							l.add_ant ant
+						end
+					else
+						$logger.info { "Food #{ l.square } gone." }
+						ai.food.remove [ l.square.row, l.square.col ]
 					end
 				end
 			}

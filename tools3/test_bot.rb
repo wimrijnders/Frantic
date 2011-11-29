@@ -8,7 +8,7 @@ require '../Config'
 live    = true
 bot_num = nil 
 turns   = AntConfig::NUM_TURNS 
-flags   = "--turntime=#{ AntConfig::TURN_TIME }" #--serial" # "--nolaunch"
+flags   = "-R --turntime=#{ AntConfig::TURN_TIME }" #--serial" # "--nolaunch"
 
 
 #
@@ -64,8 +64,6 @@ bots = [
 	"ruby ../frantic05/MyBot.rb",		# Frantic - previous version
 	"ruby ../frantic04/MyBot.rb",		# Frantic - previous version
 	"ruby ../frantic03/MyBot.rb",		# Frantic - previous version
-
-
 
 
 	"python sample_bots/python/GreedyBot.py",
