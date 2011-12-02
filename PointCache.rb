@@ -71,6 +71,7 @@ class PointCache
 				else
 				 	result = t	
 					do_nil = false
+					Region.add_searches from, [ to ]
 				end
 			end
 		end
@@ -99,7 +100,7 @@ class PointCache
 	def	determine_move from, to
 		$logger.info "entered"
 
-		next_sq = $region.path_direction from, to
+		next_sq = $region.path_direction from, to, false
 
 		if false === next_sq
 			# Move directly
@@ -125,45 +126,51 @@ class PointCache
 		raise "#{from} not a square" if not from.is_a? Square
 		raise "#{to} not a square" if not to.is_a? Square
 
-		found = false
-
+		# try direct path first
 		if item.nil?
-			if from.region.nil?
-				$logger.info "#{from} region nil; skipping"
-			elsif to.region.nil?
-				$logger.info "#{to} region nil; skipping"
-				item = $region.get_path_basic from.region, to.region
-			end
-
-			if distance.nil? and not item.nil?
-				p = Pathinfo.new from, to, item[:path]
-
-				if p.path.nil?
-					$logger.info "#{p} path nil; skipping"
-				else
-					distance = p.dist
-				end
-			end
-		end
-
-
-		if not item.nil? and not distance.nil?
-			move = determine_move from, to if move.nil?
-			invalid = false
-		else
-			$logger.info "not found"
-
-			# Assume direct path
 			d = Distance.get from, to
-			distance = d.dist
-			move = d.dir if move.nil?
-
 			if set_walk from, to, nil, true
 				# It really is a direct path!
 				$logger.info "It's a direct path"
+				distance = d.dist
+				item = @zero_pathitem
+				move = d.dir
 				invalid = false
 			else
-				invalid = true
+
+				if from.region.nil?
+					$logger.info "#{from} region nil; skipping"
+				elsif to.region.nil?
+					$logger.info "#{to} region nil; skipping"
+				else
+					item = $region.get_path_basic from.region, to.region
+				end
+
+				if distance.nil? and not item.nil?
+					p = Pathinfo.new from, to, item[:path]
+	
+					if p.path.nil?
+						$logger.info "#{p} path nil; skipping"
+					else
+						distance = p.dist
+					end
+				end
+
+
+				if not item.nil? and not distance.nil?
+					move = determine_move from, to if move.nil?
+					invalid = false
+				else
+					$logger.info "not found; assume direct path"
+
+					# d from here above
+					distance = d.dist
+					move = d.dir
+					item = @zero_pathitem
+					invalid = true
+	
+					Region.add_searches from, [ to ]
+				end
 			end
 		end
 
@@ -402,6 +409,9 @@ $logger.info "done"
 		return false if not walked_full_path and full_only
 
 		walk.each do |w|
+			item = nil
+			dist = nil
+
 			if walked_full_path
 				# ignore regions altogether
 				item = @zero_pathitem

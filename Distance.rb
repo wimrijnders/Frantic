@@ -104,6 +104,43 @@ class Distance  < AntObject
 
 
 	#
+	# Make a selection of given directions based
+	# an accesibility from given square
+	#
+	def select_accessible square, dir1, dir2, land_only
+		ret_dir = nil
+
+		sq1 = square.neighbor(dir1)
+		sq2 = square.neighbor(dir2)
+
+		# If it's not where you're going, don't
+		# get into cul-de-sacs if you can help it
+		unless dist == 1
+			return dir2 if sq1.hole?
+			return dir1 if sq2.hole?
+		end
+
+		unless land_only 
+			# If one of the directions is blocked,
+			# and the other isn't, choose the other one
+			if !sq1.passable? and sq2.passable?
+				ret_dir = dir2
+			elsif !sq2.passable? and sq1.passable?
+				ret_dir = dir1
+			end
+		else
+			# Otherwise, only check for water
+			if !sq1.land? and sq2.land?
+				ret_dir = dir2
+			elsif !sq2.land? and sq1.land?
+				ret_dir = dir1
+			end
+		end
+
+		ret_dir
+	end
+
+	#
 	# Convert distance into compass direction
 	#
 	def dir square = nil, land_only = false
@@ -133,40 +170,14 @@ class Distance  < AntObject
 			ret_dir = rowdir
 		end
 
-		unless ret_dir.nil?
-			#$logger.info "Going to #{ ret_dir }"
-			return ret_dir
-		end
+		return ret_dir unless ret_dir.nil?
 
 		# TODO: Note that following block does not take into 
 		#       account if both ways are blocked!!!!	
 
 		# If specified, take passability from square into account
 		unless square.nil?	
-			unless land_only 
-				# If one of the directions is blocked,
-				# and the other isn't, choose the other one
-				if !square.neighbor(rowdir).passable?
-					if square.neighbor(coldir).passable?
-						ret_dir = coldir
-					end
-				elsif !square.neighbor(coldir).passable?
-					if square.neighbor(rowdir).passable?
-						ret_dir = rowdir
-					end
-				end
-			else
-				# Otherwise, only check for water
-				if !square.neighbor(rowdir).land?
-					if square.neighbor(coldir).land?
-						ret_dir = coldir
-					end
-				elsif !square.neighbor(coldir).land?
-					if square.neighbor(rowdir).land?
-						ret_dir = rowdir
-					end
-				end
-			end
+			ret_dir = select_accessible square, rowdir, coldir, land_only
 		end
 		
 		if ret_dir.nil?

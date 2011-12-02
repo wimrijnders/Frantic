@@ -147,6 +147,24 @@ class MyAnt < Ant
 	def default
 		return :STAY if stuck?
 
+		target = BorderPatrolFiber.request_target self.pos
+		unless target.nil?
+			#if @ai.aggresive?
+			#	set_order target, :DEFEND
+			#	return :STAY
+			#else
+				#ignore order if already close to target
+				#d = Distance.new self, target
+				#if d.dist > 2
+					if set_order target, :GOTO
+						# Attempt to move in the right direction
+						item = $pointcache.get self.square, target 
+						return item[2] unless item.nil?
+					end
+				#end
+			#end
+		end
+
 if false
 		# if nothing better to do, move to the furthest ant location.
 		unless orders? or @ai.furthest.nil? or has_order :GOTO
@@ -167,43 +185,31 @@ if false
 		end
 end
 
-if @default.nil?
-		# Pick a random next move - not the move back if you can help it
+		# Pick a next move, preferring default
 		best = nil
 		best_dir = nil
 
-		# Select least visited direction
-		tmp = prev_move
-		if tmp == :STAY or tmp.nil?
-			tmp = [ :N, :E, :S, :W  ][rand(4)]
-		else
-			tmp = reverse tmp
-		end
-		index = [ :N, :E, :S, :W ].index tmp
+		[ :N, :E, :S, :W, :N,:E, :S, :W ][ @default_i, 4].each do |dir|
+			n = @square.neighbor( dir )
 
-		[ :N, :E, :S, :W, :N,:E, :S, :W ][ index + 1 + rand(3), 4].each do |dir|
+			# If at all possible, don't go back
+			next if dir == reverse(prev_move)
 
 			# Don't enter a cul-de-sac in default move
-			next if @square.neighbor( dir ).hole?
+			next if n.hole?
 
 			# Don't bump into walls 
-			next if @square.neighbor( dir ).water?
+			#next if n.water?
 
 			best = true
 			best_dir = dir
+			break
 		end
 
-		unless best
-			@default = best_dir
-		else
-			@default = [ :N, :E, :S, :W  ][rand(4)]
-		end
-		@default_i = [ :N, :E, :S, :W  ].index @default
-else
-		best = true
-		best_dir = @default 
-end
-	
+		#if best
+		#	@default = best_dir
+		#	@default_i = [ :N, :E, :S, :W ].index best_dir
+		#end
 
 if false
 		best = nil
@@ -230,14 +236,14 @@ if false
 end
 	
 		if best.nil?
-			# Prob never called; never mind
 			#@default
-			$logger.info "stuck"
+			$logger.info "stuck in default move"
 			:STAY 
 		else
 			best_dir
 		end	
 	end
+
 
 	#
 	# Perform some cleanup stuff when an ant dies

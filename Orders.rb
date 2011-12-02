@@ -127,8 +127,9 @@ module Orders
 		:ASSEMBLE,
 		:DEFEND_HILL,
 		:RAZE,
-		:HARVEST,
-		:GOTO
+		:DEFEND,
+		:GOTO,
+		:HARVEST
 	]
 
 	def sort_orders
@@ -230,9 +231,11 @@ module Orders
 		end
 
 		@orders.each do |o|
-			if o.order == :HARVEST and what == :HARVEST
-				$logger.info "Already harvesting"
-				return false
+			if o.order == what
+				if [ :HARVEST, :DEFEND ].include? what
+					$logger.info "Already doing order #{ what }"
+					return false
+				end
 			end
 
 			if o == n
@@ -450,6 +453,38 @@ module Orders
 				end 
 			end
 
+
+			if order_order == :GOTO
+				d = Distance.get self.square, order_sq 
+
+				if ( self.square == order_sq ) or d.dist <= 2
+					$logger.info { "GOTO close enough to square #{ order_sq.to_s}." }
+					BorderPatrolFiber.clear_target order_sq
+					clear_first_order
+					next
+				end 
+			end
+
+			if order_order == :DEFEND
+				d = Distance.get self.square, order_sq 
+
+				# Use of distance in order to get closer to location than in_view
+				if ( self.square == order_sq ) or
+				   ( d.in_attack_range? and
+				     Distance.direct_path? self.square, order_sq
+				   )
+					$logger.info { "Defending square #{ order_sq.to_s}." }
+
+					# Note: following may be a bit wasteful to call every time
+					# we are in handle orders
+					BorderPatrolFiber.clear_target order_sq
+
+					stay
+					return true
+				end 
+			end
+
+
 			if self.square == order_sq
 				# Done with this order, reached the target
 
@@ -464,6 +499,10 @@ module Orders
 				else
 					$logger.info { "#{ to_s } reached target for order #{ order_order }" }
 
+					if order_order == :GOTO
+						BorderPatrolFiber.clear_target order_sq
+					end
+
 					if order_order == :HARVEST
 						# Keep the order in the list, don't remove
 						return true
@@ -475,6 +514,17 @@ module Orders
 
 				next
 			end
+
+
+			if order_order == :GOTO
+				unless BorderPatrolFiber.known_region self.square
+					$logger.info { "#{ to_s } with order #{ order_order } outside known regions" }
+
+					clear_first_order
+					next
+				end
+			end
+
 
 			if order_order == :ASSEMBLE
 				if !collective
@@ -614,9 +664,11 @@ end
 		if evading?
 			if prev_order != @orders[0].square
 				# order changed; reset evasion
+				$logger.info "#{ self } evasion reset"
 				evade_reset
 			else
 				# Handle evasion elsewhere
+				$logger.info "#{ self } evading"
 				return false
 			end
 		end

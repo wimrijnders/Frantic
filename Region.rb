@@ -142,7 +142,7 @@ end
 class LiaisonSearch
 
 	NO_MAX_LENGTH      = -1
-	DEFAULT_MAX_LENGTH = 10
+	DEFAULT_MAX_LENGTH = 20
 	MAX_COUNT          = 8000
 
 	def initialize cache, find_shortest = false, max_length = nil
@@ -814,15 +814,16 @@ end
 
 	#
 	# Given the from and to squares, determine
-	# to which liaison square we need to move in order
+	# to which liaison we need to move in order
 	# to go in the right direction.
 	#
-	# return: square if liaison square found
-	#		  false  if no liason needed
+	# return: square if next square found
+	#		  false  if no interim square needed; move directly.
+	#                Prob doesn't occur any more
 	#         nil    if path can not be determined
 	#
-	def path_direction from, to
-		path = find_path from, to
+	def path_direction from, to, check_skip_liaison = true
+		path = find_path from, to, check_skip_liaison
 
 		return nil if path.nil?
 		return false if path.length < 2 
@@ -830,12 +831,48 @@ end
 		liaison = get_liaison path[0], path[1]
 		$logger.info { "liaison #{ liaison }, from #{ from }" }
 
+if false
+		# This occurs perhaps once per game; practically useless
+
 		if liaison and clear_path from, liaison 
-			$logger.info { "#{ from } clear to  liaison. skipping."} 
+			$logger.info { "#{ from } clear to liaison. skipping."} 
 			path = path[1,-1]
 			return false if path.nil?
 			return false if path.length < 2
 			liaison = get_liaison path[0], path[1]
+		end
+end
+
+		# If you have the choice, set path to next region 
+		# requested
+
+		if not check_skip_liaison and
+#		if not check_skip_liaison and from == liaison
+#			$logger.info { "#{ from } already on liaison; adjusting path" }
+
+			# Find a neighboring region that is the same as the
+			# next requested region
+			next_region = path[1]
+			new_from = nil
+			[ :N, :E, :S, :W ].each do |dir|
+				if from.neighbor(dir).region == next_region
+					new_from = from.neighbor(dir)
+					$logger.info { "Found region #{ next_region} to #{ dir } at #{ liaison }; using that" }
+					break
+				end
+			end
+
+
+			unless new_from.nil?
+				$logger.info { "Adjusting path to #{new_from} instead of liaison #{ liaison}" }
+				liaison = new_from
+			else
+				$logger.info { "Could not find better point than liaison #{ liaison}" }
+			end
+
+#			if from == liaison
+#				$logger.info { "Could not find good neighbor" }
+#			end
 		end
 
 		liaison
@@ -961,7 +998,7 @@ end
 	#
 	# Find path between given squares
 	#
-	def find_path from, to
+	def find_path from, to, check_skip_liaison = true
 		# Assuming input are squares
 		from_r = from.region
 		to_r   = to.region
@@ -977,7 +1014,7 @@ end
 
 			# Check if we are not already on liaison. If so, remove from list
 			liaison = get_liaison result[0], result[1]
-			if liaison and from == liaison
+			if check_skip_liaison and liaison and from == liaison
 				$logger.info { "Already at liaison, skipping it." }
 				if result.length > 2 
 					result = result[1..-1]

@@ -15,6 +15,7 @@ require 'Collective.rb'
 require 'Harvesters.rb'
 require 'Food.rb'
 require 'Turn.rb'
+require 'BorderPatrol.rb'
 require 'Fibers.rb'
 require 'PointCache.rb'
 require 'Region.rb'
@@ -429,6 +430,8 @@ class AI
 				end
 			end
 		end
+
+		BorderPatrolFiber.init_hill_regions
 
 		# determine all known squares and regions
 		my_ants.each do |ant|

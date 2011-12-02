@@ -177,7 +177,7 @@ class EvadePathFinder
 			#d1 = Pathinfo.new(target1, target).dist
 			d1 = $pointcache.distance target1, target
 		
-			history1 = @history
+			history1 = @history.clone
 		end
 
 		find_path false 

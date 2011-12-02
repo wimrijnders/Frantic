@@ -293,6 +293,60 @@ class PatternsFiber < WorkerFiber
 end
 
 
+class BorderPatrolFiber < WorkerFiber
+
+	@@list = []
+	@@obj = BorderPatrol.new
+	@@found_hills = false
+
+	def initialize region, list
+	
+		# parameter list is ignored
+		super("borderpatrol", region, @@list)
+	end
+
+	def action source
+		$logger.info { "doing action #{ source }" }
+		@@obj.clear_liaison source unless source == "go"
+		if @@obj.action
+			@@list << "go"
+		end
+	end
+
+
+	def self.add_list item
+		@@list << item
+	end
+
+
+	def self.init_hill_regions
+		return if @@found_hills
+
+		$ai.hills.each_friend do |sq| 
+			@@found_hills = true
+
+			@@obj.add_hill_region sq 
+		end
+
+		if @@found_hills
+			$logger.info "got the hills"
+			@@list << "go"
+			return
+		end
+	end
+
+	def self.request_target sq
+		@@obj.next_liaison sq
+	end
+
+	def self.clear_target sq
+		BorderPatrolFiber.add_list sq
+	end
+
+	def self.known_region sq
+		@@obj.known_region sq.region
+	end
+end
 
 
 class Fibers
@@ -306,6 +360,7 @@ class Fibers
 	def init_fibers
 		@list += $region.init_fibers
 		@list << $patterns.init_fiber
+		@list << BorderPatrolFiber.new( $region, nil )
 
 		self
 	end

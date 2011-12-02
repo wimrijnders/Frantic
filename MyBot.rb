@@ -197,7 +197,7 @@ class Strategy < BaseStrategy
 			end
 
 			# Following needed for starting the path search to the hills!
-			nearby_ants = BaseStrategy.nearby_ants_region sq, available_ants, true, -1
+			nearby_ants = BaseStrategy.nearby_ants_region sq, available_ants, true, -1, true
 
 			nearby_ants.each do |ant|
 				ant.set_order sq, :RAZE
