@@ -34,8 +34,8 @@ class BaseStrategy
 	# Determine which ants are within a reasonable
 	# striking distance of given square
 	#
-	def self.nearby_ants_region sq, ants, all_ants = false, max_length = nil, do_sort = false
-		$logger.info "called"
+	def self.nearby_ants_region sq, ants, all_ants = false, max_length = nil, do_search = false
+		$logger.info "called. max_length: #{ max_length}"
 
 		sq_ants = Region.ants_to_squares ants
 
@@ -44,7 +44,7 @@ class BaseStrategy
 		# Note that the search is actually back to front, from food
 		# to ants. The distance of course is the same
 		paths = nil
-		result = $region.get_neighbors_sorted sq, ants, do_sort, max_length
+		result = $region.get_neighbors_sorted sq, ants, do_search, max_length
 
 		if result.length > 0
 			# Remove distance info

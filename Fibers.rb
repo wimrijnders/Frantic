@@ -76,7 +76,7 @@ class WorkerFiber
 	end
 
 	def stats
-		[  @name, @status.to_s, @count, @fiber.yields, (@max_resume*1000).to_i  ]
+		[  @name, @status.to_s, @count, @fiber.yields, (@max_resume*1000).to_i, list.length  ]
 	end
 
 	def run_fiber
@@ -180,9 +180,11 @@ end
 
 
 class BigSearch< WorkerFiber
+	@@list = []
+
 	def initialize region, list
 		$logger.info "Initializing BigSearch"
-		super("BigSearch", region, list)
+		super("BigSearch", region, @@list )
 	end
 
 	def action item
@@ -194,6 +196,11 @@ class BigSearch< WorkerFiber
 		# Results will be cached within this call
 		@region.find_paths from, to_list, do_shortest, max_length
 	end
+
+	def self.add_list item
+		@@list << item
+	end
+
 end
 
 
@@ -201,24 +208,18 @@ class Fiber2 < WorkerFiber
 
 	def initialize region, list
 		super("fiber2", region, list)
-		@add_search = []
 	end
 
-	def my_list
-		@add_search
-	end
 
 	def action item
 
 		from, to_list, do_shortest, max_length = item 
 
+		$logger.info { "max_length: #{ max_length}" }
+
 		if not max_length.nil? and max_length ==-1
 			$logger.info "Offloading big search"
-			if @add_search.length > 0
-				$logger.info "Already have big search in queue, skipping"
-			else
-				@add_search << item
-			end
+			BigSearch.add_list item
 			return
 		end
 
@@ -230,7 +231,11 @@ class Fiber2 < WorkerFiber
 		$logger.info { "searching #{ from }-#{ to_list }" }
 
 		# Results will be cached within this call
-		@region.find_paths from, to_list, do_shortest, max_length
+		tmp = @region.find_paths from, to_list, do_shortest, max_length
+		if tmp.nil?
+			$logger.info "No results; retrying search as big search"
+			BigSearch.add_list [ from, to_list, do_shortest,  -1 ]
+		end
 	end
 end
 
@@ -402,12 +407,12 @@ class Fibers
 	end
 
 
-	Format1 = "%10s %8s %7s %7s %5s\n"
-	Format  = "%10s %8s %7d %7d %5d\n"
+	Format1 = "%12s %8s %7s %7s %5s %7s\n"
+	Format  = "%12s %8s %7d %7d %5d %7d\n"
 	def status
 		str = "Fibers:\n" +
-			Format1 % [ "Name      ", "status  ", "  count", "yields", "  max" ] +
-			Format1 % [ "==========", "========", "  =====", "======", "=====" ]
+			Format1 % [ "Name        ", "status  ", "  count", "yields", "  max", "queue" ] +
+			Format1 % [ "============", "========", "  =====", "======", "=====", "=====" ]
 
 		@list.each { |f|
 			str << Format % f.stats

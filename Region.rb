@@ -142,7 +142,7 @@ end
 class LiaisonSearch
 
 	NO_MAX_LENGTH      = -1
-	DEFAULT_MAX_LENGTH = 20
+	DEFAULT_MAX_LENGTH = 15
 	MAX_COUNT          = 8000
 
 	def initialize cache, find_shortest = false, max_length = nil
@@ -178,6 +178,17 @@ class LiaisonSearch
 		end
 
 		to_list_r.compact!
+
+		# Shouldn't be necessary, since all searches passed are unknown
+		# Keeping it in as a safeguard
+		# TODO: check if can be removed.
+		to_list_r.clone.each do |r|
+			if $region.get_path_basic from_r, r
+				$logger.info { "#{ from_r }-#{ r } already in cache; skipping." }
+				to_list_r.delete r
+			end 
+		end
+
 		if to_list_r.length == 0
 			$logger.info "to_list_r empty, not searching."
 			return
@@ -350,7 +361,7 @@ class Region
 		list = [
 			Fiber1.new( self, @@add_paths ), 
 			t2, 
-			BigSearch.new( self, t2.my_list ),
+			BigSearch.new( self, nil ),
 			RegionsFiber.new( self, @@add_regions )
 		]
 
@@ -361,7 +372,13 @@ class Region
 	def self.add_searches from, to_list, do_shortest = false, max_length = nil
 		sq_ants   = Region.ants_to_squares to_list
 		$logger.info { "Adding search #{ from }-#{ sq_ants }, #{ do_shortest }, #{max_length}" }
-		@@add_searches << [ from, sq_ants, do_shortest, max_length]
+		item = [ from, sq_ants, do_shortest, max_length]
+		if not max_length.nil? and max_length == -1
+			$logger.info { "Doing big search" }
+			BigSearch.add_list item
+		else
+			@@add_searches << item 
+		end
 	end
 
 	def self.add_regions source
@@ -513,6 +530,13 @@ class Region
 		@non_paths = {}
 	end
 
+	def clear_non_path from, to
+		if @non_paths[ from ] and @non_paths[from][to]
+			@non_paths[from].delete to
+			$logger.info "cleared #{ from }-#{ to }"
+		end
+	end
+
 
 	def set_path_basic from, to, path, dist = nil
 		$logger.info "entered path: #{ path }"
@@ -557,6 +581,7 @@ class Region
 		else
 			@paths[from][ to ] = item
 		end
+		clear_non_path from, to
 
 		ret
 	end
@@ -703,7 +728,10 @@ private
 		end
 	end
 
-if false
+	#
+	# Iterate over all squares in the view quadrant.
+	# Square are traversed in straight lines, from the inside outwards.
+	#
 	def quadrant
 		dim = @template.length
 		(1...dim).each do |x|
@@ -713,9 +741,14 @@ if false
 			end
 		end
 	end
-end
 
-	def quadrant
+	#
+	# Iterate over all squares in the view quadrant, by traversing
+	# concentric squares from the inside out.
+	#
+	# Doesn't work too well, because regions can go around walls.
+	# 
+	def quadrant2
 		dim = @template.length
 		(1...dim).each do |radius|
 			x = radius
@@ -748,8 +781,8 @@ end
 	public
 
 	def region_prefix sq
-		pref_row = sq.row/10 
-		pref_col = sq.col/10 
+		pref_row = sq.row/Distance.view_square_dist 
+		pref_col = sq.col/Distance.view_square_dist 
 		prefix = (pref_row*100 + pref_col)*1000
 	end
 
@@ -846,7 +879,7 @@ end
 		# If you have the choice, set path to next region 
 		# requested
 
-		if not check_skip_liaison and
+		if not check_skip_liaison 
 #		if not check_skip_liaison and from == liaison
 #			$logger.info { "#{ from } already on liaison; adjusting path" }
 
@@ -894,7 +927,7 @@ end
 		to_list_r.compact!
 		if to_list_r.length == 0
 			$logger.info "to_list_r empty, not searching."
-			return
+			return nil
 		end
 
 		results = find_paths_cache from_r, to_list_r
@@ -1160,7 +1193,7 @@ end
 		ants.delete_if { |a| ant.square == a.square }
 		return [] if ants.length == 0
 
-		$logger.info { "from: #{ ant } to #{ ants.length } ants." }
+		$logger.info { "from: #{ ant } to #{ ants.length } ants; max_length: #{ max_length }." }
 
 		ants_with_distance = $pointcache.get_sorted ant, ants, true
 

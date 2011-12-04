@@ -855,7 +855,7 @@ $ai.setup do |ai|
 	$logger.info "Doing setup"
 
 	Distance.set_ai ai
-	ai.harvesters = Harvesters.new ai.rows, ai.cols, ai.viewradius2
+	ai.harvesters = Harvesters.new ai.rows, ai.cols
 	$region = Region.new ai
 	Pathinfo.set_region $region
 	$patterns = Patterns.new ai

@@ -19,7 +19,7 @@ class Distance  < AntObject
 
 		@@ai = ai
 
-		$logger.info "attackradius2: #{ @@ai.attackradius2 }"
+		$logger.info "attackradius2: #{ ai.attackradius2 }"
 
 		#
 		# danger_radius contains the squares form which you can be attacked
@@ -27,7 +27,7 @@ class Distance  < AntObject
 		# Radius for normal attackradius of 5 is 17, which is exact.
 		#
 		# Given calculation is a sort of safeguard for if the radius might change
-		@@danger_radius2 = ( Math.sqrt(@@ai.attackradius2() -1 ) + 2  ) ** 2 + 1
+		@@danger_radius2 = ( Math.sqrt(ai.attackradius2() -1 ) + 2  ) ** 2 + 1
 		$logger.info "danger_radius2: #{ @@danger_radius2 }"
 
 		#
@@ -35,9 +35,20 @@ class Distance  < AntObject
 		# moves. for attackradius 5 the value is 37. This is not exact, contains some
 		# extra squares on the diagonal sides.
 		# Again, safeguard calculation
-		@@peril_radius2 = ( Math.sqrt(@@ai.attackradius2() -1 ) + 4  ) ** 2 + 1
+		@@peril_radius2 = ( Math.sqrt(ai.attackradius2() -1 ) + 4  ) ** 2 + 1
 		$logger.info "peril_radius2: #{ @@peril_radius2 }"
+
+
+		# Find smallest square which fits into given viewradius
+		radius = 1
+		while 2*(radius + 1)*(radius + 1) <= ai.viewradius2
+			radius +=1
+		end
+		$logger.info { "Found view-square with radius #{ radius }" }
+
+		@@view_square_dist = 2*radius + 1
 	end
+
 
 	def initialize from, to = nil
 		super
@@ -48,6 +59,8 @@ class Distance  < AntObject
 		#$logger.info { "Distance init #{ @row }, #{ @col }" }
 	end
 
+
+	def self.view_square_dist; @@view_square_dist; end
 
 	def in_view?;         @in_view;         end
 	def in_attack_range?; @in_attack_range; end
@@ -108,7 +121,8 @@ class Distance  < AntObject
 	# an accesibility from given square
 	#
 	def select_accessible square, dir1, dir2, land_only
-		ret_dir = nil
+		# Ensure default value
+		ret_dir = dir1
 
 		sq1 = square.neighbor(dir1)
 		sq2 = square.neighbor(dir2)

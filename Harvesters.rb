@@ -1,15 +1,10 @@
 
 class Harvesters
 
-	def initialize	rows, cols, viewradius2
-		# Find smalles square which fits into given viewradius
-		radius = 1
-		while 2*(radius + 1)*(radius + 1) <= viewradius2
-			radius +=1
-		end
-		$logger.info { "Found square with radius #{ radius }" }
+	def initialize	rows, cols
 
-		@dist = 2*radius + 1
+		@dist = Distance.view_square_dist
+		$logger.info { "view square dist: #{ @dist }" }
 
 		rowdim = rows/@dist
 		rowdim += 1 unless rows % @dist == 0
