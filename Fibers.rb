@@ -157,6 +157,8 @@ class Fiber1 < WorkerFiber
 
 		return if path.length == 0
 
+if false
+		# TODO: check if this absolutely necessary
 		skip_count = 0
 		while skip_count < 10
 			$logger.info { "handling path: #{ path }" }
@@ -175,7 +177,8 @@ class Fiber1 < WorkerFiber
 			break
 		end
 		return if skip_count >= 10
-
+		Fiber.yield
+end
 
 		$logger.info { "saving path: #{ path }" }
 		# Cache the result

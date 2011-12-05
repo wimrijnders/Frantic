@@ -674,27 +674,29 @@ class Patterns
 	end
 
 	def show_field square
-		str = ""
-		(-radius).upto(radius) do |row|
-			(-radius).upto(radius) do |col|
+		$logger.info {
+			str = ""
+			(-radius).upto(radius) do |row|
+				(-radius).upto(radius) do |col|
 
-				sq = square.rel [ row, col ]
+					sq = square.rel [ row, col ]
 
-				str << if sq.region.nil? 
-					"?"
-				elsif sq.water?
-					"W"
-				else
-					"_"
+					str << if sq.region.nil? 
+						"?"
+					elsif sq.water?
+						"W"
+					else
+						"_"
+					end
 				end
 
+				str << "\n"
 			end
 
-			str << "\n"
-		end
-
-		$logger.info "pattern region #{ square }:\n#{ str }" 
+			"pattern region #{ square }:\n#{ str }" 
+		}
 	end
+
 
 	def radius 
 		@radius	
@@ -713,6 +715,7 @@ class Patterns
 			did_blanks = true
 
 			fill_square test, source
+			Fiber.yield
 		end
 
 		did_blanks
@@ -891,10 +894,9 @@ class Patterns
 		$logger.info "entered"
 
 		(0...ai.rows).each do |row|
-			Fiber.yield
-
 			(0...ai.cols).each do |col|
 				fill_square test, ai.map[row][col]
+				Fiber.yield
 			end
 		end
 	end
@@ -911,7 +913,10 @@ class Patterns
 				if (Rot_tests + Line_tests ).include? t.name 
 					t.negated = true
 				end
-			end 
+			end
+
+			#TODO: Also remove multiples of the confirmed slice
+
 		elsif Line_tests.include? test.name 
 			@tests.each do |t| 
 				if (Rot_tests + [ :SLICE ] ).include? t.name 

@@ -188,6 +188,7 @@ class LiaisonSearch
 				$logger.info { "#{ from_r }-#{ r } already in cache; skipping." }
 				to_list_r.delete r
 			end 
+			Fiber.yield
 		end
 
 		if to_list_r.length == 0
@@ -254,13 +255,13 @@ class LiaisonSearch
 		end
 
 		if @find_shortest and not @cur_best_dist.nil?
-			Fiber.yield
 			dist = Pathinfo.path_distance current_path
 
 			if dist > @cur_best_dist
 				$logger.info { "cur dist #{ dist } > cur best #{ @cur_best_dist}; skipping" }
 				return
 			end
+			Fiber.yield
 		end
 
 
@@ -290,7 +291,6 @@ class LiaisonSearch
 					$logger.info { "found path #{ from }-#{ to_list }: #{ result }" }
 
 					if @find_shortest
-						Fiber.yield
 						dist = Pathinfo.path_distance result
 
 						if @cur_best_dist.nil? or dist < @cur_best_dist
@@ -301,6 +301,7 @@ class LiaisonSearch
 						else
 							next
 						end
+						Fiber.yield
 					else
 						results << result 
 						@cached_results[to] = result
@@ -344,6 +345,7 @@ class Region
 	@@ai = nil
 
 	@@add_paths = []
+	@@done_paths = {}
 	@@add_searches = []
 	@@add_regions = []
 
@@ -351,6 +353,30 @@ class Region
 
 	def self.add_paths result
 		$logger.info { "add_paths #{ result }" }
+
+		result.clone.each do |path|
+			if @@done_paths[ path ]
+				$logger.info { "path already queued" }
+				result.delete path
+			else
+				@@done_paths[ path ] = true
+			end
+if false
+			item = $region.get_path_basic path[0], path[-1]
+			unless item.nil?
+				$logger.info { "path item already there" }
+
+				if item[:path] == path
+					$logger.info { "path is the same; not adding to queue" }
+					result.delete path
+					next
+				end
+			end
+end
+		end
+
+
+
 		@@add_paths.concat result
 	end
 
@@ -624,10 +650,14 @@ public
 			replaced_count += 1
 		end
 
+
+		Fiber.yield if not Fiber.current.nil?
+
 		new1, known1, replaced1  = set_path path[0..-2]
 		new_count      += new1
 		known_count    += known1
 		replaced_count +=  replaced1
+
 
 		new1, known1, replaced1  = set_path path[1..-1]
 		new_count      += new1
@@ -947,6 +977,7 @@ end
 		end
 
 		results = find_paths_cache from_r, to_list_r
+		Fiber.yield
 
 		# if nothing found, perform a search on all values at the same time
 		if results.nil? or results.length == 0

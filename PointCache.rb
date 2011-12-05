@@ -461,6 +461,8 @@ $logger.info "done"
 	def recalc_pointcache path_item
 		$logger.info "entered"
 
+		# Don't put a yield in this loop; you'll get set-errors
+		# in the hash elsewhere
 		@cache.each_pair do |from,v|
 			v.each_pair do |to, cache_item|
 				if path_item.object_id == cache_item[1].object_id
