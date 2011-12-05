@@ -461,6 +461,7 @@ module Orders
 			end
 
 
+if false
 			if order_order == :GOTO
 				d = Distance.get self.square, order_sq 
 
@@ -471,6 +472,7 @@ module Orders
 					next
 				end 
 			end
+end
 
 			if order_order == :DEFEND
 				d = Distance.get self.square, order_sq 

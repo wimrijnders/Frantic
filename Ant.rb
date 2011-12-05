@@ -153,89 +153,18 @@ class MyAnt < Ant
 			#	set_order target, :DEFEND
 			#	return :STAY
 			#else
-				#ignore order if already close to target
-				#d = Distance.new self, target
-				#if d.dist > 2
-					if set_order target, :GOTO
-						# Attempt to move in the right direction
-						item = $pointcache.get self.square, target 
-						return item[2] unless item.nil?
-					end
-				#end
+				if set_order target, :GOTO
+					# Attempt to move in the right direction
+					item = $pointcache.get self.square, target 
+					return item[2] unless item.nil?
+				end
 			#end
 		end
 
-if false
-		# if nothing better to do, move to the furthest ant location.
-		unless orders? or @ai.furthest.nil? or has_order :GOTO
-			set_order @ai.furthest.pos, :GOTO
-			$logger.info { "#{ self } moving out to #{ @ai.furthest.pos }" }
-		end
-end
 
-if false
-		# if next to a wall, run into it on purpose
-		[ :N, :E, :S, :W ].each do |dir|
-			if square.neighbor( dir).water?
-				# Also reset the default direction, otherwise ant might backtrack
-				#@default = nil
-				@default = dir
-				return dir
-			end
-		end
-end
-
-if false
-		# Pick a next move, preferring default
-		best = nil
-		best_dir = nil
-
-		[ :N, :E, :S, :W, :N,:E, :S, :W ][ @default_i, 4].each do |dir|
-			n = @square.neighbor( dir )
-
-			# If at all possible, don't go back
-			next if dir == reverse(prev_move)
-
-			# Don't enter a cul-de-sac in default move
-			next if n.hole?
-
-			# Don't bump into walls 
-			#next if n.water?
-
-			best = true
-			best_dir = dir
-			break
-		end
-end
-
-		#if best
-		#	@default = best_dir
-		#	@default_i = [ :N, :E, :S, :W ].index best_dir
-		#end
-
-if false
-		best = nil
-		best_dir = nil
-		# Select least visited direction
-		#[ :N, :E, :S, :W, :N,:E, :S, :W ][ @next_default_dir, 4].each do |dir|
-		[ :N, :E, :S, :W, :N,:E, :S, :W ][ @default_i, 4].each do |dir|
-
-			# Don't enter a cul-de-sac in default move
-			next if @square.neighbor( dir ).hole?
-
-			# Don't bump int walls 
-			next if @square.neighbor( dir ).water?
-
-			visited = @square.neighbor( dir ).visited
-
-			if best.nil? or best > visited
-				best = visited
-				best_dir = dir
-			end
-		end
-		#@next_default_dir = ( @next_default_dir +1 ) % 4 
-
-end
+		# Attempts to use intelligent default movement here all have adverse effect
+		# on movement downstream (loads of twitching. Best to not be clever about movement
+		# here
 
 		best = true
 		best_dir = @default
