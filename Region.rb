@@ -542,7 +542,6 @@ class Region
 	def set_path_basic from, to, path, dist = nil
 		$logger.info "entered path: #{ path }"
 		ret = :new
-		change = true
 
 		if dist.nil?
 			dist = Pathinfo.path_distance path, false
@@ -567,24 +566,34 @@ class Region
 				ret = :replaced
 				
 			else
-				$logger.info { "Path for #{ from }-#{ to } longer: prev_dist: #{ prev_dist }, new_dist: #{ dist }" }
-				change = false
+				$logger.info { "Path for #{ from }-#{ to } longer or equal: prev_dist: #{ prev_dist }, new_dist: #{ dist }" }
+				return :known
 			end
 		end
 
-		return :known if not change
 
-		item = {
-			:path => path,
-			:dist => dist
-		}
+		if prev_item.nil?
+			item = {
+				:path => path,
+				:dist => dist
+			}
 
-		unless @paths[ from ]
-			@paths[from] = { to => item }
+			unless @paths[ from ]
+				@paths[from] = { to => item }
+			else
+				@paths[from][ to ] = item
+			end
+			clear_non_path from, to
 		else
-			@paths[from][ to ] = item
+			# Replace contents of previous item
+			prev_item[ :path] = path
+			prev_item[ :dist] = dist
+
+			$pointcache.recalc_pointcache prev_item
+
+			# NOTE: trick to only yield in fibers
+			Fiber.yield if not Fiber.current.nil?
 		end
-		clear_non_path from, to
 
 		ret
 	end
@@ -624,31 +633,6 @@ public
 		new_count      += new1
 		known_count    += known1
 		replaced_count +=  replaced1
-
-if false
-		# Try to add the sub paths as well
-		0.upto( path.length-2) do |i|
-			# Doing longest path first
-			( path.length-1).downto(i+1) do |j|
-				from = path[i]
-				to   = path[j]
-				new_path = path[i..j]
-
-				case set_path_basic from, to, new_path 
-				when :new
-					new_count += 1
-				when :known
-					# This path was known; so all sub-paths are also known.
-					# No need to check these
-					$logger.info "path is known"
-					known_count += 1
-					break
-				when :replaced
-					replaced_count += 1
-				end
-			end
-		end
-end
 
 		#$logger.info { "path #{ path }: added #{ new_count }, known #{ known_count}" }
 		[ new_count, known_count, replaced_count ]

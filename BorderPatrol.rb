@@ -3,7 +3,6 @@ class BorderPatrol
 		@complete_regions = []
 
 		@regions = []
-		#@done_regions = []
 		@liaisons = []
 		@done_liaisons = []
 		@last_liaison = nil
@@ -145,19 +144,6 @@ class BorderPatrol
 			if done
 				$logger.info "Completed border patrol for region #{ region }"
 
-if false
-				# move on to next region
-				next_regions.each { |r|
-					if not @regions.include? r and not @done_regions.include? r
-						# Regions have changed, signal that we need to reloop
-						ret = true
-						@regions << r
-					end
-				}
-				@regions.delete region
-				@done_regions << region
-end
-
 				$ai.my_ants.each do |a|
 					liaisons.each do |l|
 						if a.has_order :DEFEND, l
@@ -196,16 +182,9 @@ end
 			changed = get_region_liaisons  @regions[0]
 			@regions.rotate! 
 		end
-if false
-		unless @done_regions.empty?
-			changed = get_region_liaisons  @done_regions[0]
-			@done_regions.rotate! 
-		end
-end
 
 		$logger.info "have regions: #{ @regions.join(", ") }"
 		$logger.info "Num completed regions: #{ @complete_regions.length }"
-#		$logger.info "Num done regions: #{ @done_regions.length }"
 		$logger.info "have liaisons: #{ @liaisons.join(", ") }"
 		$logger.info "last liaison: #{ @last_liaison }"
 		$logger.info "num done liaisons: #{ @done_liaisons.length }"
@@ -254,7 +233,6 @@ end
 	def redo_hills
 		if @liaisons.empty?
 			$logger.info "No border liaisons present; redoing from hills"
-			#@done_regions.clear
 			$ai.hills.each_friend do |sq|
 				add_hill_region sq
 			end

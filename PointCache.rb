@@ -452,5 +452,31 @@ $logger.info "done"
 
 		walked_full_path
 	end
+
+
+	#
+	# Path has changed for given path_item, recalculate relevant
+	# items in the pointcache
+	#
+	def recalc_pointcache path_item
+		$logger.info "entered"
+
+		@cache.each_pair do |from,v|
+			v.each_pair do |to, cache_item|
+				if path_item.object_id == cache_item[1].object_id
+					p = Pathinfo.new from, to, cache_item[1][:path]
+					distance = p.dist
+					move = determine_move from, to
+
+					$logger.info { "New distance: #{ distance}; move: #{ move }" }
+
+					cache_item[0] = distance
+					cache_item[1] = move
+
+					@replaces += 1
+				end
+			end
+		end		
+	end
 end
 
