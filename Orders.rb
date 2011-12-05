@@ -688,7 +688,7 @@ end
 
 		item = $pointcache.get self.square, order_sq
 		to = nil
-		if not item.nil? and item[3]
+		if not item.nil? and not item[3]
 			$logger.info "Valid pointcache item detected"
 
 			to = item[2]	# to is a direction

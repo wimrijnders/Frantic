@@ -80,6 +80,10 @@ class BorderPatrol
 			changed = get_region_liaisons  @regions[0]
 			@regions.rotate! 
 		end
+		unless @done_regions.empty?
+			changed = get_region_liaisons  @done_regions[0]
+			@done_regions.rotate! 
+		end
 
 		$logger.info "have regions: #{ @regions.join(", ") }"
 		$logger.info "Num done regions: #{ @done_regions.length }"
@@ -100,10 +104,31 @@ class BorderPatrol
 		if known_region sq.region
 
 			unless @liaisons.empty?
-				ret = @liaisons[0]
-				@liaisons.rotate!
+					ret = @liaisons[0]
+					@liaisons.rotate!
+
+if false
+				# This takes painfully long. TODO: find better solution
+	
+				# Find nearest border liaison to given square
+				nearest = $pointcache.get_sorted sq, @liaisons, true
+
+				if nearest
+					$logger.info { "Selecting nearest border liaison #{ nearest[0][0] }" }
+					ret = nearest[0][0]
+				else
+					ret = @liaisons[0]
+					@liaisons.rotate!
+				end
+end
 			else
 				ret = @last_liaison
+
+				$logger.info "No border liaisons present; redoing from hills"
+				@done_regions.clear
+				$ai.hills.each_friend do |sq|
+					add_hill_region sq
+				end
 			end
 		end
 
