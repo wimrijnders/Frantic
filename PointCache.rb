@@ -159,6 +159,9 @@ class PointCache
 
 				if not item.nil? and not distance.nil?
 					move = determine_move from, to if move.nil?
+
+					return nil if move.nil?
+
 					invalid = false
 				else
 					$logger.info "not found; assume direct path"

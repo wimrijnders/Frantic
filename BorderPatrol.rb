@@ -11,6 +11,7 @@ class BorderPatrol
 		$logger.info "Adding region #{ sq.region } for square #{ sq }"
 
 		@regions << sq.region
+		get_region_liaisons sq.region
 	end
 
 	def get_region_liaisons region
@@ -122,18 +123,27 @@ if false
 				end
 end
 			else
-				ret = @last_liaison
-
-				$logger.info "No border liaisons present; redoing from hills"
-				@done_regions.clear
-				$ai.hills.each_friend do |sq|
-					add_hill_region sq
-				end
+				#ret = @last_liaison
+				redo_hills
 			end
 		end
 
 		$logger.info "ret #{ ret }"
 		ret
+	end
+
+	def redo_hills
+		if @liaisons.empty?
+			$logger.info "No border liaisons present; redoing from hills"
+			@done_regions.clear
+			$ai.hills.each_friend do |sq|
+				add_hill_region sq
+			end
+
+			true
+		else
+			false
+		end
 	end
 
 
@@ -143,11 +153,14 @@ end
 
 
 	def clear_liaison sq
-		return unless @liaisons.include? sq
+		if @liaisons.include? sq
 
-		$logger.info "liaison #{ sq } cleared"
-		@last_liaison = sq
-		@liaisons.delete sq
-		@done_liaisons << sq
+			$logger.info "liaison #{ sq } cleared"
+			@last_liaison = sq
+			@liaisons.delete sq
+			@done_liaisons << sq
+		end
+
+		redo_hills
 	end
 end

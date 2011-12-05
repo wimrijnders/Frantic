@@ -106,7 +106,7 @@ class Order
 			end
 		end
 
-		$logger.info { "handle_liaison current #{ cur_sq } moving to #{ @liaison }" }
+		$logger.info { "current #{ cur_sq } moving to #{ @liaison }" }
 		ai.map[ @liaison.row][ @liaison.col ]
 	end
 end
@@ -244,9 +244,16 @@ module Orders
 			end
 		end
 
-		if [ :EVADE_GOTO, :GOTO ].include? what
+		if [ :EVADE_GOTO ].include? what
 			clear_order what 
 		end
+
+		if [ :GOTO ].include? what
+			clear_order what 
+			clear_order :EVADE_GOTO 
+			evade_reset
+		end
+
 
 		if [ :FORAGE ].include? what
 			clear_order :EVADE_GOTO 

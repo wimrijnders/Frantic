@@ -260,6 +260,19 @@ class EvadePathFinder
 		end
 
 		$logger.info { "last_zero #{ last_zero }" }
+
+		# TODO: This test currently does NOTHING
+		unless last_zero.nil?
+
+			if [ :N, :S ].include? @dir and last_zero.col == @start.col
+				$logger.info "last_zero column unchanged in N/S direction; ignoring"
+				return nil
+			elsif [ :E, :W ].include? @dir and last_zero.row == @start.row
+				$logger.info "last_zero row unchanged in E/W direction; ignoring"
+				return nil
+			end
+		end
+
 		last_zero
 	end
 

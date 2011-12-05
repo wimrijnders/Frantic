@@ -157,6 +157,26 @@ class Fiber1 < WorkerFiber
 
 		return if path.length == 0
 
+		skip_count = 0
+		while skip_count < 10
+			$logger.info { "handling path: #{ path }" }
+			item = @region.get_path_basic path[0], path[-1]
+			unless item.nil?
+				$logger.info { "path item already there" }
+
+				if item[:path] == path
+					$logger.info { "path is the same; skipping" }
+					skip_count += 1
+					return if list.empty?
+					path = list.pop # NOTE: list is accessed directly here
+					next
+				end
+			end
+			break
+		end
+		return if skip_count >= 10
+
+
 		$logger.info { "saving path: #{ path }" }
 		# Cache the result
 		new_tmp, known_tmp, replaced_tmp = @region.set_path path
@@ -312,7 +332,11 @@ class BorderPatrolFiber < WorkerFiber
 
 	def action source
 		$logger.info { "doing action #{ source }" }
-		@@obj.clear_liaison source unless source == "go"
+		unless source == "go"
+			if @@obj.clear_liaison source
+				@@list << "go"	# Note that this allows double (perhaps even more) go's in list
+			end
+		end
 		if @@obj.action
 			@@list << "go"
 		end

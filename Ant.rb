@@ -185,6 +185,7 @@ if false
 		end
 end
 
+if false
 		# Pick a next move, preferring default
 		best = nil
 		best_dir = nil
@@ -205,6 +206,7 @@ end
 			best_dir = dir
 			break
 		end
+end
 
 		#if best
 		#	@default = best_dir
@@ -234,6 +236,9 @@ if false
 		#@next_default_dir = ( @next_default_dir +1 ) % 4 
 
 end
+
+		best = true
+		best_dir = @default
 	
 		if best.nil?
 			#@default

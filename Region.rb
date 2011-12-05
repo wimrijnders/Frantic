@@ -12,30 +12,31 @@ class Pathinfo
 
 		unless path
 			path = $region.find_path from, to
-		end
-
-		if path
-			@path = path
 			@path_dist = Pathinfo.path_distance path
-			@distance = calc_distance
+		else
+			@path = path
+			@path_dist = Pathinfo.path_distance path, false
 		end
+		@distance = calc_distance
 
 		self
 	end
 
 
-	def self.path_distance path
+	def self.path_distance path, check_cache = true
 		return 0 if path.length <= 2
 		$logger.info "entered"
 
-		# Consult the cache first
-		item = $region.get_path_basic path[0], path[-1]
-		unless item.nil?
-			return item[:dist]
-		end
+		if check_cache 
+				# Consult the cache first
+			item = $region.get_path_basic path[0], path[-1]
+			unless item.nil?
+				return item[:dist]
+			end
 
-		# Not in cache; do the calculation
-		$logger.info "path not in cache"
+			# Not in cache; do the calculation
+			$logger.info "path not in cache"
+		end
 
 		prev = nil
 		total = 0
@@ -544,7 +545,7 @@ class Region
 		change = true
 
 		if dist.nil?
-			dist = Pathinfo.path_distance path
+			dist = Pathinfo.path_distance path, false
 		end
 
 		# path already present?
@@ -560,11 +561,13 @@ class Region
 				return :known
 			end
 
+			$logger.info "previous path: #{ prev_path }"
 			if dist < prev_dist
 				$logger.info { "Found shorter path for #{ from }-#{ to }: #{ path }; prev_dist: #{ prev_dist }, new_dist: #{ dist }" }
 				ret = :replaced
 				
 			else
+				$logger.info { "Path for #{ from }-#{ to } longer: prev_dist: #{ prev_dist }, new_dist: #{ dist }" }
 				change = false
 			end
 		end
@@ -589,17 +592,44 @@ class Region
 public
 
 	def set_path path
-		$logger.info "entered path: #{ path }"
+		return [0,0,0] if path.length < 2
 
+		$logger.info "entered path: #{ path }"
 		new_count = 0
 		known_count = 0
 		replaced_count = 0
 
+		from = path[0]
+		to   = path[-1]
+
+		case set_path_basic from, to, path 
+		when :new
+			new_count += 1
+		when :known
+			# This path was known; so all sub-paths are also known.
+			# No need to check these
+			$logger.info "path is known"
+			known_count += 1
+			return [ new_count, known_count, replaced_count ]
+		when :replaced
+			replaced_count += 1
+		end
+
+		new1, known1, replaced1  = set_path path[0..-2]
+		new_count      += new1
+		known_count    += known1
+		replaced_count +=  replaced1
+
+		new1, known1, replaced1  = set_path path[1..-1]
+		new_count      += new1
+		known_count    += known1
+		replaced_count +=  replaced1
+
+if false
 		# Try to add the sub paths as well
 		0.upto( path.length-2) do |i|
 			# Doing longest path first
 			( path.length-1).downto(i+1) do |j|
-				changed = false
 				from = path[i]
 				to   = path[j]
 				new_path = path[i..j]
@@ -610,6 +640,7 @@ public
 				when :known
 					# This path was known; so all sub-paths are also known.
 					# No need to check these
+					$logger.info "path is known"
 					known_count += 1
 					break
 				when :replaced
@@ -617,6 +648,7 @@ public
 				end
 			end
 		end
+end
 
 		#$logger.info { "path #{ path }: added #{ new_count }, known #{ known_count}" }
 		[ new_count, known_count, replaced_count ]
@@ -627,7 +659,7 @@ public
 	#
 	# Read given item from the cache.
 	#
-	# If found, returns array: [ path, path_length ]
+	# If found, returns hash: { :path => path, :dist => path_length }
 	# If not found, return nil
 	#
 	def get_path_basic from, to
