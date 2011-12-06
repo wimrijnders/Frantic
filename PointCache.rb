@@ -463,8 +463,10 @@ $logger.info "done"
 
 		# Don't put a yield in this loop; you'll get set-errors
 		# in the hash elsewhere
-		@cache.each_pair do |from,v|
-			v.each_pair do |to, cache_item|
+		@cache.keys.clone.each do |from|
+			Fiber.yield unless Fiber.current.nil?
+			@cache[from].keys.clone.each do |to|
+				cache_item = @cache[from][to]
 				if path_item.object_id == cache_item[1].object_id
 					p = Pathinfo.new from, to, cache_item[1][:path]
 					distance = p.dist

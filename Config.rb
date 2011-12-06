@@ -6,7 +6,7 @@ module AntConfig
 	TURN_TIME		= 4000	# Num msec per bot per turn
 
 
-	LOG_OUTPUT      = true
+	LOG_OUTPUT      = false
 	LOG_STATUS      = true	# if LOG_OUTPUT is false, log status info only
 
 	DEFENSIVE_LIMIT = 20	# Number of ants needed to be present

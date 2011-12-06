@@ -131,28 +131,30 @@ class BaseStrategy
 
 		$ai.turn.check_maxed_out
 
-		if not ant.stuck?
-			ant.handle_orders
-			return true 
-		else
+		if ant.stuck?
 			if $ai.turn.maxed_out?
 				ant.stay
 				return false
 			end
-		end
 
-		[ :N, :E, :S, :W ].each do |dir|
-			ant2 = ant.square.neighbor( dir ).ant
-			if ant2 and
-			   ant2.mine? and
-			   ant2.moved? and
-			   not list.include? ant2
+			[ :N, :E, :S, :W ].each do |dir|
+				ant2 = ant.square.neighbor( dir ).ant
+				if ant2 and
+				   ant2.mine? and
+				   not ant2.moved? and
+				   not list.include? ant2
 			
-				if move_neighbors list + [ ant2 ]	
-					ant.handle_orders
-					return true
+					if move_neighbors list + [ ant2 ]	
+						ant.handle_orders
+						return true
+					end
 				end
 			end
+		end
+
+		if not ant.stuck?
+			ant.handle_orders
+			return true 
 		end
 
 		false
