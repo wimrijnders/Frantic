@@ -106,38 +106,8 @@ class Pathinfo
 	def dist
 		@distance
 	end
-
-	def self.shortest_path from, to_list
-		results = $region.find_paths from, to_list, true
-
-		return nil if results.nil? or results.length == 0
-
-		# Determine shortest path from the list of results
-		# Note that this is not the actual path length, as it excludes
-		# the real from and to squares
-		best_path = nil
-		best_dist = -1
-		results.each do |path|
-			# Same region always wins
-			if path.length == 0
-				best_path = path
-				best_dist = 0
-				break
-			end
-
-			dist = path_distance path
-
-
-			if best_path.nil? or dist < best_dist
-				best_path = path
-				best_dist = dist
-			end	
-		end
-
-		$logger.info { "Shortest path: #{ best_path }, dist: #{ best_dist}" }
-		best_path
-	end
 end
+
 
 
 class LiaisonSearch
@@ -346,7 +316,6 @@ class Region
 
 	@@add_paths = []
 	@@done_paths = {}
-	@@add_searches = []
 	@@add_regions = []
 
 	private 
@@ -383,28 +352,44 @@ end
 	public 
 
 	def init_fibers
-		t2 = Fiber2.new( self, @@add_searches) 
-
-		list = [
+		[
 			Fiber1.new( self, @@add_paths ), 
-			t2, 
+			Fiber2.new( self, nil),
 			BigSearch.new( self, nil ),
 			RegionsFiber.new( self, @@add_regions )
 		]
-
-		list
 	end
 
 
 	def self.add_searches from, to_list, do_shortest = false, max_length = nil
 		sq_ants   = Region.ants_to_squares to_list
 		$logger.info { "Adding search #{ from }-#{ sq_ants }, #{ do_shortest }, #{max_length}" }
-		item = [ from, sq_ants, do_shortest, max_length]
+
+		# Don't bother with empty input 
+		return if from.nil? or from.region.nil?
+		return if sq_ants.nil? or sq_ants.length == 0
+
+		# Convert input to regions
+		from_r = from.region
+		to_list_r = Region.squares_to_regions sq_ants
+		to_list_r.compact!
+
+		# Don't bother with targetting from-region
+		to_list_r.delete from_r
+
+		if to_list_r.length == 0
+			$logger.info "to_list_r empty or same as from, not searching."
+			return 
+		end
+		to_list_r.sort!		# To make comparing list easier further on
+
+		item = [ from_r, to_list_r, do_shortest, max_length]
+
 		if not max_length.nil? and max_length == -1
 			$logger.info { "Doing big search" }
 			BigSearch.add_list item
 		else
-			@@add_searches << item 
+			Fiber2.add_list item 
 		end
 	end
 
@@ -970,19 +955,11 @@ end
 	#
 	# In the case of searching for shortest path, it is still
 	# possible that multiple paths are returned, ie. best interim results.
+	#
+	# Pre: input regions non-empty and validated
 	#	
-	def find_paths from, to_list, do_shortest = false, max_length = nil
-		$logger.info { "searching from #{ from } for #{ to_list.length } destinations" }
-		return nil if to_list.nil? or to_list.length == 0
-
-		from_r = from.region
-		to_list_r = Region.squares_to_regions to_list
-		to_list_r.compact!
-		if to_list_r.length == 0
-			$logger.info "to_list_r empty, not searching."
-			return nil
-		end
-
+	def find_paths from_r, to_list_r, do_shortest = false, max_length = nil
+		$logger.info { "searching from #{ from_r } for #{ to_list_r.length } destinations" }
 		results = find_paths_cache from_r, to_list_r
 		Fiber.yield
 

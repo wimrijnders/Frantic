@@ -6,9 +6,7 @@ class Turn
 	public
 
 	def initialize turntime, stdout
-		margin = 200 
-
-		@turntime = 1.0*(turntime - margin)/1000
+		@turntime = 1.0*(turntime - AntConfig::TURN_MARGIN)/1000
 		@stdout = stdout
 
 		@open = false

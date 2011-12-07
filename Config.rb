@@ -3,7 +3,11 @@
 module AntConfig
 	# Testbot config
 	NUM_TURNS		= 1500	# Max number of turns per game
-	TURN_TIME		= 4000	# Num msec per bot per turn
+	TURN_TIME		= 3000	# Num msec per bot per turn
+
+	# Num msec safety margin for handling turn
+	#TURN_MARGIN		= 200   # This value for the tournament
+	TURN_MARGIN		= 400   # This value for testing. 
 
 
 	LOG_OUTPUT      = true

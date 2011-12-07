@@ -5,7 +5,7 @@ require '../Config'
 # Configuration options
 #
 
-live    = true
+live    = false
 bot_num = nil 
 turns   = AntConfig::NUM_TURNS 
 flags   = "-R --turntime=#{ AntConfig::TURN_TIME }" #--serial" # "--nolaunch"
@@ -38,7 +38,7 @@ end
 #
 
 if live
-	live_opts = " -So | java -jar visualizer.jar"
+	live_opts = " -So | java -Xms1536m -Xmx1536m -jar visualizer.jar"
 else
 	live_opts = ""
 end
@@ -57,10 +57,9 @@ bots = [
 
 	"ruby ../Blob.rb",
 	"ruby ../Foam.rb",
-
 	"ruby ../Twitcher.rb",
 	"ruby ../GoSouth.rb",
-	"ruby ../Inertia.rb",
+
 	"python2.7 sample_bots/python/HunterBot.py",
 
 	"ruby ../frantic17/MyBot.rb",
@@ -71,14 +70,15 @@ bots = [
 
 
 	"python sample_bots/python/GreedyBot.py",
+
 	"ruby ../Twitcher.rb",
-	"ruby ../Inertia.rb",
+	"ruby ../Blob.rb",
 	"ruby ../Twitcher.rb",
-	"ruby ../Inertia.rb",
+	"ruby ../Blob.rb",
+
 	"python sample_bots/python/GreedyBot.py",
 	"python2.7 sample_bots/python/HunterBot.py",
 	"python sample_bots/python/LeftyBot.py",
-	"ruby ../Inertia.rb",
 	"python2.7 sample_bots/python/HunterBot.py",
 	"python submission_test/TestBot.py"
 ]

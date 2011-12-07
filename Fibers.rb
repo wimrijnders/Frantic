@@ -204,60 +204,66 @@ end
 
 class BigSearch< WorkerFiber
 	@@list = []
+	@@q_cache= {}
 
 	def initialize region, list
 		$logger.info "Initializing BigSearch"
+
+		# NOTE: param list ignored
 		super("BigSearch", region, @@list )
 	end
 
+	def self.add_list item
+		if @@q_cache[ item]
+			# NOTE: This does not seem to be happening!
+			$logger.info { "big search #{item} already queued" }
+		else
+			@@q_cache[ item] = true
+			@@list << item
+		end
+	end
+
 	def action item
+		from_r, to_list_r, do_shortest, max_length = item 
 
-		from, to_list, do_shortest, max_length = item 
-
-		$logger.info { "searching #{ from }-#{ to_list }" }
+		$logger.info { "searching regions #{ from_r }-#{ to_list_r }" }
 
 		# Results will be cached within this call
-		@region.find_paths from, to_list, do_shortest, max_length
+		@region.find_paths from_r, to_list_r, do_shortest, max_length
 	end
-
-	def self.add_list item
-		@@list << item
-	end
-
 end
 
 
+
 class Fiber2 < WorkerFiber
+	@@list = []
+	@@q_cache= {}
 
 	def initialize region, list
-		super("fiber2", region, list)
+		# NOTE: param list ignored
+		super("fiber2", region, @@list)
+	end
+
+	def self.add_list item
+		if @@q_cache[ item]
+			$logger.info { "search #{item} already queued" }
+		else
+			@@q_cache[ item] = true
+			@@list << item
+		end
 	end
 
 
 	def action item
+		from_r, to_list_r, do_shortest, max_length = item 
 
-		from, to_list, do_shortest, max_length = item 
-
-		$logger.info { "max_length: #{ max_length}" }
-
-		if not max_length.nil? and max_length ==-1
-			$logger.info "Offloading big search"
-			BigSearch.add_list item
-			return
-		end
-
-		if from.nil?
-			$logger.info(true) { "ERROR from item is nil; skipping" }
-			return
-		end
-
-		$logger.info { "searching #{ from }-#{ to_list }" }
+		$logger.info { "searching regions #{ from_r }-#{ to_list_r }" }
 
 		# Results will be cached within this call
-		tmp = @region.find_paths from, to_list, do_shortest, max_length
+		tmp = @region.find_paths from_r, to_list_r, do_shortest, max_length
 		if tmp.nil?
 			$logger.info "No results; retrying search as big search"
-			BigSearch.add_list [ from, to_list, do_shortest,  -1 ]
+			BigSearch.add_list [ from_r, to_list_r, do_shortest,  -1 ]
 		end
 	end
 end
@@ -410,8 +416,25 @@ class Fibers
 				end
 
 				begin 
-					f.resume
-					$ai.turn.check_time_limit
+					if f.kind_of? Fiber1  and f.status != :waiting
+						$logger.info "giving priority 1 to Fiber1"
+
+						while f.status != :waiting
+							f.resume
+							$ai.turn.check_time_limit
+						end
+					#elsif f.kind_of? Fiber2  and f.status != :waiting
+					#	$logger.info "giving priority 2 to Fiber2"
+
+					#	while f.status != :waiting
+					#		f.resume
+					#		$ai.turn.check_time_limit
+					#	end
+					else
+						f.resume
+						$ai.turn.check_time_limit
+					end
+
 				rescue FiberError
 					$logger.info(true) { "Thread probably died...." }
 					# Help it out of its misery
