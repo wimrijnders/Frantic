@@ -569,9 +569,6 @@ end
 		$logger.info "entered path: #{ path }"
 		ret = :new
 
-		if dist.nil?
-			dist = Pathinfo.path_distance path, false
-		end
 
 		# path already present?
 		prev_item = get_path_basic from, to 
@@ -581,12 +578,18 @@ end
 			prev_path = prev_item[ :path ]
 			prev_dist = prev_item[ :dist ]
 
+			# Path between adjacent regions always wins
+			return :known if prev_path.length == 2
+
 			# Skip if these are the same solutions
-			if path == prev_path
-				return :known
+			return :known if path == prev_path
+
+			$logger.info { "previous path: #{ prev_path }" }
+
+			if dist.nil?
+				dist = Pathinfo.path_distance path, false
 			end
 
-			$logger.info "previous path: #{ prev_path }"
 			if dist < prev_dist
 				$logger.info { "Found shorter path for #{ from }-#{ to }: #{ path }; prev_dist: #{ prev_dist }, new_dist: #{ dist }" }
 				ret = :replaced
@@ -599,6 +602,10 @@ end
 
 
 		if prev_item.nil?
+			if dist.nil?
+				dist = Pathinfo.path_distance path, false
+			end
+
 			item = {
 				:path => path,
 				:dist => dist
@@ -615,10 +622,10 @@ end
 			prev_item[ :path] = path
 			prev_item[ :dist] = dist
 
-			$pointcache.recalc_pointcache prev_item
+			#$pointcache.recalc_pointcache prev_item
 
-			# NOTE: trick to only yield in fibers
-			Fiber.yield if not Fiber.current.nil?
+			## NOTE: trick to only yield in fibers
+			#Fiber.yield if not Fiber.current.nil?
 		end
 
 		ret

@@ -13,7 +13,9 @@ class PointCache
 		@invalidate_num = 0 
 
 		@zero_pathitem = { :path => [], :dist => 0 }
-		@zero_distance_item = [ 0, @zero_pathitem, :STAY, false ]
+
+		# Fields: [ total_distance, path, next_move, invalid, path_distance ]
+		@zero_distance_item = [ 0, @zero_pathitem, :STAY, false, 0 ]
 	end
 
 
@@ -57,13 +59,30 @@ class PointCache
 				t[3] = false
 				invalid = t[3]
 				t[1] = @zero_pathitem
+				t[4] = 0
 			end	
 
 			if not invalid
 
 				#$logger.info "hit #{from}-#{ to}: dist #{ t[0]}, dir #{ t[2] }"
-				@hits += 1
 
+				if t[4] != t[1][:dist]
+					$logger.info "Path distance changed; recalculating"
+					path = t[1][:path]
+
+					p = Pathinfo.new from, to, path 
+					distance = p.dist
+					move = determine_move from, to 
+
+					$logger.info { "distance old: #{ t[0] }; new: #{ distance }" }
+
+					t[0] = distance
+					t[2] = move
+					t[4] = t[1][:dist]
+					@replaces += 1
+				end
+
+				@hits += 1
 				return t
 			else
 				if check_invalid
@@ -84,7 +103,6 @@ class PointCache
 		if do_nil 
 			#$logger.info { "Adding nilitem for #{ from}-#{ to}" }
 
-			#set to, from, nil, nil, true
 			# Note that this returns a value
 			tmp = set( from, to, nil, nil, true)
 			if result.nil?
@@ -126,6 +144,9 @@ class PointCache
 		raise "#{from} not a square" if not from.is_a? Square
 		raise "#{to} not a square" if not to.is_a? Square
 
+		# safeguard initialization
+		path_distance = 0
+
 		# try direct path first
 		if item.nil?
 			d = Distance.get from, to
@@ -136,6 +157,7 @@ class PointCache
 				item = @zero_pathitem
 				move = d.dir
 				invalid = false
+				path_distance = 0
 			else
 
 				if from.region.nil?
@@ -144,6 +166,10 @@ class PointCache
 					$logger.info "#{to} region nil; skipping"
 				else
 					item = $region.get_path_basic from.region, to.region
+				end
+				
+				if not item.nil?
+					path_distance = item[:dist]
 				end
 
 				if distance.nil? and not item.nil?
@@ -171,13 +197,14 @@ class PointCache
 					move = d.dir
 					item = @zero_pathitem
 					invalid = true
+					path_distance = 0
 	
 					Region.add_searches from, [ to ]
 				end
 			end
 		end
 
-		result = [distance, item, move, invalid ]
+		result = [distance, item, move, invalid, path_distance ]
 
 		#$logger.info {
 		#	"from-to => [ distance, item, move, invalid] : " +
@@ -460,12 +487,19 @@ $logger.info "done"
 	#
 	def recalc_pointcache path_item
 		$logger.info "entered"
+		count = 1
 
-		# Don't put a yield in this loop; you'll get set-errors
+		# clone()'s are needed; otherwise you'll get set-errors
 		# in the hash elsewhere
 		@cache.keys.clone.each do |from|
+
 			Fiber.yield unless Fiber.current.nil?
+
 			@cache[from].keys.clone.each do |to|
+				if count % 100 == 0
+					Fiber.yield unless Fiber.current.nil?
+				end
+
 				cache_item = @cache[from][to]
 				if path_item.object_id == cache_item[1].object_id
 					p = Pathinfo.new from, to, cache_item[1][:path]
@@ -478,9 +512,13 @@ $logger.info "done"
 					cache_item[1] = move
 
 					@replaces += 1
+
+					count += 1
 				end
 			end
 		end		
+
+		$logger.info "done"
 	end
 end
 

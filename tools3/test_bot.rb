@@ -53,20 +53,21 @@ map = map.to_i if is_number? map
 
 
 bots = [
-	"ruby ../Inertia.rb",
-	"ruby ../Blob.rb",
-	"ruby ../Blob2.rb",
-	"ruby ../Twitcher.rb",
-
 	"ruby ../MyBot.rb",					# Frantic - latest version
 
+	"ruby ../Blob.rb",
+	"ruby ../Foam.rb",
+
+	"ruby ../Twitcher.rb",
 	"ruby ../GoSouth.rb",
+	"ruby ../Inertia.rb",
 	"python2.7 sample_bots/python/HunterBot.py",
 
-	"ruby ../frantic13/MyBot.rb",		# Frantic - previous version
-	"ruby ../frantic05/MyBot.rb",		# Frantic - previous version
-	"ruby ../frantic04/MyBot.rb",		# Frantic - previous version
-	"ruby ../frantic03/MyBot.rb",		# Frantic - previous version
+	"ruby ../frantic17/MyBot.rb",
+	"ruby ../frantic13/MyBot.rb",
+	"ruby ../frantic05/MyBot.rb",
+	"ruby ../frantic04/MyBot.rb",
+	"ruby ../frantic03/MyBot.rb",
 
 
 	"python sample_bots/python/GreedyBot.py",
@@ -76,11 +77,6 @@ bots = [
 	"ruby ../Inertia.rb",
 	"python sample_bots/python/GreedyBot.py",
 	"python2.7 sample_bots/python/HunterBot.py",
-	"python sample_bots/python/GreedyBot.py",
-	"ruby ../GoSouth.rb",
-	"ruby ../Twitcher.rb",
-	"ruby ../Inertia.rb",
-	"ruby ../frantic03/MyBot.rb",		# Frantic - previous version
 	"python sample_bots/python/LeftyBot.py",
 	"ruby ../Inertia.rb",
 	"python2.7 sample_bots/python/HunterBot.py",
@@ -94,19 +90,18 @@ if map == 'test'
 	#flags << " --food none"
 elsif map == 'open'
 	mapfile  = "maps/open_4_98.map"
-elsif map[0] == 'm'
-	map = "0" + map if map.length ==1
+elsif map == 'm'
 	mapfile  = "maps/maze/maze_#{nump}p_#{ num }.map"
-elsif map[0] == 'c'
-	num = "0" + num if num.length ==1
-	map = "0" + map if map.length ==1
-	mapfile  = "maps/cell/cell_maze_p#{nump}_#{ num }.map"
-elsif map[0] == 'h'
-	map = "0" + map if map.length ==1
+elsif map == 'mp'
+	mapfile  = "maps/maze/maze_#p{nump}_#{ num }.map"
+elsif map == 'c'
+	mapfile  = "maps/cell_maze/cell_maze_p#{nump}_#{ num }.map"
+elsif map == 'h'
 	mapfile  = "maps/multi_hill_maze/maze_#{ nump }p_#{ num }.map"
-elsif map[0] == 'r'
-	map = "0" + map if map.length ==1
+elsif map == 'r'
 	mapfile  = "maps/random_walk/random_walk_#{ nump }p_#{ num }.map"
+elsif map == 'rp'
+	mapfile  = "maps/random_walk/random_walk_p#{ nump }_#{ num }.map"
 end
 
 puts "Map: #{ mapfile }"

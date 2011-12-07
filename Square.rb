@@ -61,7 +61,9 @@ class Square
 	#
 	def passable? do_cur_ant = true
 
-		return false if water? or moved_here? 
+		# NOTE: incredibly, food is not passable! This happens
+		#       if food appears right next to ant. KEEP IT IN THE TEST!
+		return false if water? or food? or moved_here? 
 
 		if do_cur_ant and ant? 
 			return false if @ant.enemy?
