@@ -103,6 +103,32 @@ class BorderPatrol
 	end
 
 
+	# 
+	# Retrieve all liaisons from given region AND the known neighboring
+	# regions
+	def get_nearby_liaisons region
+		$logger.info "entered"
+
+		cached_liaisons = $region.get_liaisons region
+
+		return [] if cached_liaisons.nil?
+
+		next_regions, liaisons = cached_liaisons.to_a.transpose
+
+		next_regions.each do |r|
+			tmp = $region.get_liaisons r
+
+			next if tmp.nil?
+		
+			liaisons += cached_liaisons.to_a.transpose[1]
+		end
+		liaisons.uniq!
+
+		$logger.info { "nearby liaisons for region #{ region }: #{ liaisons }" }
+		liaisons
+	end
+
+
 	def get_region_liaisons region
 		if  @complete_regions.include? region
 			# This region has been handled to completion
@@ -202,23 +228,19 @@ class BorderPatrol
 		if known_region sq.region
 
 			unless @liaisons.empty?
-					ret = @liaisons[0]
-					@liaisons.rotate!
+				# Detect nearby active liaisons
+				tmp = get_nearby_liaisons sq.region
+				tmp = tmp & @liaisons
 
-if false
-				# This takes painfully long. TODO: find better solution
-	
-				# Find nearest border liaison to given square
-				nearest = $pointcache.get_sorted sq, @liaisons, true
+				$logger.info { "nearby active liaisons: #{ tmp }" }
 
-				if nearest
-					$logger.info { "Selecting nearest border liaison #{ nearest[0][0] }" }
-					ret = nearest[0][0]
+				if not tmp.nil? and not tmp.empty?
+					# Just get the first
+					ret = tmp[0]
 				else
 					ret = @liaisons[0]
 					@liaisons.rotate!
 				end
-end
 			else
 				#ret = @last_liaison
 				redo_hills

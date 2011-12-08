@@ -354,43 +354,13 @@ end
 	def init_fibers
 		[
 			Fiber1.new( self, @@add_paths ), 
-			Fiber2.new( self, nil),
-			BigSearch.new( self, nil ),
 			RegionsFiber.new( self, @@add_regions )
 		]
 	end
 
 
 	def self.add_searches from, to_list, do_shortest = false, max_length = nil
-		sq_ants   = Region.ants_to_squares to_list
-		$logger.info { "Adding search #{ from }-#{ sq_ants }, #{ do_shortest }, #{max_length}" }
-
-		# Don't bother with empty input 
-		return if from.nil? or from.region.nil?
-		return if sq_ants.nil? or sq_ants.length == 0
-
-		# Convert input to regions
-		from_r = from.region
-		to_list_r = Region.squares_to_regions sq_ants
-		to_list_r.compact!
-
-		# Don't bother with targetting from-region
-		to_list_r.delete from_r
-
-		if to_list_r.length == 0
-			$logger.info "to_list_r empty or same as from, not searching."
-			return 
-		end
-		to_list_r.sort!		# To make comparing list easier further on
-
-		item = [ from_r, to_list_r, do_shortest, max_length]
-
-		if not max_length.nil? and max_length == -1
-			$logger.info { "Doing big search" }
-			BigSearch.add_list item
-		else
-			Fiber2.add_list item 
-		end
+		SelectSearch.add_list [ from, to_list, do_shortest, max_length ]
 	end
 
 	def self.add_regions source
@@ -604,13 +574,11 @@ end
 			clear_non_path from, to
 		else
 			# Replace contents of previous item
+			# Changed paths are detected in pointcache, because there path
+			# length are stored in the cache items. Changes in path length
+			# are detected and trigger a recalculation of the pointcache item.
 			prev_item[ :path] = path
 			prev_item[ :dist] = dist
-
-			#$pointcache.recalc_pointcache prev_item
-
-			## NOTE: trick to only yield in fibers
-			#Fiber.yield if not Fiber.current.nil?
 		end
 
 		ret

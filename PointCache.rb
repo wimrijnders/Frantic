@@ -479,46 +479,5 @@ $logger.info "done"
 
 		walked_full_path
 	end
-
-
-	#
-	# Path has changed for given path_item, recalculate relevant
-	# items in the pointcache
-	#
-	def recalc_pointcache path_item
-		$logger.info "entered"
-		count = 1
-
-		# clone()'s are needed; otherwise you'll get set-errors
-		# in the hash elsewhere
-		@cache.keys.clone.each do |from|
-
-			Fiber.yield unless Fiber.current.nil?
-
-			@cache[from].keys.clone.each do |to|
-				if count % 100 == 0
-					Fiber.yield unless Fiber.current.nil?
-				end
-
-				cache_item = @cache[from][to]
-				if path_item.object_id == cache_item[1].object_id
-					p = Pathinfo.new from, to, cache_item[1][:path]
-					distance = p.dist
-					move = determine_move from, to
-
-					$logger.info { "New distance: #{ distance}; move: #{ move }" }
-
-					cache_item[0] = distance
-					cache_item[1] = move
-
-					@replaces += 1
-
-					count += 1
-				end
-			end
-		end		
-
-		$logger.info "done"
-	end
 end
 

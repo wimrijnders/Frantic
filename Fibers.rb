@@ -202,15 +202,70 @@ end
 end
 
 
+#
+# Fiber to preprocess and filter searches for the two search threads,
+# to offload the computation from the main program.
+#
+# Gains are absolutely minimal, but what the hey. Every msec counts.
+#
+class SelectSearch < WorkerFiber
+	@@list = []
+	@@q_cache= {}
+
+	def initialize
+		super("select", $region, @@list )
+	end
+
+	def self.add_list item
+		@@list << item
+	end
+
+	def action item
+		from, to_list, do_shortest, max_length =item
+
+		sq_ants   = Region.ants_to_squares to_list
+
+		$logger.info {
+			"handling search #{ from }-#{ sq_ants }, " +
+			"#{ do_shortest }, #{max_length}"
+		}
+
+		# Don't bother with empty input 
+		return if from.nil? or from.region.nil?
+		return if sq_ants.nil? or sq_ants.length == 0
+
+		# Convert input to regions
+		from_r = from.region
+		to_list_r = Region.squares_to_regions sq_ants
+		to_list_r.compact!
+
+		# Don't bother with targetting from-region
+		to_list_r.delete from_r
+
+		if to_list_r.length == 0
+			$logger.info "to_list_r empty or same as from, not searching."
+			return 
+		end
+		to_list_r.sort!		# To make comparing list easier downstream 
+
+		item = [ from_r, to_list_r, do_shortest, max_length]
+
+		if not max_length.nil? and max_length == -1
+			$logger.info { "Doing big search" }
+			BigSearch.add_list item
+		else
+			Fiber2.add_list item 
+		end
+	end
+end
+
+
 class BigSearch< WorkerFiber
 	@@list = []
 	@@q_cache= {}
 
-	def initialize region, list
-		$logger.info "Initializing BigSearch"
-
-		# NOTE: param list ignored
-		super("BigSearch", region, @@list )
+	def initialize
+		super("BigSearch", $region, @@list )
 	end
 
 	def self.add_list item
@@ -239,9 +294,8 @@ class Fiber2 < WorkerFiber
 	@@list = []
 	@@q_cache= {}
 
-	def initialize region, list
-		# NOTE: param list ignored
-		super("fiber2", region, @@list)
+	def initialize
+		super("fiber2", $region, @@list)
 	end
 
 	def self.add_list item
@@ -333,10 +387,8 @@ class BorderPatrolFiber < WorkerFiber
 	@@obj = BorderPatrol.new
 	@@found_hills = false
 
-	def initialize region, list
-	
-		# parameter list is ignored
-		super("borderpatrol", region, @@list)
+	def initialize
+		super("borderpatrol", $region, @@list)
 	end
 
 	def action source
@@ -396,9 +448,14 @@ class Fibers
 	end
 
 	def init_fibers
+		@list += [
+			SelectSearch.new,
+			Fiber2.new,
+			BigSearch.new,
+			BorderPatrolFiber.new
+		]
 		@list += $region.init_fibers
 		@list << $patterns.init_fiber
-		@list << BorderPatrolFiber.new( $region, nil )
 
 		self
 	end
@@ -416,20 +473,20 @@ class Fibers
 				end
 
 				begin 
-					if f.kind_of? Fiber1  and f.status != :waiting
-						$logger.info "giving priority 1 to Fiber1"
+					if f.kind_of? SelectSearch  and f.status != :waiting
+						$logger.info "giving priority 1 to SelectSearch"
 
 						while f.status != :waiting
 							f.resume
 							$ai.turn.check_time_limit
 						end
-					#elsif f.kind_of? Fiber2  and f.status != :waiting
-					#	$logger.info "giving priority 2 to Fiber2"
+					elsif f.kind_of? Fiber1  and f.status != :waiting
+						$logger.info "giving priority 2 to Fiber1"
 
-					#	while f.status != :waiting
-					#		f.resume
-					#		$ai.turn.check_time_limit
-					#	end
+						while f.status != :waiting
+							f.resume
+							$ai.turn.check_time_limit
+						end
 					else
 						f.resume
 						$ai.turn.check_time_limit

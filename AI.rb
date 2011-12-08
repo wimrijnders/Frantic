@@ -847,19 +847,21 @@ end
 #GC.disable
 
 $ai=AI.new
-$logger = Logger.new $ai
-$timer = Timer.new
-Coord.set_ai $ai
 
 $ai.setup do |ai|
+	$logger = Logger.new ai
 	$logger.info "Doing setup"
 
+	$timer = Timer.new
+	Coord.set_ai ai
 	Distance.set_ai ai
 	ai.harvesters = Harvesters.new ai.rows, ai.cols
 	$region = Region.new ai
 	Pathinfo.set_region $region
 	$patterns = Patterns.new ai
 	$pointcache = PointCache.new ai
+
+	# Init after region has been declared
 	$fibers = Fibers.new.init_fibers
 end
 

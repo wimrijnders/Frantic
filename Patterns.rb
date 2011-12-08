@@ -4,7 +4,7 @@ class Hypothesis
 	CONFIRM_LIMIT = 10
 
 	attr_accessor :parent, :name, :type, :orient, :num_players, :row_inc, :col_inc
-	attr_accessor :negated, :supported, :good_matches, :confirmed, :complete
+	attr_accessor :negated, :good_matches, :confirmed, :complete
 
 	@@ai = nil
 
@@ -13,7 +13,6 @@ class Hypothesis
 			parent, name, type, orient, num_players, row_inc, col_inc
 
 		@negated = nil
-		@supported = nil
 		@good_matches = 0
 		@symmetry_items = []
 		@confirmed = false
@@ -22,8 +21,6 @@ class Hypothesis
 	end
 
 	def symmetry_item
-		#$logger.info "entered"
-
 		@symmetry_items.each do |s|
 			return s[0] if s[1] >= CONFIRM_LIMIT
 		end
@@ -56,12 +53,13 @@ class Hypothesis
 
 
 	def test_match source
-		# For the life of me, I can not understand why I can't directly do
-		# max_count = ai.rows -1
-		# TODO: test if this is still the case
+		count = if ai.rows > ai.cols
+			ai.rows
+		else
+			ai.cols
+		end
 
-		rows = ai.rows
-		iterate source, rows - 1
+		iterate source, count - 1
 	end
 
 
@@ -291,10 +289,8 @@ class Hypothesis
 		#$logger.info "Running test #{ self }"
 		coord = [ 0, 0 ]
 
-		total_count = 0
-		match_count = 0
-		fail_count  = 0
-
+		fail_count = 0
+	
 		1.upto( max_count) do
 			# Be a good citizen
 			Fiber.yield
@@ -302,20 +298,16 @@ class Hypothesis
 			coord[0] += row_inc
 			coord[1] += col_inc
 
-			total_count += 1
-
 			target = source.rel coord	
 			#$logger.info "Testing #{ target }"
 
 			match = parent.match_range source, target, orient
 
 			if match.nil? 
-				fail_count += 1
+				fail_count += 1 
 
 				break if type == :ALL
 			else
-				match_count += 1
-
 				if detect_good_match match, target
 
 					item = nil
@@ -356,38 +348,11 @@ class Hypothesis
 			end
 		end
 
-		conclude fail_count, match_count, total_count
-	end
-
-	#
-	# Process the conclusions of the test
-	#
-	def conclude fail_count, match_count, total_count
-		if type == :ALL
-			if fail_count > 0
-				$logger.info { "Hypothesis #{ self } negated." }
-				@negated = true
-			elsif total_count == match_count
-				#$logger.info { "Hypothesis #{ test } supported." }
-				#@supported = true
-			end
-		else # :ONE
-			if match_count == 0 
-				# NB: if you are on top of the symmetry line, following can happen as well
-				# Same goes for when you are at the outer border of the symmetry region
-				$logger.info { "Hypothesis #{ self } negated." }
-				@negated = true
-			elsif match_count == 1
-				$logger.info { "Hypothesis #{ self } totally supported." }
-				@supported = true
-			else
-				# Theoretically, it is possible that there are more matches, if there
-				# is more symmetry in the map. For the time being, we consider this
-				# extra test as pedantic, hoping that the sysops of the challenge don't 
-				# come up with this idea.
-				#
-				# TODO: handle this case anyway
-			end
+	
+		if ( fail_count > 0 and type == :ALL ) or
+			( fail_count == max_count )
+			$logger.info { "Hypothesis #{ self } negated." }
+			@negated = true
 		end
 	end
 
@@ -823,8 +788,13 @@ class Patterns
 		@tests.compact!
 
 
-		$logger.info { "Tests still in the running:\n\t#{ ( @tests.collect { |t| t.info} ).join( "\n\t") }" }
+		$logger.info { 
+			"Tests still in the running:\n\t#{ 
+				( @tests.collect { |t| t.info} ).join( "\n\t")
+			}"
+		}
 	end
+
 
 	def all_confirmed
 		result = true 
