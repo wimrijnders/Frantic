@@ -1,18 +1,30 @@
 
 class Timer
 
+	def self.now
+		Time.now
+
+		# Following in combination with controlled GC running generates
+		# segmentation faults!
+		#Process.times.utime + Process.times.stime
+	end
+
+	def now
+		Timer.now
+	end
+
 	def initialize
 		@list = {}
 
 		# Following to make throttle calc on first turn work.
-		@list[ :yield ] = [ Time.now, Time.now, 0 ]
+		@list[ :yield ] = [ now, now, 0 ]
 
 		@count = 0
 		@max = {}
 	end
 
 	def start key
-		@list[ key ] = [ Time.now, nil, @count ]
+		@list[ key ] = [ now, nil, @count ]
 		@count += 1
 
 		if block_given?
@@ -30,7 +42,7 @@ class Timer
 	def end key
 		v = @list[ key]
 		if v 
-			v[1] = Time.now
+			v[1] = now
 
 			value = ( (v[1] - v[0])*1000 ).to_i 
 
@@ -62,7 +74,7 @@ class Timer
 			if v[1]
 				value = ( ( v[1] - v[0])*1000 ).to_i 
 			else
-				value = ( ( Time.now - v[0])*1000 ).to_i 
+				value = ( ( now - v[0])*1000 ).to_i 
 			end
 		end
 
@@ -72,7 +84,7 @@ class Timer
 
 	def display
 		str = "Timer results (msec):\n";
-		start = Time.now
+		start = now
 		max_k = nil
 		@list.each_pair do |k,v|
 			if max_k.nil? or max_k.length < k.length

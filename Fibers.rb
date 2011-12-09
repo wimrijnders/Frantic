@@ -46,13 +46,17 @@ end
 class WorkerFiber 
 	attr_accessor :status
 
+	def now
+		Timer.now
+	end
+
 
 	def resume 
-		start = Time.now
+		start = now
 
 		@fiber.resume 
 
-		diff = Time.now - start
+		diff = now - start
 	
 		if @max_resume < diff
 			@max_resume = diff
@@ -93,7 +97,7 @@ class WorkerFiber
 				end
 
 				count = 0
-				start = Time.now
+				start = now
 				@status = :running
 				init_loop
 
@@ -109,7 +113,7 @@ class WorkerFiber
 				doing = !done_loop
 
 				$logger.info {
-					diff = ( (Time.now - start)*1000 ).to_i
+					diff = ( (now - start)*1000 ).to_i
 
 					if longest_diff.nil? or diff > longest_diff
 						longest_diff = diff

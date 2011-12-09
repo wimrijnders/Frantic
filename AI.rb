@@ -178,7 +178,10 @@ class AI
 							# Only used for debugging porpoises
 							$logger.info "garbage collecting"
 							$timer.start( :garbage_collect ) {
-								GC.start	
+								# enable/disable leads to segmentation faults!
+								#GC.enable
+								GC.start
+								#GC.disable	
 							}
 						}
 
@@ -842,14 +845,12 @@ end
 #
 # Global component initialization
 #
-
-
 #GC.disable
-
 $ai=AI.new
+$logger = Logger.new $ai
+
 
 $ai.setup do |ai|
-	$logger = Logger.new ai
 	$logger.info "Doing setup"
 
 	$timer = Timer.new

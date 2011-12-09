@@ -54,11 +54,10 @@ map = map.to_i if is_number? map
 
 bots = [
 	"ruby ../MyBot.rb",					# Frantic - latest version
-	"ruby ../Blob.rb",
+	"ruby ../frantic05/MyBot.rb",
 
 	"ruby ../frantic17/MyBot.rb",
 	"ruby ../frantic13/MyBot.rb",
-	"ruby ../frantic05/MyBot.rb",
 	"ruby ../frantic04/MyBot.rb",
 	"ruby ../frantic03/MyBot.rb",
 
