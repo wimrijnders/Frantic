@@ -237,7 +237,8 @@ class AI
 					"Distance cache: " + Distance.status + "\n" +
 					"GC count: #{ GC.count }\n" +
 					AntObject.status + "\n" + 
-					$fibers.status
+					$fibers.status + "\n" +
+					Class.report_final_tally
 				}
 			end
 			$logger.info "Exited game loop - goodbye"
@@ -271,9 +272,9 @@ class AI
 			when 'viewradius2'; @viewradius2=value.to_i
 			when 'attackradius2'; @attackradius2=value.to_i
 			when 'spawnradius2'; @spawnradius2=value.to_i
-			when 'seed'; @seed=value.to_i
+			when 'player_seed'; @seed=value.to_i; srand @seed
 			else
-				warn "unexpected: #{rd}"
+				$logger.info { "WARNING: unexpected cmd-param: #{rd}" }
 			end
 		end
 		
@@ -366,10 +367,10 @@ class AI
 			when 'a'
 
 				if owner==0
-					a = MyAnt.new sq, self
 
 					unless sq.moved_here?
 						$logger.info { "New ant at #{ sq }." }
+						a = MyAnt.new sq, self
 						my_ants.push a
 					else
 						a = sq.moved_here 
@@ -854,7 +855,6 @@ $ai.setup do |ai|
 	$logger.info "Doing setup"
 
 	$timer = Timer.new
-	Coord.set_ai ai
 	Distance.set_ai ai
 	ai.harvesters = Harvesters.new ai.rows, ai.cols
 	$region = Region.new ai

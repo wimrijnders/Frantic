@@ -9,23 +9,20 @@ class Order
 		@liaison = nil
 	end
 
-	#
-	# NOTE: square actually returns a coord!
-	#
 	def square
+		sq = @square
+
 		if @square.respond_to? :square
-			sq = Coord.new @square.square
+			sq = @square.square
+		end
+
+		if @offset.nil?
+			sq
 		else
-			sq = Coord.new @square
+			sq.rel @offset
 		end
-
-		if !@offset.nil?
-			sq.row += @offset[0]
-			sq.col += @offset[1]
-		end
-
-		$ai.map[ sq.row][ sq.col ]
 	end
+
 
 	def to_s
 		str = ""
@@ -216,7 +213,8 @@ module Orders
 			return false
 		end
 
-		square = ai.map[n.square.row][ n.square.col ]
+		square = n.square
+
 		if square.water?
 			$logger.info { "Target #{ square.to_s } is water; determine nearest land" }
 			offset = nearest_non_water square

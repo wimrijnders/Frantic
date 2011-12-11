@@ -314,10 +314,6 @@ class MoveHistoryFriendly
 		return if @list.length == 0
 
 		sq = firstsq
-		if sq.class == Coord
-			sq = $ai.map[ sq.row][ sq.col ]
-		end
-
 
 		@list.reverse.each do |l|
 			dir = l.dir

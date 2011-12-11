@@ -134,9 +134,6 @@ class Analyze
 			end
 
 
-
-
-
 			# Clean up the doubles in the list
 			enemies_danger.uniq!
 			enemies_peril.uniq!
@@ -198,50 +195,21 @@ class Analyze
 			# Do the analysis for the fighting ants
 			best_moves = Analyze.determine_best_move guess, friends_danger
 
-
 			unless best_moves.nil?
-				# Select the first good move
+				# Select best good move
 
-if false
-	# This code can run wild if there are many, many friends in peril
-	# Disabled for the time being till we get a better solution
-	
-				# 
-				# Ensure that peril ants are not blocking
-				#
-	
-				best_move = nil
-				ant_combis = friends_danger
-				best_moves.each do |m|	
-					# Friends in peril should just get out of the way
-					ret = Analyze.ensure_safe friends_peril, m
+				# moving around friends in peril to prevent blocking was a bad idea, code
+				# ran wild if there were many. So let's not do that.
 
-					if ret === true
-						# All is well; use current move
-						best_move = m
-						break
-					elsif not ret.nil?
-						# Move conflict, but we have a solution
-						best_move = m
-						ant_combis += friends_peril
-						break
-					end
-				end
-				if best_move.nil?
-					$logger.info "WARNING: No satisfactory move; using the first"
-					best_move = best_moves[0]
-				end
-else
 				# Just pick the first and hope for the best
 				best_move = best_moves[0]
 				ant_combis = friends_danger
-end
 
 				#
 				# Move the ants
 				#
 
-				# Need to do some move arbitration here, because adjacent ants can 
+				# Doing some move arbitration here, because adjacent ants can 
 				# block each other
 				all_moved = false	# to get in the loop
 				block_count = 0
@@ -285,9 +253,6 @@ end
 							next
 						end
 
-						# TODO: this sometimes goes wrong with > 1 ant
-						#       incorrection direction in neighbor()
-						# Perhaps because :STAY was not handled properly for collectives
 						ant.move dir
 						block_count = 0
 
@@ -295,23 +260,7 @@ end
 				end
 			end
 
-
-if false
-			# Move in to help
-			friends_close.each do |ant3|
-				next if ant3.moved?
-
-				$logger.info { "#{ ant3 } moving in to help" }
-				e = ant3.closest_enemy
-				unless e.nil?
-					# move in to closest enemy
-					ant3.move_to e.square
-				else
-					# Failing that, move in to known enemy
-					ant3.move_to enemies[0].square 
-				end
-			end
-end
+			# Close friend will move in on their own in code downstream
 		end
 	end
 
@@ -563,8 +512,7 @@ end
 			end
 		}
 
-		# WRI TEST TODO: do hurting moves only
-		# We run the risk of having no moves at all - this is just a test
+		# return hurting moves only.
 		tmp = list.clone.delete_if { |a| a[1][0].empty? }
 
 		# if no hurting moves present, just return the first move
@@ -716,6 +664,17 @@ end
 		best_move = nil
 		best_dead = nil
 
+		# We have two criteria modes:
+		# play hard: aggresive; we concluded that we are superior in this conflict; target is to
+		#			 maximize difference between enemy and own casualties
+		# play safe: we're not sure we are superior: inflict as much damage as possible while
+		#			 minimizing losses.
+
+		play_hard = !Analyze.play_safe? or
+			# We have a numeric advantage
+			ants.length > guess.length
+		play_safe = !play_hard
+
 
 		Analyze.iterate_moves( ants ) do |move|
 			$logger.info { "move: #{ move }" }
@@ -729,7 +688,7 @@ end
 
 			$logger.info {
 				"analyzed: friends dead: #{ dead[0] }, " +
-				" enemies dead: #{ dead[1] }, " +
+				"enemies dead: #{ dead[1] }, " +
 				"best_dist: #{ dead[2] }"
 			}
 
@@ -754,10 +713,13 @@ end
 				break
 			end
 
+
+
 			if  best_dead.nil? or
 				# Maximize the difference in body count
-				( (best_dead[1] - best_dead[0] ) < ( dead[1] - dead[0] ) ) or
-				( Analyze.play_safe? and dead[0] < best_dead[0] )
+				( play_hard and (best_dead[1] - best_dead[0] ) < ( dead[1] - dead[0] ) ) or
+				# Select combination which does damage with least own casualties
+				( play_safe and dead[0] < best_dead[0] )
 
 				best_move = [move]
 				best_dead = dead
@@ -774,18 +736,16 @@ end
 				end
 			end
 
-			# Stop on first item which kills enemies without losses
-			# This kind of invalidates this loop, never mind. This loop
-			# needs to be optimized badly.
-			if best_dead[0] == 0 and best_dead[1] > 0
+			# Stop on first item which kills enemies without losses when you're a pussy.
+			if play_safe and  best_dead[0] == 0 and best_dead[1] > 0
 				$logger.info "Killing without being killed"
 				break
 			end
 		end
 
 		if best_dead.nil? or 
-			( Analyze.play_safe? and best_dead[0] >= best_dead[1] ) or
-			( not Analyze.play_safe? and best_dead[0] > best_dead[1] ) 
+			( play_safe and best_dead[0] >= best_dead[1] ) or
+			( play_hard and best_dead[0] > best_dead[1] ) 
 			$logger.info "Opting for best safe move"
 
 			Analyze.iterate_safe( 0, ants, [], true ) { |r|

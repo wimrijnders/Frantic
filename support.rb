@@ -58,53 +58,6 @@ def reverse dir
 end
 
 
-class Coord
-	@@ai = nil;
-
-	attr_accessor :row, :col
-
-	def self.set_ai ai
-		@@ai = ai
-	end
-
-	def normalize
-		@row, @col = @@ai.normalize @row, @col
-	end
-
-	def initialize sq, col = nil
-		if col
-			@row = sq
-			@col = col
-		else
-			@row = sq.row
-			@col = sq.col
-		end
-
-		normalize
-	end
-
-	def == a
-		@row == a.row and @col == a.col
-	end
-
-	def to_s
-		"( #{ row }, #{col} )"
-	end
-
-	def row= v
-		@row = v
-		normalize
-	end	
-
-	def col= v
-		@col = v
-		normalize
-	end	
-end
-
-	
-
-
 
 #
 # Determine closest ant by way of view distance.
@@ -136,15 +89,14 @@ end
 # Following derived from Harvesters
 #
 
-	def check_spot ai, r,c, roffs, coffs
-		coord = Coord.new( r + roffs, c + coffs)
-
-		if ai.map[ coord.row ][ coord.col ].land?
-			# Found a spot
-			# return relative position
-			throw:done, [ roffs, coffs ]
-		end
+def check_spot ai, r,c, roffs, coffs
+	if ai.map[ r ][ c ].rel(roffs, coffs).land?
+		# Found a spot
+		# return relative position
+		throw:done, [ roffs, coffs ]
 	end
+end
+
 
 def nearest_non_water sq
 	return sq if sq.land?
@@ -191,4 +143,78 @@ def nearest_non_water sq
 		end
 
 		offset
+end
+
+# Only add this when debugging
+if AntConfig::LOG_OUTPUT or AntConfig::LOG_STATUS
+
+#
+# Count created objects
+#
+# Source: http://snippets.dzone.com/posts/show/2108
+#
+class Class
+  alias_method :orig_new, :new
+
+  @@count = 0
+  @@stoppit = false
+  @@class_caller_count = Hash.new{|hash,key| hash[key] = Hash.new(0)}
+
+  def new(*arg,&blk)
+    unless @@stoppit
+      @@stoppit = true
+      @@count += 1
+      @@class_caller_count[self][caller[0]] += 1
+      @@stoppit = false
+    end
+    orig_new(*arg,&blk)
+  end
+
+  def Class.report_final_tally
+	str  = []
+
+	# don't stop; we want interim counts
+    #@@stoppit = true
+    str << "Number of objects created = #{@@count}"
+
+    total = Hash.new(0)
+    
+    @@class_caller_count.each_key do |klass|
+      caller_count = @@class_caller_count[klass]
+      caller_count.each_value do |count|
+        total[klass] += count
+      end
+    end
+    
+    klass_list = total.keys.sort{|klass_a, klass_b| 
+      a = total[klass_a]
+      b = total[klass_b]
+      if a != b
+        -1* (a <=> b)
+      else
+        klass_a.to_s <=> klass_b.to_s
+      end
+    }
+
+    klass_list.each do |klass|
+		# Don't bother with the small fry
+		break if total[klass] < 300
+
+      str << "%7d %20s" % [ total[klass], klass ]
+
+	# Following tells you WHERE in code objects are created
+	# very nice, but perhaps overkill for the poor logfiles. 
+if false
+      caller_count = @@class_caller_count[ klass]
+      caller_count.keys.sort_by{|call| -1*caller_count[call]}.each do |call|
+        str << "\t#{call}\tCreated #{caller_count[call]} #{klass} objects."
+      end
+end
+    end
+
+	str.join("\n")
+  end
+
+end
+
 end

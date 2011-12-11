@@ -2,16 +2,21 @@
 
 module AntConfig
 	# Testbot config
-	NUM_TURNS		= 1500	# Max number of turns per game
-	TURN_TIME		= 2000	# Num msec per bot per turn
+	NUM_TURNS		= 750	# Max number of turns per game
+
+	# Tournament runs on Xeon X5675 @ 3.07GHz servers (totaalnet); bogomips: 6117.71
+	# My laptop is a Core 2 Duo SU7300 1.3GHz; bogomips: 2678.11
+	# So server is 2.28 times faster
+
+	TURN_TIME		= 1150	# Num msec per bot per turn
 
 	# Num msec safety margin for handling turn
 	#TURN_MARGIN		= 200   # This value for the tournament
 	TURN_MARGIN		= 400   # This value for testing. 
 
 
-	LOG_OUTPUT      = false
-	LOG_STATUS      = true	# if LOG_OUTPUT is false, log status info only
+	LOG_OUTPUT      = true
+	LOG_STATUS      = false	# if LOG_OUTPUT is false, log status info only
 
 	DEFENSIVE_LIMIT = 20	# Number of ants needed to be present
 							# before ants start attacking as well
@@ -19,7 +24,7 @@ module AntConfig
 	AGGRESIVE_LIMIT = 30	# At this number, the ant will
 							# choose fights sooner 
 
-	ANALYZE_LIMIT	= 60	# After this number of ants, analyze will
+	ANALYZE_LIMIT	= 40	# After this number of ants, analyze will
 							# give preferences to hurting instead of
 							# playing safe
 
