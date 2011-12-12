@@ -2,9 +2,9 @@
 
 module AntConfig
 	# Testbot config
-	NUM_TURNS		= 750	# Max number of turns per game
+	NUM_TURNS		= 500	# Max number of turns per game
 
-	# Tournament runs on Xeon X5675 @ 3.07GHz servers (totaalnet); bogomips: 6117.71
+	# Tournament runs on Xeon X5675 3.07GHz servers (totaalnet); bogomips: 6117.71
 	# My laptop is a Core 2 Duo SU7300 1.3GHz; bogomips: 2678.11
 	# So server is 2.28 times faster
 
@@ -12,11 +12,11 @@ module AntConfig
 
 	# Num msec safety margin for handling turn
 	#TURN_MARGIN		= 200   # This value for the tournament
-	TURN_MARGIN		= 400   # This value for testing. 
+	TURN_MARGIN		= 350   # This value for testing. 
 
 
 	LOG_OUTPUT      = true
-	LOG_STATUS      = false	# if LOG_OUTPUT is false, log status info only
+	LOG_STATUS      = true	# if LOG_OUTPUT is false, log status info only
 
 	DEFENSIVE_LIMIT = 20	# Number of ants needed to be present
 							# before ants start attacking as well

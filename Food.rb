@@ -8,11 +8,11 @@ class Food
 		@coord = coord
 		@active = true
 		@ants = []
-		@counter = 0
+		@counter = $ai.turn_number
 	end
 
 	def == coord
-		@coord[0] == @coord[0] and @coord[1] == coord[1]
+		@coord[0] == coord[0] and @coord[1] == coord[1]
 	end
 
 	def row
@@ -55,7 +55,7 @@ class Food
 	end
 
 	def reset
-		@counter = COUNTER_LIMIT
+		@counter = $ai.turn_number + COUNTER_LIMIT
 	end
 
 	#
@@ -64,7 +64,7 @@ class Food
 		# Only forage active food
 		return false unless active
 
-		if @counter <= 0 
+		if @counter <= $ai.turn_number
 			$logger.info "Food #{ coord } counter ran out, signal to be found."
 			return true
 		else
@@ -91,8 +91,6 @@ class FoodList
 	def add coord
 		# Check if already present
 
-		# Incredibly, following line returns false positives sometimes
-		# TODO: check out how to handle this
 		index = @list.index coord
 
 		if index

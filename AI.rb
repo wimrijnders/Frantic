@@ -261,7 +261,7 @@ class AI
 		warn "unexpected: #{rd}" unless rd=='turn 0'
 
 		until((rd=@stdin.gets.strip)=='ready')
-			_, name, value = *rd.match(/\A([a-z0-9]+) (\d+)\Z/)
+			_, name, value = *rd.match(/\A([a-z0-9_]+) (\d+)\Z/)
 			
 			case name
 			when 'loadtime'; @loadtime=value.to_i

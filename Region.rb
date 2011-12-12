@@ -63,32 +63,39 @@ class Pathinfo
 		total
 	end
 
-
-	def calc_distance
+	def self.total_path_distance from, to, path, path_dist = nil
 		total = 0
-		if @path.nil? or @path.length < 2
+		if path.nil? or path.length < 2
 			# There is no path; calculate distance between from and to
-			dist = Distance.get @from, @to
+			dist = Distance.get from, to
 			total += dist.dist
 		else
-			cur = @@region.get_liaison @path[0], @path[1]
-			dist = Distance.get @from, cur
+			if path_dist.nil?
+				path_dist = Pathinfo.path_distance path, false
+			end
+
+			cur = @@region.get_liaison path[0], path[1]
+			dist = Distance.get from, cur
 			total += dist.dist
 
-			cur = @@region.get_liaison @path[-2], @path[-1]
-			dist = Distance.get cur, @to
+			cur = @@region.get_liaison path[-2], path[-1]
+			dist = Distance.get cur, to
 			total += dist.dist
 
-			total += @path_dist
+			total += path_dist
 		end
 
 		#$logger.info {
-		#	path_length = @path.length() - 1
+		#	path_length = path.length() - 1
 		#	path_length = 0 if path_length < 0
-		#	"Distance #{ @from.to_s }-#{ @to.to_s } through #{ path_length } liasions: #{ total }." 
+		#	"Distance #{ from.to_s }-#{ to.to_s } through #{ path_length } liasions: #{ total }." 
 		#}
 
 		total
+	end
+
+	def calc_distance
+		Pathinfo.total_path_distance @from, @to, @path, @path_dist
 	end
 
 	def path?
@@ -886,7 +893,6 @@ end
 		# requested
 
 		if not check_skip_liaison 
-#		if not check_skip_liaison and from == liaison
 #			$logger.info { "#{ from } already on liaison; adjusting path" }
 
 			# Find a neighboring region that is the same as the

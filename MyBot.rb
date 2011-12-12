@@ -2,9 +2,6 @@ $:.unshift File.dirname($0)
 #######################################
 # TODO
 #
-# - Determine new symmetries of cell maps
-# - Get rid of wall following as default move; stupid ants are going around in circles in the random maps.
-#
 # - IMPORTANT: Defend your hill; some players (include me!) are good at targetting
 #   these.
 #		- Especially, throw up a defence if enemy close.

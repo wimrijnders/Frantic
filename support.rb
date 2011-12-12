@@ -90,10 +90,12 @@ end
 #
 
 def check_spot ai, r,c, roffs, coffs
-	if ai.map[ r ][ c ].rel(roffs, coffs).land?
+	offset = [ roffs, coffs ]
+
+	if ai.map[ r ][ c ].rel( offset ).land?
 		# Found a spot
 		# return relative position
-		throw:done, [ roffs, coffs ]
+		throw:done, offset 
 	end
 end
 
@@ -145,8 +147,6 @@ def nearest_non_water sq
 		offset
 end
 
-# Only add this when debugging
-if AntConfig::LOG_OUTPUT or AntConfig::LOG_STATUS
 
 #
 # Count created objects
@@ -154,6 +154,10 @@ if AntConfig::LOG_OUTPUT or AntConfig::LOG_STATUS
 # Source: http://snippets.dzone.com/posts/show/2108
 #
 class Class
+
+# Only add this when debugging
+if AntConfig::LOG_OUTPUT 
+
   alias_method :orig_new, :new
 
   @@count = 0
@@ -214,7 +218,13 @@ end
 
 	str.join("\n")
   end
+else
+
+	def Class.report_final_tally
+		""
+	end
 
 end
 
 end
+

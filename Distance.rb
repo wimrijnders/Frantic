@@ -121,8 +121,7 @@ class Distance  < AntObject
 	# an accesibility from given square
 	#
 	def select_accessible square, dir1, dir2, land_only
-		# Ensure default value
-		ret_dir = dir1
+		ret_dir = nil
 
 		sq1 = square.neighbor(dir1)
 		sq2 = square.neighbor(dir2)

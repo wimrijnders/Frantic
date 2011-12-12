@@ -174,7 +174,6 @@ class EvadePathFinder
 		find_path true 
 		if @square != @start
 			target1 = @square
-			#d1 = Pathinfo.new(target1, target).dist
 			d1 = $pointcache.distance target1, target
 		
 			history1 = @history.clone
@@ -183,7 +182,6 @@ class EvadePathFinder
 		find_path false 
 		if @square != @start
 			target2 = @square
-			#d2 = Pathinfo.new(target2, target).dist
 			d2 = $pointcache.distance target2, target
 		end
 
@@ -210,12 +208,14 @@ class EvadePathFinder
 			@history = history1
 			@square = target1
 
-			true
+			ret = true
 		else
 			$logger.info "right is better"
 
-			false
+			ret = false
 		end
+
+		ret
 	end
 
 
@@ -261,9 +261,16 @@ class EvadePathFinder
 
 		$logger.info { "last_zero #{ last_zero }" }
 
-		# TODO: This test currently does NOTHING
-		unless last_zero.nil?
 
+
+		unless last_zero.nil?
+			dist = $pointcache.distance @start, last_zero 
+			if dist == 1
+				$logger.info "Not doing EVADE_GOTO over distance 1"
+				return nil
+			end
+
+			# TODO: This test currently does NOTHING
 			if [ :N, :S ].include? @dir and last_zero.col == @start.col
 				$logger.info "last_zero column unchanged in N/S direction; ignoring"
 				return nil

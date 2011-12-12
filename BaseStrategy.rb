@@ -161,11 +161,9 @@ class BaseStrategy
 	end
 
 	def ant_orders ai
-		$timer.start( :ant_orders ) {
-			ai.my_ants.each do |ant|
-				move_neighbors [ant]
-			end
-		}
+		ai.my_ants.each do |ant|
+			move_neighbors [ant]
+		end
 	end
 
 
@@ -183,9 +181,9 @@ class BaseStrategy
 
 
 	def turn ai, do_orders = true, do_food = true
+		evade ai
 		ant_orders ai if do_orders
 		find_food ai  if do_food
-		evade ai
 
 		$logger.info "=== Default Move Phase ==="
 		ai.my_ants.each do |ant|

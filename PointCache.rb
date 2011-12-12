@@ -56,10 +56,11 @@ class PointCache
 
 			# items with distance one can be validated immediately
 			if invalid and t[0] == 1
-				t[3] = false
-				invalid = t[3]
 				t[1] = @zero_pathitem
+				t[3] = false
 				t[4] = 0
+
+				invalid = t[3]
 			end	
 
 			if not invalid
@@ -70,9 +71,10 @@ class PointCache
 					$logger.info "Path distance changed; recalculating"
 					path = t[1][:path]
 
-					p = Pathinfo.new from, to, path 
-					distance = p.dist
-					move = determine_move from, to 
+					distance = Pathinfo.total_path_distance from, to, path, t[1][:dist]
+					move, direct = determine_move from, to 
+
+					raise "move is nil" if move.nil?
 
 					$logger.info { "distance old: #{ t[0] }; new: #{ distance }" }
 
@@ -115,7 +117,7 @@ class PointCache
 
 
 
-	def	determine_move from, to
+	def	next_square from, to
 		$logger.info "entered"
 
 		next_sq = $region.path_direction from, to, false
@@ -124,93 +126,36 @@ class PointCache
 			# Move directly
 			next_sq = to
 		elsif next_sq.nil?
-			# Can't be determined
+			$logger.info "Next square can not be determined."
+		end
+
+		next_sq
+
+
+	end
+
+	def	determine_move from, to
+		$logger.info "entered"
+
+		next_sq = next_square from, to
+		if next_sq.nil?
 			$logger.info "Move dir can not be determined."
 			return nil
 		end
 
 		d = Distance.get( from, next_sq)
-		move = d.dir from, true
 
+		move = d.dir from, true
 		$logger.info "Determined move #{ move }"
-		move
+
+		# try direct path
+		direct = set_walk( from, next_sq, nil, true )
+
+		[ move, direct]
 	end
 
 
-
-	def set from, to, distance, item, invalid = false, move = nil
-		$logger.info "entered, move #{ move }"
-
-		raise "#{from} not a square" if not from.is_a? Square
-		raise "#{to} not a square" if not to.is_a? Square
-
-		# safeguard initialization
-		path_distance = 0
-
-		# try direct path first
-		if item.nil?
-			d = Distance.get from, to
-			if set_walk from, to, nil, true
-				# It really is a direct path!
-				$logger.info "It's a direct path"
-				distance = d.dist
-				item = @zero_pathitem
-				move = d.dir
-				invalid = false
-				path_distance = 0
-			else
-
-				if from.region.nil?
-					$logger.info "#{from} region nil; skipping"
-				elsif to.region.nil?
-					$logger.info "#{to} region nil; skipping"
-				else
-					item = $region.get_path_basic from.region, to.region
-				end
-				
-				if not item.nil?
-					path_distance = item[:dist]
-				end
-
-				if distance.nil? and not item.nil?
-					p = Pathinfo.new from, to, item[:path]
-	
-					if p.path.nil?
-						$logger.info "#{p} path nil; skipping"
-					else
-						distance = p.dist
-					end
-				end
-
-
-				if not item.nil? and not distance.nil?
-					move = determine_move from, to if move.nil?
-
-					return nil if move.nil?
-
-					invalid = false
-				else
-					$logger.info "not found; assume direct path"
-
-					# d from here above
-					distance = d.dist
-					move = d.dir
-					item = @zero_pathitem
-					invalid = true
-					path_distance = 0
-	
-					Region.add_searches from, [ to ]
-				end
-			end
-		end
-
-		result = [distance, item, move, invalid, path_distance ]
-
-		#$logger.info {
-		#	"from-to => [ distance, item, move, invalid] : " +
-		#	"#{ from }-#{ to } => [ #{ distance }, #{ item }, #{ move }, #{ invalid } ]"
-		#}
-
+	def add_cache from, to, result
 		f = @cache[ from ]
 		if f.nil?
 			@cache[from] = {}
@@ -223,7 +168,69 @@ class PointCache
 			@known += 1
 		end
 		f[to] = result
+	end
 
+
+	def set from, to, distance, item, invalid = false, move = nil
+		$logger.info "entered, from #{ from}, to #{ to }, move #{ move }"
+
+		raise "#{from} not a square" if not from.is_a? Square
+		raise "#{to} not a square" if not to.is_a? Square
+
+		if item.nil?
+			# try direct path first
+			d = Distance.get from, to
+			if set_walk from, to, nil, true
+				$logger.info "direct path from-to"
+				result = [ d.dist, @zero_pathitem, d.dir, false, 0 ]
+				add_cache from, to, result
+				return result
+			end
+
+			if from.region.nil?
+				$logger.info "from #{from} region nil; skipping"
+				return nil
+			elsif to.region.nil?
+				$logger.info "to #{to} region nil; skipping"
+				return nil
+			end
+
+			item = $region.get_path_basic from.region, to.region
+			if not item.nil?
+				distance = Pathinfo.total_path_distance from, to, item[:path], item[:dist]
+				path_distance = item[:dist]
+			end
+		else
+			$logger.info "Already have item"
+
+			# If item is present, distance is also present
+			# No need to calculate it
+
+			path_distance = item[:dist]
+		end
+
+		if move.nil?
+			move, direct = determine_move from, to
+			invalid = false if direct and not move.nil?
+		end
+
+		result = [distance, item, move, invalid, path_distance ]
+
+
+		if result[0].nil? or
+		   result[1].nil? or
+		   result[2].nil? or
+		   result[3].nil? or
+		   result[4].nil?
+
+			#$logger.info "result #{ result } not complete; assume direct path"
+			d = Distance.get from, to
+			result = [ d.dist, nil, d.dir, true, 0 ]
+
+			Region.add_searches from, [ to ]
+		end
+
+		add_cache from, to, result
 		result	
 	end
 
@@ -242,8 +249,14 @@ class PointCache
 			else
 			 
 				# Following to determine path
-				p = Pathinfo.new from, to, in_path
-				path = p.path
+				if in_path.nil?
+					p = Pathinfo.new from, to, in_path
+					path = p.path
+					dist = p.dist
+				else 
+					path = in_path
+					dist = Pathinfo.total_path_distance from, to, path
+				end
 				$logger.info "path #{ path }"
 		
 				newitem = nil	
@@ -263,11 +276,12 @@ class PointCache
 						end
 
 					else
+						# This should never be reached
 						$logger.info "WARNING: small path encountered; should not happen."
 			
 						# store anyway
-						set to, from, p.dist, @zero_pathitem 
-						newitem = set from, to, p.dist, @zero_pathitem 
+						set to, from, dist, @zero_pathitem 
+						newitem = set from, to, dist, @zero_pathitem 
 					end
 				end
 			end
@@ -459,14 +473,7 @@ $logger.info "done"
 					next
 				end
 
-				p = Pathinfo.new w[0], lastpoint, item[:path]
-
-				if p.path.nil?
-					$logger.info "#{p} path nil; skipping"
-					next
-				end
-
-				dist = p.dist
+				dist = Pathinfo.total_path_distance w[0], lastpoint, item[:path], item[:dist]
 			end
 
 

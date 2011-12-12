@@ -198,8 +198,8 @@ class Analyze
 			unless best_moves.nil?
 				# Select best good move
 
-				# moving around friends in peril to prevent blocking was a bad idea, code
-				# ran wild if there were many. So let's not do that.
+				# moving around friends in peril to prevent blocking was a bad
+				# idea, code ran wild if there were many. So let's not do that.
 
 				# Just pick the first and hope for the best
 				best_move = best_moves[0]

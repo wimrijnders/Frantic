@@ -69,10 +69,7 @@ class Order
 	end
 
 	def handle_liaison cur_sq, ai
-		sq = ai.map[ square.row][ square.col ]
-		unless $region 
-			return sq 
-		end
+		sq = square
 
 		if @liaison
 			# First condition is to keep on moving to final target, 
@@ -242,20 +239,15 @@ module Orders
 			end
 		end
 
-		if [ :EVADE_GOTO ].include? what
-			clear_order what 
+		if [ :EVADE_GOTO, :FORAGE, :GOTO ].include? what
+			clear_order :EVADE_GOTO 
 		end
 
-		if [ :GOTO ].include? what
-			clear_order what 
-			clear_order :EVADE_GOTO 
+		if [ :GOTO, :FORAGE ].include? what
+			clear_order :GOTO 
 			evade_reset
 		end
 
-
-		if [ :FORAGE ].include? what
-			clear_order :EVADE_GOTO 
-		end
 
 		$logger.info { "Setting order #{ what } on square #{ square.to_s } for #{ self.to_s }" }
 
@@ -411,8 +403,7 @@ module Orders
 		return false if collective_assembled?
 		ai.turn.check_maxed_out
 
-		# If right next to enemy, stay put and ignore orders
-		# This happens when razing hills.
+		# Following happens when razing hills.
 		if neighbor_enemies?(1)
 			$logger.info { " #{ self } right next to enemy, staying and ignoring orders." }
 			stay
@@ -545,40 +536,6 @@ end
 				sq = order_sq
 				str = ""
 
-if false	
-	# No need to determine close ant ; if it is in_view, the food would be active
-	# and therefor visible
-
-				closest = closest_ant_view [ sq.row, sq.col], @ai
-				unless closest.nil?
-					d = Distance.get closest, sq
-
-					if d.in_view? 
-						if !@ai.map[ sq.row ][sq.col].food?
-							# food is already gone. Skip order
-							clear_first_order true
-							str << "no"
-							next
-						else
-							str << "yes"
-
-							# Special case; sometimes food appears right next to
-							# ant (eg first turn next to an anthill). For some reason
-							# it does not get consumed immediately
-							if d.dist == 1
-								str << ", right next to it"
-								stay
-								return true
-							end
-						end
-					else
-						str << "can't tell, out of view"
-					end
-				end
-
-				$logger.info { "Food #{ sq } still there: #{ str}" }
-end
-
 				result = @ai.food.active? [ sq.row, sq.col ]
 				if result.nil?
 					# food is already gone. Skip order
@@ -610,7 +567,6 @@ end
 				end
 				$logger.info { "Food #{ sq } still there: #{ str}" }
 			end
-
 
 
 			# Check if hill still present when in-range
@@ -694,13 +650,20 @@ end
 
 
 		item = $pointcache.get self.square, order_sq
+
 		to = nil
-		if not item.nil? and not item[3]
-			$logger.info "Valid pointcache item detected"
+		if not item.nil? 
+			if not item[3]
+				$logger.info "Valid pointcache item detected"
+			end
 
 			to = item[2]	# to is a direction
 			move to, order_sq
 		else
+			# This should never happen any more
+
+			$logger.info "WARNING: nil item from pointcache"
+
 			to = @orders[0].handle_liaison( self.square, ai )
 
 			if to.nil? 
