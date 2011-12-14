@@ -6,6 +6,8 @@ class Timer
 
 		# Following in combination with controlled GC running generates
 		# segmentation faults!
+		#
+		# This proper timing creates timeouts, unfortunately
 		#Process.times.utime + Process.times.stime
 	end
 

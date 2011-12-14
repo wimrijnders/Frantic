@@ -34,9 +34,9 @@ class Analyze
 
 	def self.analyze ai
 
-		# Remember who we handled, so we don'r re-iterate over them
-		# Note that only collective leaders are stored here, not entire
-		# collectives
+		# Remember who we handled, so we don't re-iterate over them
+		# Note that only collective leaders are stored here, not all
+		# collective members
 		done = []
 
 		ai.my_ants.each do |ant|
@@ -84,17 +84,6 @@ class Analyze
 				end
 			end
 			#$logger.info { "Friends of #{ ant }: #{ friends }" }
-
-			# Collect enemies in view of self and near friends
-			enemies_in_view = ant.enemies_in_view 
-
-			friends.each do |f|
-				#$logger.info { "Enemies of friend #{ f}: #{ f.enemies_in_view }" }
-				enemies_in_view += f.enemies_in_view
-			end
-			enemies_in_view.uniq!
-			#$logger.info { "Enemies of #{ ant }: #{ enemies_in_view }" }
-
 
 			# Make current ant part of the friends group
 			if ant.collective_leader?  and ant.collective.assembled?( false)
@@ -193,7 +182,7 @@ class Analyze
 
 
 			# Do the analysis for the fighting ants
-			best_moves = Analyze.determine_best_move guess, friends_danger
+			best_moves = Analyze.determine_best_move guess, friends_danger, harmless
 
 			unless best_moves.nil?
 				# Select best good move
@@ -658,7 +647,7 @@ class Analyze
 		ret
 	end
 
-	def self.determine_best_move guess, ants
+	def self.determine_best_move guess, ants, harmless
 		# calculate the body count for all possible moves
 		# Select the best result
 		best_move = nil
@@ -670,9 +659,21 @@ class Analyze
 		# play safe: we're not sure we are superior: inflict as much damage as possible while
 		#			 minimizing losses.
 
+		num_my_ants = 0
+		ants.each do |a|
+			if a.kind_of? Collective 
+				num_my_ants += a.size
+			else
+				num_my_ants += 1
+			end
+		end
+
 		play_hard = !Analyze.play_safe? or
 			# We have a numeric advantage
-			ants.length > guess.length
+			num_my_ants > guess.length or
+			# Enemies are static or twitching pussies
+			harmless
+
 		play_safe = !play_hard
 
 

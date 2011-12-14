@@ -112,7 +112,8 @@ class MyAnt < Ant
 
 	# Square this ant sits on.
 	attr_accessor :moved_to, :prev_move, 
-		:abspos # absolute position relative to leader, if part of collective
+		:abspos, # absolute position relative to leader, if part of collective
+		:been_there	# Regions through which this ant has passed
 	
 	attr_accessor :collective, :enemies
 	attr_writer   :friends
@@ -141,13 +142,15 @@ class MyAnt < Ant
 		orders_init
 
 		#@trail = MoveHistoryFriendly.new 
+
+		@been_there = []
 	end
 
 
 	def default
 		return :STAY if stuck?
 
-		target = BorderPatrolFiber.request_target self.pos
+		target = BorderPatrolFiber.request_target self.pos, self.been_there
 		unless target.nil?
 			#if @ai.aggresive?
 			#	set_order target, :DEFEND
@@ -163,7 +166,7 @@ class MyAnt < Ant
 
 
 		# Attempts to use intelligent default movement here all have adverse effect
-		# on movement downstream (loads of twitching. Best to not be clever about movement
+		# on movement downstream (loads of twitching). Best to not be clever about movement
 		# here
 
 		best = true
@@ -203,9 +206,15 @@ class MyAnt < Ant
 
 		if @ai.order self, direction
 			# order accepted - change state of ant now.
-			@square.neighbor( direction ).moved_here = self
+			next_sq = @square.neighbor( direction )
+			next_sq.moved_here = self
 			@moved= true
 			@moved_to= direction
+
+			next_region = next_sq.region
+			unless @been_there.include? next_region
+				@been_there << next_region
+			end
 
 			#@trail.add direction, @square
 			true
@@ -298,7 +307,7 @@ class MyAnt < Ant
 
 		next_sq = square.neighbor(dir)
 
-		$logger.info { "next_sq: #{ next_sq }, hole: #{ next_sq.hole?}" }
+		$logger.info { "dir #{ dir }, next_sq: #{ next_sq }, can_pass: #{ can_pass? dir }; hole: #{ next_sq.hole?}" }
 
 		if dir == :STAY
 			str =  "stuck"
@@ -414,7 +423,6 @@ class MyAnt < Ant
 	# 
 
 	def make_friends
-		# Not called any more; sorting done externally,see :sort_friends_view
 		if @friends.nil?
 			$logger.info "Sorting friends."
 			@friends = ai.neighbor_ants self.square
@@ -505,7 +513,8 @@ end
 		d = Distance.get self, enemy
 
 		unless d.nil?
-			if d.in_view? and Distance.direct_path?( self.square, enemy )
+			#if d.in_view? and Distance.direct_path?( self.square, enemy )
+			if d.in_view? and $pointcache.has_direct_path( self.square, enemy )
 				$logger.info { "ant #{ @square.to_s } attacked by #{ enemy }!" }
 
 				@attack_distance = d
@@ -581,6 +590,8 @@ end
 
 
 	def neighbor_attack
+		$logger.info "entered"
+
 		# Check for direct friendly neighbours 
 		done = false
 		has_neighbour = false
@@ -600,7 +611,7 @@ end
 				end
 			end
 		end
-		return if done
+		return true if done
 	
 	
 		if has_neighbour
@@ -608,7 +619,7 @@ end
 			$logger.info "Attack."
 	
 			move attack_distance.attack_dir
-			return 
+			return true
 		end
 	
 		# Find a close neighbour and move to him
@@ -624,17 +635,10 @@ end
 				$logger.info "Moving to friend."
 				move_to friend[0].square 
 			end
-			return 
+			return true
 		end
 
-		# when defending a hill, stay put	
-		if find_order :DEFEND_HILL
-			stay
-		else
-			# Otherwise, just run away
-			retreat
-		end
-		return 
+		false
 	end
 
 
@@ -643,11 +647,12 @@ end
 	
 		# Find an attacked neighbour and move in to help
 		ai.my_ants.each do |l|
+			next if self == l
 			next unless l.attacked?
 			next if l.collective?	# Collectives can fend for themselves
 	
 			d = Distance.get self, l.pos	
-	
+
 			# Only help out if current ant has no order,
 			# or ant in distress is nearer
 			if order_dist and order_dist.dist < d.dist
@@ -656,11 +661,11 @@ end
 			end
 	
 			if d.dist == 1 
-				$logger.info "Moving in - next to friend." 
+				$logger.info { "#{ self } moving in - next to friend #{ l }." }
 				stay
 				break
 			elsif d.in_view?
-				$logger.info "Moving in to help attacked buddy."
+				$logger.info { "#{ self } moving in to help attacked buddy #{ l }." }
 				move_to l.pos
 				break
 			end
@@ -669,12 +674,9 @@ end
 
 
 	def handle_conflict
-		#return if moved?
-	
 		# If we can complete the order before being in conflict, 
 		# the order will take precedence.
 		return if check_orders
-
 
 		if ai.kamikaze?
 			# Pick the nearest enemy and go for it
@@ -686,17 +688,27 @@ end
 			end
 		end
 	
-		if attacked?
-			#retreat and return if ai.defensive?
+		if attacked? and attack_distance.in_peril?
+			$logger.info "#{ self } in conflict!"
+if false
+	# Conflict handled collectively in Analyze Phase
 
 			if ai.aggresive? and enemies.length == 1
 				move attack_distance.attack_dir
 				return 
 			end
 	
-			$logger.info "Conflict!"
 
-			neighbor_attack
+			return if neighbor_attack
+end
+
+			# when defending a hill, stay put	
+			if find_order :DEFEND_HILL
+				stay
+			else
+				# Otherwise, just run away
+				retreat
+			end
 		else
 			neighbor_help
 		end

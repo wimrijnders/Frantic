@@ -4,7 +4,7 @@ class Logger
 		@log = AntConfig::LOG_OUTPUT
 		@log_status = true
 		@@ai = ai
-		@start = Time.now
+		@start = Timer.now
 
 		@f = {}
 		@q = []
@@ -134,7 +134,7 @@ class Logger
 
 
 	def out file, method_name, str
-		time = (Time.now - @start)*1000
+		time = (Timer.now - @start)*1000
 		str = "#{ time.to_i } - #{ method_name}: #{ str }"
 
 		while qval = @q.pop

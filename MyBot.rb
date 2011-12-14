@@ -66,9 +66,6 @@ end
 class Strategy < BaseStrategy
 
 	def default_move ant
-		return if ant.moved?
-		return if ant.collective?
-	
 		ant.move ant.default 
 	end
 
@@ -307,9 +304,10 @@ class Strategy < BaseStrategy
 			end
 
 			# Handle non-collective ants which are in a conflict situation
-			$logger.info "Do individual conflict ants"
 			ai.my_ants.each do |ant|
 				next if ant.collective?
+				next if ant.moved?
+
 				ant.handle_conflict
 			end
 		}
@@ -344,6 +342,8 @@ class Strategy < BaseStrategy
 		end
 
 if false
+	# Disabled because static ants seriously impede ant traffic
+
 		ai.turn.check_maxed_out
 		$logger.info "=== Enlist Phase ==="
 		$timer.start :Enlist_Phase

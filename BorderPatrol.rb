@@ -106,22 +106,29 @@ class BorderPatrol
 	# 
 	# Retrieve all liaisons from given region AND the known neighboring
 	# regions
-	def get_nearby_liaisons region
+	def get_nearby_liaisons region, skip_regions
 		$logger.info "entered"
 
 		cached_liaisons = $region.get_liaisons region
 
 		return [] if cached_liaisons.nil?
 
-		next_regions, liaisons = cached_liaisons.to_a.transpose
 
-		next_regions.each do |r|
-			tmp = $region.get_liaisons r
+		liaisons = []
 
+		cached_liaisons.each_pair do |k, v|
+			next if skip_regions.include? k
+			liaisons << v
+
+			tmp = $region.get_liaisons k
 			next if tmp.nil?
-		
-			liaisons += cached_liaisons.to_a.transpose[1]
+
+			tmp.each_pair do |k2,v2|
+				next if skip_regions.include? k2
+				liaisons << v2
+			end
 		end
+		
 		liaisons.uniq!
 
 		$logger.info { "nearby liaisons for region #{ region }: #{ liaisons }" }
@@ -219,8 +226,23 @@ class BorderPatrol
 	end
 
 
-	def next_liaison sq
+	def next_liaison sq, skip_regions
 		$logger.info "entered, sq #{sq}"
+
+		lam = lambda do |list, sq|
+			if not list.nil? and not list.empty?
+				list.clone.each do |l|
+					if l == sq
+						$logger.info "Already there!"
+						clear_liaison l
+					else
+						return l 
+					end
+				end
+			end
+
+			return nil
+		end
 
 		ret = nil
 
@@ -229,23 +251,28 @@ class BorderPatrol
 
 			unless @liaisons.empty?
 				# Detect nearby active liaisons
-				tmp = get_nearby_liaisons sq.region
-				tmp = tmp & @liaisons
+				tmp1 = get_nearby_liaisons sq.region, skip_regions
+				tmp = tmp1 & @liaisons
 
 				$logger.info { "nearby active liaisons: #{ tmp }" }
+				ret = lam.call tmp, sq
 
-				if not tmp.nil? and not tmp.empty?
-					# Just get the first
-					ret = tmp[0]
-				else
-					ret = @liaisons[0]
-					@liaisons.rotate!
+				if ret.nil? 
+					# No nearby options found, just get the first
+					ret = lam.call @liaisons, sq
+
+					## Get a nearby liaison instead
+					#ret = lam.call tmp1, sq
 				end
+			
+				# Change the list order, even if we did not get the first item
+				@liaisons.rotate!
 			else
-				#ret = @last_liaison
 				redo_hills
 			end
+
 		end
+
 
 		$logger.info "ret #{ ret }"
 		ret
@@ -281,7 +308,6 @@ class BorderPatrol
 			true
 		end
 
-		#redo_hills
 		false
 	end
 end

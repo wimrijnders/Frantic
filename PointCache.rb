@@ -67,7 +67,7 @@ class PointCache
 
 				#$logger.info "hit #{from}-#{ to}: dist #{ t[0]}, dir #{ t[2] }"
 
-				if t[4] != t[1][:dist]
+				if !check_invalid and  t[4] != t[1][:dist]
 					$logger.info "Path distance changed; recalculating"
 					path = t[1][:path]
 
@@ -137,20 +137,25 @@ class PointCache
 	def	determine_move from, to
 		$logger.info "entered"
 
+		# No point in retrieving item from cache; the whole
+		# point of this routine is to create or replace an
+		# existing item. It is called from get and set.
+
 		next_sq = next_square from, to
 		if next_sq.nil?
 			$logger.info "Move dir can not be determined."
 			return nil
 		end
 
+		direct = set_walk from, next_sq, nil, true
+
+		# Note that we are lying a bit here; there is 
+		# a possibility that the dir returned from d.dir
+		# is not the same as the first dir in the walk
 		d = Distance.get( from, next_sq)
-
 		move = d.dir from, true
+
 		$logger.info "Determined move #{ move }"
-
-		# try direct path
-		direct = set_walk( from, next_sq, nil, true )
-
 		[ move, direct]
 	end
 
@@ -182,8 +187,11 @@ class PointCache
 			d = Distance.get from, to
 			if set_walk from, to, nil, true
 				$logger.info "direct path from-to"
-				result = [ d.dist, @zero_pathitem, d.dir, false, 0 ]
-				add_cache from, to, result
+				# At this point, the new value has been saved by a recursive
+				# call to set(). Retrieve it without triggering a new set.
+				result = get from, to, true
+				#result = [ d.dist, @zero_pathitem, d.dir, false, 0 ]
+				#add_cache from, to, result
 				return result
 			end
 
@@ -201,7 +209,7 @@ class PointCache
 				path_distance = item[:dist]
 			end
 		else
-			$logger.info "Already have item"
+			#$logger.info "Already have item"
 
 			# If item is present, distance is also present
 			# No need to calculate it
@@ -307,8 +315,7 @@ class PointCache
 
 
 	def get_sorted from, to, valid_first = false
-$logger.info "entered"
-
+		$logger.info "entered"
 
 		# Following to take ants into account
 		if from.respond_to? :square
@@ -334,7 +341,7 @@ $logger.info "entered"
 		list = []
 
 		to.each do |a|
-$logger.info "to ant: #{ a}"
+			#$logger.info "to ant: #{ a}"
 			if a.respond_to? :square
 				sq_to = a.square
 			else
@@ -347,10 +354,9 @@ $logger.info "to ant: #{ a}"
 
 			$ai.turn.check_maxed_out
 		end
-$logger.info "done get"
+		$logger.info "done get"
 
 		PointCache.sort_valid list, valid_first
-$logger.info "done sort"
 
 		$ai.turn.check_maxed_out
 
@@ -369,7 +375,7 @@ $logger.info "done sort"
 			ret << [ l[0], l[1][0] ]
 		end
 
-$logger.info "done"
+		$logger.info "done"
 		ret
 	end
 
@@ -425,8 +431,43 @@ $logger.info "done"
 		end
 	end
 
+	def is_direct_path item
+		!item.nil? and !item[3]  and item[1] == @zero_pathitem
+	end
+
 	def has_direct_path from, to
-		Distance.direct_path? from, to
+		return true if from == to
+
+		# Silly to recalc this if already in pointcache
+		# In any case, if it isn't, the call to get will put it there
+		#Distance.direct_path? from, to
+
+		from = from.square if from.respond_to? :square
+		to = to.square if to.respond_to? :square
+
+		item = get from, to
+
+		ret = is_direct_path item
+
+		$logger.info { "#{from}-#{to} direct: #{ ret }" }	
+		ret
+	end
+
+
+	def can_reach from, to
+		return true if from == to
+		
+		from = from.square if from.respond_to? :square
+		to = to.square if to.respond_to? :square
+
+		item =  get from, to
+		if not item.nil? and not item[3]
+			$logger.info "There's a known path for #{ from }-#{to }"
+			return true
+		end
+
+		$logger.info "Can not reach #{ from }-#{to }"
+		false
 	end
 
 	#
@@ -442,7 +483,7 @@ $logger.info "done"
 		lastpoint = to if lastpoint.nil?
 
 		walk = Distance.get_walk from, to
-		return false if walk.length == 0
+		return false if walk.nil? or walk.empty?
 
 		walked_full_path = ( walk[-1][0] == lastpoint )
 
@@ -479,8 +520,17 @@ $logger.info "done"
 
 			# Don't add last point if full path reached
 			unless w[2] == 0
-				#$logger.info "Saving this item"
-				set w[0], lastpoint, dist , item, false, w[1]
+				#$logger.info "Saving #{ w[0] }-#{lastpoint}"
+				tmp = get w[0], lastpoint, true 
+				#$logger.info "tmp #{ tmp }"
+				if not is_direct_path tmp
+					set w[0], lastpoint, dist , item, false, w[1]
+				else
+					# Item has already been added; so the rest of the path
+					# has been added as well
+					$logger.info "rest of path is known"
+					break
+				end
 			end
 		end
 

@@ -31,8 +31,8 @@ class Distance  < AntObject
 		$logger.info "danger_radius2: #{ @@danger_radius2 }"
 
 		#
-		# same as peril radius, but contains squares from which you can be attacked in
-		# moves. for attackradius 5 the value is 37. This is not exact, contains some
+		# same as danger radius, but contains squares from which you can be attacked in
+		# 2 moves. for attackradius 5 the value is 37. This is not exact, contains some
 		# extra squares on the diagonal sides.
 		# Again, safeguard calculation
 		@@peril_radius2 = ( Math.sqrt(ai.attackradius2() -1 ) + 4  ) ** 2 + 1
@@ -207,21 +207,6 @@ class Distance  < AntObject
 	end
 
 
-	def self.direct_path? from, to
-		walk = Distance.get_walk from, to
-		return false if walk.length == 0
-		walked_full_path = ( walk[-1][0] == to )
-
-		if walked_full_path 
-			$logger.info { "Direct path between #{ from } and #{ to }" }
-		else
-			$logger.info { "No direct path between #{ from } and #{ to }" }
-		end
-
-		walked_full_path
-	end
-
-
 	#
 	# Make a shortest path between the two points.
 	# If water is encountered, return path up till the water
@@ -229,7 +214,7 @@ class Distance  < AntObject
 	# first item is from 
 	# If full path has been made, last item is to
 	#
-	def self.get_walk from, to
+	def self.get_walk1 from, to
 		raise "from and to are equal: #{ from }-#{to}" if from == to
 
 		d = Distance.get from, to
@@ -257,6 +242,102 @@ class Distance  < AntObject
 		result
 	end
 
+	def self.get_walk from, final_to
+		if from.region.nil? or final_to.region.nil?
+			$logger.info "from or to in unknown territory"
+			return nil
+		end
+		to = final_to
+		if from.region != final_to.region
+			path_item = $region.get_path_basic from.region, final_to.region
+			$logger.info { "path_item #{ path_item }" }
+			if path_item.nil? 
+				$logger.info "from and to regions not connected"
+				return nil
+			end
+
+			if path_item[:path].nil?
+				$logger.info "WARNING: have no path info in cache"
+				return nil
+			end
+
+			if path_item[:path].length > 2
+				$logger.info "regions are too separated"
+				return nil
+			end
+
+			regions = path_item[:path]
+		else
+			regions = [ from.region ]
+		end
+
+		$logger.info "entered, going for #{ to }"
+
+		active = []
+		done = []
+
+		d = Distance.get from, to
+		active << [from, d.dist, [from] ]
+
+		current = nil
+		found = false
+		while not active.empty?
+			current = active.shift
+			sq, dist, path = current
+			if sq == to
+				found = true
+				break
+			end
+
+			done << sq
+
+			added = false
+			[ :N, :E, :S, :W].each do |dir|
+				n = sq.neighbor(dir)
+				next if active.include? n
+				next if done.include? n
+				next if path.include? n
+				next if n.water? 
+				next if n.region.nil?
+				# We know the region path, use it
+				next if not regions.include? n.region
+
+				d = Distance.get n, to
+				active << [n, d.dist, path + [n] ]
+				added = true
+			end
+
+			if added
+				#active.sort! { |a,b| (a[1] + a[2].length) <=> ( b[1] + b[2].length ) }
+				active.sort! { |a,b| a[1]  <=> b[1] }
+			end
+
+			#$logger.info {
+			#	str = ""
+			#	active[0..3].each { |a| str << "[ " + a.join(",") + "]\n" }
+			#	 "Current active:\n#{ str }"
+			#}
+		end
+
+		if not found 
+			$logger.info "No solution"
+			return nil
+		end
+
+		# Make the output in the format we want it
+		list = current[2]
+		#$logger.info { "found path #{ list }" }
+
+		walk = []
+		(0..( list.length() -2 )).each do |i|
+			d = Distance.get list[i], list[i+1]
+			walk << [ list[i], d.dir, list.length() - 1 - i ]
+		end
+		walk << [ list[-1], :STAY , 0 ]
+
+		$logger.info { "made walk: #{ walk }" }
+		walk
+	end
 
 	def longest_dir 
 		if row.abs == col.abs

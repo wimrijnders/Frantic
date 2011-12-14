@@ -439,8 +439,14 @@ class AI
 
 		# determine all known squares and regions
 		my_ants.each do |ant|
-			Region.add_regions ant.square
-		end unless $region.nil?
+			# First turn we do directly, not through the fiber
+			if @turn_number == 1
+				$logger.info "First turn add regions"
+				$region.find_regions ant.square 
+			else
+				Region.add_regions ant.square
+			end
+		end
 
 		$timer.start( :detect_enemies ) {
 			detect_enemies @new_enemy_ants
@@ -527,24 +533,31 @@ end
 
 	def detect_enemies new_enemy_ants
 		return if @enemy_ants.length == 0 and new_enemy_ants.length == 0
+		$logger.info "entered"
 
-		$logger.info "Entered detect_enemies"
+		found_list = []
+
+		$logger.info { "Pre:
+   enemy_ants    : #{ @enemy_ants.length} 
+   new_enemy_ants: #{ new_enemy_ants.length}"
+		}
+
 
 		# First, check new enemies wrt. previous ones
-		$logger.info { "Pre new ants: #{ @enemy_ants.length} ants." }
+		# This part handles moving and static ants
 		count = 0
 		found_some = true
 		while found_some  and @enemy_ants.length > 0
 			count += 1
 			found_some = false
 
-			new_enemy_ants.each do |b|
-				next if b.state?
+			new_enemy_ants.clone.each do |b|
+				#next if b.state?
 
 				list = []
 				@enemy_ants.each do |a|
 					d = Distance.get b,a
-					if d.dist == 1
+					if d.dist <= 1
 						list << a
 					end
 				end
@@ -555,24 +568,29 @@ end
 					$logger.info "Found only one option for new ant"
 					if b.dead?
 						$logger.info { "Dead #{ b } detected" }
-						# Use state for signalled this ant has been found
-						b.state = true
+						# Use state for signalling this ant has been found
+						#b.state = true
 					else
 						$logger.info { "Alive #{ b } detected" }
-						b.transfer_state a
+						#b.transfer_state a
+						a.state.add b.square
+						b.square.ant = a
+						a.square = b.square
+						found_list << a
 					end
 
+					new_enemy_ants.delete b
 					@enemy_ants.delete a
 					found_some = true
 				end
 			end
 		end
-		$logger.info { "post new ants: #{ @enemy_ants.length} ants; iterations: #{ count }" }
+		$logger.info { "post new ants: #{ found_list.length} ants; iterations: #{ count }" }
 		
 		# reset states for dead ants
-		new_enemy_ants.each do |b|
-			b.state = nil if b.dead? and b.state?
-		end
+		#new_enemy_ants.each do |b|
+		#	b.state = nil if b.dead? and b.state?
+		#end
 
 
 		# Need to define list here for the lambda
@@ -621,11 +639,14 @@ end
 						$logger.info { "Dead #{ b } detected" }
 					else
 						$logger.info { "Alive #{ b } detected" }
-						b.transfer_state a
+						#b.transfer_state a
+						a.state.add b.square
+						b.square.ant = a
+						a.square = b.square
+						found_list << a
 					end
 
-					# TODO: for some reason, ants do not get cleaned
-					#       up on hills here. Find out why!
+					new_enemy_ants.delete b
 					@enemy_ants.delete a
 					found_some = true
 				end
@@ -637,14 +658,22 @@ end
 		while found_some  and @enemy_ants.length > 0
 			count += 1
 			found_some = false
-			@enemy_ants.each do |a|
+			@enemy_ants.clone.each do |a|
 				list = []
-				b = a.square.ant
-				list << b if b and b.enemy? and b.alive? and not b.state?
+				b1 = a.square.ant
+				list << b1 if b1 and b1.enemy? and b1.alive? and not b1.state?
 
 				if list.length == 1
 					$logger.info { "Found the ant." }
-					list[0].transfer_state a
+					#list[0].transfer_state a
+					b = list[0]
+
+					a.state.add b.square
+					b.square.ant = a
+					a.square = b.square
+					found_list << a
+
+					new_enemy_ants.delete b
 					@enemy_ants.delete a
 					found_some = true
 				end
@@ -652,7 +681,7 @@ end
 		end
 
 
-		$logger.info { "Match post: #{ @enemy_ants.length} ants; iterations: #{ count }" }
+		$logger.info { "Match post: iterations: #{ count }" }
 	
 		# Clean up dead ants
 		new_enemy_ants.clone.each do |a|
@@ -662,13 +691,23 @@ end
 				$logger.info { "Cleaned up dead #{ a.to_s }" }
 			end
 		end
-	
+
+
+		$logger.info { "Final:
+   enemy_ants    : #{ @enemy_ants.length}
+   new_enemy_ants: #{ new_enemy_ants.length}
+   found_list    : #{ found_list.length}"
+		}
+
+
+		# Anything that's left is a new ant	
 		new_enemy_ants.each do |a|
 			a.init_state unless a.state?
-			$logger.info { a.to_s }
+			$logger.info { "New ant #{ a }" }
 		end
+		found_list += new_enemy_ants
 
-		@enemy_ants = new_enemy_ants
+		@enemy_ants = found_list
 
 
 if false
@@ -694,6 +733,7 @@ end
 			add_sorted_view enemies2
 		}
 
+		$logger.info "done"
 	end
 
 
@@ -760,7 +800,7 @@ end
 		end
 		PointCache.sort_valid ants
 
-		$logger.info { "ants: #{ ants }" }
+		#$logger.info { "ants: #{ ants }" }
 
 		# Output has distance info only
 		ants2 = []
@@ -849,6 +889,7 @@ end
 #GC.disable
 $ai=AI.new
 $logger = Logger.new $ai
+Fiber.init
 
 
 $ai.setup do |ai|

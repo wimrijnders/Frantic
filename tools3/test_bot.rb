@@ -56,16 +56,17 @@ bots = [
 	"ruby ../MyBot.rb",					# Frantic - latest version
 
 	"ruby ../frantic17/MyBot.rb",
-	"ruby ../frantic13/MyBot.rb",
-	"ruby ../frantic05/MyBot.rb",
-	"ruby ../frantic04/MyBot.rb",
-	"ruby ../frantic03/MyBot.rb",
 
 	"ruby ../Blob.rb",
 	"ruby ../Foam.rb",
 	"ruby ../Twitcher.rb",
 	"ruby ../GoSouth.rb",
 
+
+	"ruby ../frantic05/MyBot.rb",
+	"ruby ../frantic13/MyBot.rb",
+	"ruby ../frantic04/MyBot.rb",
+	"ruby ../frantic03/MyBot.rb",
 
 	"python2.7 sample_bots/python/HunterBot.py",
 	"python sample_bots/python/GreedyBot.py",

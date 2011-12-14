@@ -172,8 +172,6 @@ class BaseStrategy
 	#
 	def check_attacked ai
 		ai.my_ants.each do |ant|
-			# WOW WHAT A STUPID BUG!
-			#conflict ||= ant.check_attacked
 			ant.check_attacked
 		end
 	end
@@ -188,6 +186,10 @@ class BaseStrategy
 		$logger.info "=== Default Move Phase ==="
 		ai.my_ants.each do |ant|
 			next if ant.moved?
+			# DON'T EVER PUT FOLLOWING BACK!
+			# Ants need to be able to access default moves, even 
+			# if they do have orders, in order to get the next border liaison.
+			#next if ant.orders?
 			next if ant.collective?
 			next if ant.harvesting?
 

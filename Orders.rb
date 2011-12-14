@@ -137,6 +137,18 @@ module Orders
 			"Sorting orders pre: " + str
 		}
 
+		# if none of the following orders present, then GOTO and FORAGE have equal standing
+		other_present = true
+if false
+		other_present = false
+		[ :ATTACK, :ASSEMBLE, :DEFEND_HILL, :RAZE, :DEFEND ].each do |order|
+			if has_order order
+				other_present = true
+				break	
+			end
+		end
+end
+
 		# Nearest orders first
 		items = {}
 		@orders.each { |a| 
@@ -145,12 +157,9 @@ module Orders
 
 		@orders.sort! do |a,b|
 			# Food goes before rest
-			if a.order == :FORAGE and b.order == :FORAGE
-
-				# Nearest food first
-				#adist = Distance.get( self.pos, a.square)
-				#bdist = Distance.get( self.pos, b.square)
-				#adist.dist <=> bdist.dist
+			if ( other_present and a.order == :FORAGE and b.order == :FORAGE ) or
+				( not other_present and [ :FORAGE, :GOTO].include? a.order and
+				  [:FORAGE, :GOTO ].include? b.order  )
 
 				itema = items[a] 
 				itemb = items[b] 
@@ -199,18 +208,23 @@ module Orders
 		n = Order.new(square, what, offset)
 		#$logger.info { "Trying #{ n } for #{ self.to_s }" }
 
-		if collective_leader? and what == :FORAGE
-			$logger.info { "Collective leader #{ self } doesn't accept order #{ what }" }
+		if collective_leader? and
+		  what == :FORAGE and
+		( collective_assembled? or
+		  (attacked? and attack_distance.in_peril? )
+		) 
+
+			$logger.info { "Collective leader #{ self } doesn't accept order #{ what } while in conflict." }
 			return false
 		end
 
-		if not $region.can_reach self.square, square
+		if not $pointcache.can_reach self.square, square
 			# ignore order
 			$logger.info "#{ self } can't reach target #{ n }"
 			return false
 		end
-
 		square = n.square
+
 
 		if square.water?
 			$logger.info { "Target #{ square.to_s } is water; determine nearest land" }
@@ -245,7 +259,7 @@ module Orders
 
 		if [ :GOTO, :FORAGE ].include? what
 			clear_order :GOTO 
-			evade_reset
+			#evade_reset
 		end
 
 
@@ -404,7 +418,7 @@ module Orders
 		ai.turn.check_maxed_out
 
 		# Following happens when razing hills.
-		if neighbor_enemies?(1)
+		if neighbor_enemies?(2)
 			$logger.info { " #{ self } right next to enemy, staying and ignoring orders." }
 			stay
 			return true
@@ -469,7 +483,8 @@ end
 				# Use of distance in order to get closer to location than in_view
 				if ( self.square == order_sq ) or
 				   ( d.in_attack_range? and
-				     Distance.direct_path? self.square, order_sq
+				     #Distance.direct_path? self.square, order_sq
+				     $pointcache.has_direct_path self.square, order_sq
 				   )
 					$logger.info { "Defending square #{ order_sq.to_s}." }
 
@@ -654,7 +669,7 @@ end
 		to = nil
 		if not item.nil? 
 			if not item[3]
-				$logger.info "Valid pointcache item detected"
+				$logger.info "Valid pointcache item detected" # #{ item }"
 			end
 
 			to = item[2]	# to is a direction

@@ -60,7 +60,6 @@ class Square
 	# In addition, no other friendly ant should have moved here.
 	#
 	def passable? do_cur_ant = true
-
 		# NOTE: incredibly, food is not passable! This happens
 		#       if food appears right next to ant. KEEP IT IN THE TEST!
 		return false if water? or food? or moved_here? 

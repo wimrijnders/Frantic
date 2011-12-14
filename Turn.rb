@@ -11,7 +11,7 @@ class Turn
 
 		@open = false
 		@history = []
-		@last_go = Time.now 
+		@last_go = Timer.now 
 	
 		# First time send	
 		@stdout.puts 'go'
@@ -29,7 +29,7 @@ class Turn
 
 
 	def check_time_limit
-		diff = Time.now - @start
+		diff = Timer.now - @start
 
 		if diff >= @turnlimit
 			$logger.turn(true) { "Hit time limit" }
@@ -43,7 +43,7 @@ class Turn
 			$logger.turn "throwing :maxed_out"
 			throw :maxed_out
 		else
-			diff = Time.now - @start
+			diff = Timer.now - @start
 
 			if diff >= @turnlimit
 				$logger.turn(true) { "Maxed out!" }
@@ -63,7 +63,7 @@ class Turn
 			@stdout.puts "go"
 			@stdout.flush
 
-			@last_go = Time.now
+			@last_go = Timer.now
 			@open = false
 			add_history maxed_out 
 		end
@@ -72,7 +72,7 @@ class Turn
 
 
 	def start turn, diff_gets_d
-		start = Time.now
+		start = Timer.now
 		diff = 0.0
 		diff = ((start - @start)*1000).to_i unless @start.nil?
 		@start = start

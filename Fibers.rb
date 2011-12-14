@@ -3,7 +3,6 @@ require 'fiber'
 
 class Fiber
 
-
 	def []= arg, value
 
 		@hash = {} if @hash.nil?
@@ -31,9 +30,16 @@ class Fiber
 	class << self
 		alias :prev_yield :yield
 
+		def init
+			@root_fiber = Fiber.current
+			$logger.info "Root fiber: #{ @root_fiber }"
+		end
+
 		def yield
-			Fiber.current.inc_yields
-			prev_yield
+			if Fiber.current != @root_fiber
+				Fiber.current.inc_yields
+				prev_yield
+			end
 		end
 	end
 end
@@ -429,8 +435,8 @@ class BorderPatrolFiber < WorkerFiber
 		end
 	end
 
-	def self.request_target sq
-		@@obj.next_liaison sq
+	def self.request_target sq, skip_regions
+		@@obj.next_liaison sq, skip_regions
 	end
 
 	def self.clear_target sq

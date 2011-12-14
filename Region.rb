@@ -618,7 +618,7 @@ public
 		end
 
 
-		Fiber.yield if not Fiber.current.nil?
+		Fiber.yield
 
 		new1, known1, replaced1  = set_path path[0..-2]
 		new_count      += new1
@@ -1240,39 +1240,5 @@ end
 		end
 
 		to
-	end
-
-	def can_reach from, to
-		return true if from == to
-		
-		if from.respond_to? :square
-			from = from.square
-		end
-		if to.respond_to? :square
-			to = to.square
-		end
-
-if false
-		pathitem = get_path_basic from.region, to.region
-	
-		unless pathitem.nil?	
-			$logger.info "Found path for #{ from }-#{to }"
-			return true
-		end
-
-		walk = Distance.get_walk from, to
-		if walk.length > 0 and walk[-1][0] == to
-			$logger.info "Found walk for #{ from }-#{to }"
-			return true
-		end
-end
-		item =  $pointcache.get( from, to )
-		if not item.nil? and not item[3]
-			$logger.info "There's a known path for #{ from }-#{to }"
-			return true
-		end
-
-		$logger.info "Can not reach #{ from }-#{to }"
-		false
 	end
 end

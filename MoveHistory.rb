@@ -20,6 +20,7 @@ class Move
 	#
 	# If distance is more than one square, this
 	# value is undefined
+	#
 	def calc_dir dist
 		if dist.row == 1 and dist.col == 0
 			@dir = :S
@@ -96,22 +97,17 @@ class MoveHistory
 
 
 	def advancing? pos
-		# special case for straight-liners; sometimes one can be seen
-		# as advancing when directly in front of leader
-		if straight_line?
-			if first and @list[-2]
-				dist1 = Distance.get pos, first.pos
-				dist2 = Distance.get pos, @list[-2].pos
-			end
-
-			return dist1.longest_dist.abs < dist2.longest_dist.abs
-		end
-
 		if first and @list[-2]
 			dist1 = Distance.get pos, first.pos
 			dist2 = Distance.get pos, @list[-2].pos
 
-			return dist1.dist.abs < dist2.dist.abs
+			if straight_line?
+				# special case for straight-liners; sometimes one can be seen
+				# as advancing when directly in front of leader
+				return dist1.longest_dist.abs < dist2.longest_dist.abs
+			else
+				return dist1.dist.abs < dist2.dist.abs
+			end
 		end
 
 

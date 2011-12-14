@@ -605,7 +605,7 @@ end
 			# It is possible to approach an anthill completely and 
 			# be right next to the emerging enemy ants. Following ensures
 			# that the collective will not try to evade.
-			if dist.dist == 1 
+			if dist.dist <= 2 
 				stay
 				throw :done
 			end
@@ -637,6 +637,8 @@ end
 					hold_ground dist if dist.in_peril?
 				end
 			else
+if false
+	# Analyze now done in collective Phase
 				dir = analyze_attack
 				$logger.info { "analyze_attack returned #{dir}" }
 				unless dir === false
@@ -650,6 +652,7 @@ end
 						return
 					end
 				end
+end
 
 				dir = dist.attack_dir
 				$logger.info "Attack dir #{ leader.to_s }: #{ dir }"
@@ -665,7 +668,7 @@ end
 				if enemies.length() > 1 and leader.ai.defensive? 
 
 					if enemies.length > size() -1 and not leader.has_order :DEFEND_HILL
-						$logger.info "#{ leader.to_s} too many enemies"
+						$logger.info "#{ self } too many enemies"
 						dir = stay_away enemy, dist
 					else
 						# Advance up to peril distance
@@ -727,15 +730,19 @@ end
 					# Location is not good, move away
 					random_move
 				else
-					#if not assembled yet, wait for the missing ants to join
-					stay
+					# Allow foraging if possible
+					unless leader.find_order :FORAGE
+						# Otherwise, if not assembled yet
+						# wait for the missing ants to join
+						stay
+					end
 				end
 				throw :done
 			end
 
 
 			if leader.first_order :RAZE
-				# WRI TEST: this is a special case, using ant orders
+				# This is a special case, using ant orders
 				# to move collectives.
 				o = leader.get_first_order
 				to = o.handle_liaison( leader.square, leader.ai )
