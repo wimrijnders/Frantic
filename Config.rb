@@ -11,15 +11,17 @@ module AntConfig
 	# Still, this margin is not enough.....
 	# Bloody random timeout occurring; crank it up and hope for the best in the comp.
 
-	TURN_TIME		= 2000	# Num msec per bot per turn
+	TURN_TIME		= 1500	# Num msec per bot per turn
 
 	# Num msec safety margin for handling turn
 	#TURN_MARGIN		= 200   # This value for the tournament
 	TURN_MARGIN		= 400   # This value for testing. 
 
 
-	LOG_OUTPUT      = true
-	LOG_STATUS      = false	# if LOG_OUTPUT is false, log status info only
+	LOG_OUTPUT      = false
+	LOG_STATUS      = true	# if LOG_OUTPUT is false, log status info only
+
+	MAX_GET_WALK	= 50	# Max search time for paths
 
 	DEFENSIVE_LIMIT = 20	# Number of ants needed to be present
 							# before ants start attacking as well
@@ -31,7 +33,7 @@ module AntConfig
 							# give preferences to hurting instead of
 							# playing safe
 
-	THROTTLE_LIMIT  = -1
+	THROTTLE_LIMIT  = 210 
 
 	KAMIKAZE_LIMIT  = 150	# Number of ants after which all enemies
 							# are attacked without reserve. 

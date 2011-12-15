@@ -177,7 +177,11 @@ class BorderPatrol
 					# directions unocuppied and therefor vulnerable.
 					#
 					# Following intended to shuffle the list to reduce this effect.
-					@liaisons.insert rand( @liaisons.length )
+					if @liaisons.empty?
+						@liaisons << l
+					else
+						@liaisons.insert rand( @liaisons.length ), l
+					end
 					#@liaisons.rotate!
 					#@liaisons << l
 				end
@@ -287,7 +291,7 @@ class BorderPatrol
 		ret
 	end
 
-	# TODO: apparently not called any more
+
 	def redo_hills
 		if @liaisons.empty?
 			$logger.info "No border liaisons present; redoing from hills"
@@ -295,6 +299,7 @@ class BorderPatrol
 				add_hill_region sq
 			end
 
+			BorderPatrolFiber.add_list "go"
 			true
 		else
 			false

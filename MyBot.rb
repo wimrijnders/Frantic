@@ -281,7 +281,8 @@ class Strategy < BaseStrategy
 
 			Collective.complete_collectives ai
 
-			if not ai.kamikaze? and not enough_collectives ai
+			#if not ai.kamikaze? and not enough_collectives ai
+			if not enough_collectives ai
 				Collective.create_collectives ai unless ai.kamikaze? 
 			end
 

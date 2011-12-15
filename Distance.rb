@@ -297,7 +297,7 @@ class Distance  < AntObject
 
 		$logger.info "entered, going for #{ to }"
 		$timer.start :get_walk
-		max_get_walk = 100
+		max_get_walk = AntConfig::MAX_GET_WALK	# Limit time for searches
 
 		active = []
 		known = []
