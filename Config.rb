@@ -19,7 +19,7 @@ module AntConfig
 
 
 	LOG_OUTPUT      = false
-	LOG_STATUS      = true	# if LOG_OUTPUT is false, log status info only
+	LOG_STATUS      = false	# if LOG_OUTPUT is false, log status info only
 
 	MAX_GET_WALK	= 50	# Max search time for paths
 
