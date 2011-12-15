@@ -69,18 +69,23 @@ class Timer
 	end
 
 
-	def current key
+	#
+	# Return running value of timer in msec.
+	# If timer finished, return end value.
+	# If timer doesn't exist return null.
+	#
+	def value key
 		v = @list[ key ]
-		value = nil
+		val = nil
 		if v 
 			if v[1]
-				value = ( ( v[1] - v[0])*1000 ).to_i 
+				val = ( ( v[1] - v[0])*1000 ).to_i 
 			else
-				value = ( ( now - v[0])*1000 ).to_i 
+				val = ( ( now - v[0])*1000 ).to_i 
 			end
 		end
 
-		"Timer #{ key.to_s }: #{value} msec"
+		val
 	end
 
 

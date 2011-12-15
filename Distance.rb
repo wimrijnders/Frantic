@@ -1,4 +1,28 @@
 
+#
+# Do a binary search for a given index
+#
+def find_index array, item
+	l,r = 0, array.length-1
+
+	while l <= r
+		m = (r+l) / 2
+		comp = yield item, array[m]
+		if comp == false
+			# Items compare the same
+			return false
+		elsif comp == -1 
+			r = m - 1
+		else
+			l = m + 1
+		end
+	end
+
+	l
+end
+
+
+
 class Distance  < AntObject
 	attr_accessor :row, :col
 
@@ -272,16 +296,24 @@ class Distance  < AntObject
 		end
 
 		$logger.info "entered, going for #{ to }"
+		$timer.start :get_walk
+		max_get_walk = 100
 
 		active = []
-		done = []
+		known = []
 
 		d = Distance.get from, to
 		active << [from, d.dist, [from] ]
 
 		current = nil
 		found = false
+		count = 0
 		while not active.empty?
+			if $timer.value( :get_walk) > max_get_walk
+				$logger.info { "search taking longer than #{ max_get_walk }, aborting" }
+				break
+			end
+
 			current = active.shift
 			sq, dist, path = current
 			if sq == to
@@ -289,35 +321,71 @@ class Distance  < AntObject
 				break
 			end
 
-			done << sq
+			next if known.include? sq 
+			known << sq
 
 			added = false
 			[ :N, :E, :S, :W].each do |dir|
 				n = sq.neighbor(dir)
-				next if active.include? n
-				next if done.include? n
+				#next if active.include? n
+				next if known.include? n
 				next if path.include? n
 				next if n.water? 
 				next if n.region.nil?
-				# We know the region path, use it
-				next if not regions.include? n.region
 
 				d = Distance.get n, to
-				active << [n, d.dist, path + [n] ]
+
+				# Put new values in front, to aid quicksort
+				#active.insert 0, [n, d.dist, path + [n] ]
+				item = [n, d.dist, path + [n] ]
 				added = true
+
+				index = find_index( active, item ) { |a,b| 
+					da = a[1] + a[2].length
+					db = b[1] + b[2].length
+					if da != db
+						next da  <=> db 
+					end
+
+					if a[1] != b[1]
+						a[1] <=> b[1]
+					elsif a[0] == b[0]
+						false   # items compare equivalent 
+					else
+						# the closer we are to the target region, the better
+						ia = regions.index a[0]
+						ib = regions.index b[0]
+
+						# it is entirely possible that the route goes through
+						# a region not in the path, if the liaison is off this route
+						# following allows other regions, but with lowest priority
+
+						next -1 if not ia.nil? and ib.nil?
+						next 1 if ia.nil? and not ib.nil?
+						next 0 if ia.nil? and ib.nil?
+
+						# regions are known and in path, highest index wins
+						ib <=> ia
+					end
+				}
+
+				# Don't add items already present
+				unless index === false
+					active.insert( index, item )
+					known << sq
+				end
 			end
 
-			if added
-				#active.sort! { |a,b| (a[1] + a[2].length) <=> ( b[1] + b[2].length ) }
-				active.sort! { |a,b| a[1]  <=> b[1] }
-			end
+			count += 1
+			$logger.info {
+				str = "Iteration: #{ count }, num active: #{ active.length }\n"
+				active[0..3].each { |a| str << "[ " + a.join(",") + "]\n" }
 
-			#$logger.info {
-			#	str = ""
-			#	active[0..3].each { |a| str << "[ " + a.join(",") + "]\n" }
-			#	 "Current active:\n#{ str }"
-			#}
+				 "Current active:\n#{ str }"
+			}
 		end
+
+		$timer.end :get_walk
 
 		if not found 
 			$logger.info "No solution"

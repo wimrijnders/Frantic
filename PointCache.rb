@@ -147,16 +147,35 @@ class PointCache
 			return nil
 		end
 
+		item = get from, next_sq, true
+		if not item.nil?
+			# Cached item present till liaison; use that
+			ret =[ item[2], !item[3] ]		# Second param means 'direct route present'
+											# This translates to a 'valid' cache item, ie 'not invalid',
+											# which is what you read there
+			$logger.info "Move from cache returns #{ ret }"
+			return ret 
+		end
+
+		# No cached item; try to make a path to the liaison
 		direct = set_walk from, next_sq, nil, true
 
-		# Note that we are lying a bit here; there is 
-		# a possibility that the dir returned from d.dir
-		# is not the same as the first dir in the walk
-		d = Distance.get( from, next_sq)
-		move = d.dir from, true
+		if direct
+			# At this point, the value has been stored in the pointcache
+			# Retrieve it without triggering a new set for the move
+			item = get from, next_sq, true
 
-		$logger.info "Determined move #{ move }"
-		[ move, direct]
+			if item.nil?
+				$logger.info "WARNING: expected non-nil item but got one anyway"
+				return nil
+			end
+
+			$logger.info "Determined move #{ item[2] }"
+			[ item[2], true]
+		else	
+			$logger.info "Move dir can not be determined from set_walk."
+			nil
+		end
 	end
 
 
@@ -177,6 +196,8 @@ class PointCache
 
 
 	def set from, to, distance, item, invalid = false, move = nil
+		$ai.turn.check_maxed_out
+
 		$logger.info "entered, from #{ from}, to #{ to }, move #{ move }"
 
 		raise "#{from} not a square" if not from.is_a? Square

@@ -170,7 +170,16 @@ class BorderPatrol
 				unless @liaisons.include? l
 					$logger.info "Adding #{ l } to liaisons list"
 
-					@liaisons << l
+		
+					# Added liaisons have the tendency to be grouped in a particular
+					# region. If they are added linearly to the list, new ants all tend
+					# to go in the same direction for an extended period, leaving other
+					# directions unocuppied and therefor vulnerable.
+					#
+					# Following intended to shuffle the list to reduce this effect.
+					@liaisons.insert rand( @liaisons.length )
+					#@liaisons.rotate!
+					#@liaisons << l
 				end
 			end
 

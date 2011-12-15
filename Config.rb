@@ -7,8 +7,11 @@ module AntConfig
 	# Tournament runs on Xeon X5675 3.07GHz servers (totaalnet); bogomips: 6117.71
 	# My laptop is a Core 2 Duo SU7300 1.3GHz; bogomips: 2678.11
 	# So server is 2.28 times faster
+	#
+	# Still, this margin is not enough.....
+	# Bloody random timeout occurring; crank it up and hope for the best in the comp.
 
-	TURN_TIME		= 1200	# Num msec per bot per turn
+	TURN_TIME		= 2000	# Num msec per bot per turn
 
 	# Num msec safety margin for handling turn
 	#TURN_MARGIN		= 200   # This value for the tournament
@@ -16,7 +19,7 @@ module AntConfig
 
 
 	LOG_OUTPUT      = true
-	LOG_STATUS      = true	# if LOG_OUTPUT is false, log status info only
+	LOG_STATUS      = false	# if LOG_OUTPUT is false, log status info only
 
 	DEFENSIVE_LIMIT = 20	# Number of ants needed to be present
 							# before ants start attacking as well

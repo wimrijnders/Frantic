@@ -83,6 +83,10 @@ bots = [
 	"python submission_test/TestBot.py"
 ]
 
+#
+# Good test maps:
+# c 2 6 - smallest 2-player cell map
+#
 
 
 if map == 'test'
@@ -93,7 +97,7 @@ elsif map == 'open'
 elsif map == 'm'
 	mapfile  = "maps/maze/maze_#{nump}p_#{ num }.map"
 elsif map == 'mp'
-	mapfile  = "maps/maze/maze_#p{nump}_#{ num }.map"
+	mapfile  = "maps/maze/maze_p#{nump}_#{ num }.map"
 elsif map == 'c'
 	mapfile  = "maps/cell_maze/cell_maze_p#{nump}_#{ num }.map"
 elsif map == 'h'
