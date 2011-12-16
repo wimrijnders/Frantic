@@ -152,11 +152,54 @@ class WorkerFiber
 	end
 end
 
+module WorkerQueue
+
+	# This is the way to include class methods from a mixin module.
+	# Amazingly, I can't find this call in the ruby docs.
+	def self.included(base)
+		base.extend ClassMethods
+	end
+
+  module ClassMethods
+
+		# Note that we are using class instance variables,
+		# not class static variables!
+
+		def init
+			@list = []	if @list.nil?
+			@q_cache= {} if @q_cache.nil?
+		end
+
+		#
+		# return true if item added, false otherwise
+		#
+		def add_list item
+			init
+
+			if @q_cache[ item]
+				$logger.info { "#{ name } #{item} already queued" }
+				false
+			else
+				@q_cache[ item] = true
+				@list << item
+				true
+			end
+		end
+
+		def list
+			init
+
+			@list
+		end
+	end
+end
 
 
 class Fiber1 < WorkerFiber
-	def initialize region, list
-		super("fiber1", region, list)
+	include WorkerQueue
+
+	def initialize
+		super("fiber1", $region, Fiber1.list)
 	end
 
 	def init_loop
@@ -166,29 +209,6 @@ class Fiber1 < WorkerFiber
 	def action path
 
 		return if path.length == 0
-
-if false
-		# TODO: check if this absolutely necessary
-		skip_count = 0
-		while skip_count < 10
-			$logger.info { "handling path: #{ path }" }
-			item = @region.get_path_basic path[0], path[-1]
-			unless item.nil?
-				$logger.info { "path item already there" }
-
-				if item[:path] == path
-					$logger.info { "path is the same; skipping" }
-					skip_count += 1
-					return if list.empty?
-					path = list.pop # NOTE: list is accessed directly here
-					next
-				end
-			end
-			break
-		end
-		return if skip_count >= 10
-		Fiber.yield
-end
 
 		$logger.info { "saving path: #{ path }" }
 		# Cache the result
@@ -219,16 +239,12 @@ end
 # Gains are absolutely minimal, but what the hey. Every msec counts.
 #
 class SelectSearch < WorkerFiber
-	@@list = []
-	@@q_cache= {}
+	include WorkerQueue
 
 	def initialize
-		super("select", $region, @@list )
+		super("select", $region, SelectSearch.list )
 	end
 
-	def self.add_list item
-		@@list << item
-	end
 
 	def action item
 		from, to_list, do_shortest, max_length =item
@@ -259,6 +275,7 @@ class SelectSearch < WorkerFiber
 		to_list_r.sort!		# To make comparing list easier downstream 
 
 		item = [ from_r, to_list_r, do_shortest, max_length]
+		$logger.info { "item #{ item }" }
 
 		if not max_length.nil? and max_length == -1
 			$logger.info { "Doing big search" }
@@ -270,23 +287,15 @@ class SelectSearch < WorkerFiber
 end
 
 
+
+
 class BigSearch< WorkerFiber
-	@@list = []
-	@@q_cache= {}
+	include WorkerQueue
 
 	def initialize
-		super("BigSearch", $region, @@list )
+		super("BigSearch", $region, BigSearch.list )
 	end
 
-	def self.add_list item
-		if @@q_cache[ item]
-			# NOTE: This does not seem to be happening!
-			$logger.info { "big search #{item} already queued" }
-		else
-			@@q_cache[ item] = true
-			@@list << item
-		end
-	end
 
 	def action item
 		from_r, to_list_r, do_shortest, max_length = item 
@@ -301,22 +310,11 @@ end
 
 
 class Fiber2 < WorkerFiber
-	@@list = []
-	@@q_cache= {}
+	include WorkerQueue
 
 	def initialize
-		super("fiber2", $region, @@list)
+		super("fiber2", $region, Fiber2.list)
 	end
-
-	def self.add_list item
-		if @@q_cache[ item]
-			$logger.info { "search #{item} already queued" }
-		else
-			@@q_cache[ item] = true
-			@@list << item
-		end
-	end
-
 
 	def action item
 		from_r, to_list_r, do_shortest, max_length = item 
@@ -334,8 +332,10 @@ end
 
 
 class RegionsFiber < WorkerFiber
-	def initialize region, list
-		super("regions", region, list)
+	include WorkerQueue
+
+	def initialize
+		super("regions", $region, RegionsFiber.list)
 	end
 
 	def action source
@@ -350,18 +350,25 @@ end
 
 
 class PatternsFiber < WorkerFiber
-	def initialize patterns, list
-		super("patterns", patterns, list)
+	include WorkerQueue
 
-		patterns.init_tasks
+	def initialize
+		# NB: Patterns instance passed to instance var named @region!
+		#	  This is a potential source of confusion.
+		super("patterns", $patterns, PatternsFiber.list)
+
+		$patterns.init_tasks
 	end
 
 
-	def action square
-		# Confusion arbitrator...
-		patterns = @region 
+	# Confusion resolver.
+	def patterns
+		@region
+	end
 
-		# Only handle last square added with known region
+	def action square
+		# Only handle last square added with known region, ignore
+		# rest of queue
 		unless square.done_region
 			while square = @list.pop
 				break if square.done_region
@@ -378,9 +385,6 @@ class PatternsFiber < WorkerFiber
 
 
 	def done_loop
-		# Confusion arbitrator...
-		patterns = @region 
-
 		if patterns.all_confirmed
 			$logger.info "No more open tests; yay, we're done!"
 			true
@@ -391,11 +395,40 @@ class PatternsFiber < WorkerFiber
 end
 
 
+class WalkFiber < WorkerFiber
+	# WorkerQueue intentionally not mixed in.
+	@@list = []
+
+	def self.add_list item
+		@@list << item
+	end
+
+	def initialize
+		super("walk", $region, @@list)
+	end
+
+	def action item
+		from, to = item
+
+		$pointcache.set_walk from, to, to, true, true
+	end
+end
+
+
 class BorderPatrolFiber < WorkerFiber
+	# WorkerQueue not mixed in.
+	# This is intentional; there can be multiple 'go'
+	# instructions in the queue, these should not be filtered
+	# for uniqueness.
 
 	@@list = []
 	@@obj = BorderPatrol.new
 	@@found_hills = false
+
+
+	def self.add_list item
+		@@list << item
+	end
 
 	def initialize
 		super("borderpatrol", $region, @@list)
@@ -411,11 +444,6 @@ class BorderPatrolFiber < WorkerFiber
 		if @@obj.action
 			@@list << "go"
 		end
-	end
-
-
-	def self.add_list item
-		@@list << item
 	end
 
 
@@ -462,10 +490,12 @@ class Fibers
 			SelectSearch.new,
 			Fiber2.new,
 			BigSearch.new,
-			BorderPatrolFiber.new
+			BorderPatrolFiber.new,
+			Fiber1.new,
+			RegionsFiber.new,
+			PatternsFiber.new,
+			WalkFiber.new
 		]
-		@list += $region.init_fibers
-		@list << $patterns.init_fiber
 
 		self
 	end

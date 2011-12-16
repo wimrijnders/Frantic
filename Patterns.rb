@@ -582,13 +582,8 @@ class Patterns
 	Rot_tests = [ :ROT90, :ROT180 ]
 	Line_tests = [ :DIAG_TLBR, :DIAG_BLTR, :HOR, :VERT]
 
-	def add_square square
-		$logger.info "Adding square #{ square } to patterns."
-		@add_squares.push square
-	end
 
 	def initialize ai
-		@add_squares = []
 		@ai = ai
 		@tests = []
 
@@ -600,9 +595,6 @@ class Patterns
 		Hypothesis.set_ai ai
 	end
 
-	def init_fiber
-		PatternsFiber.new self, @add_squares 
-	end
 
 	#
 	# Count the number of true positive matches

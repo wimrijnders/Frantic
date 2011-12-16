@@ -18,8 +18,8 @@ module AntConfig
 	TURN_MARGIN		= 400   # This value for testing. 
 
 
-	LOG_OUTPUT      = false
-	LOG_STATUS      = false	# if LOG_OUTPUT is false, log status info only
+	LOG_OUTPUT      = true
+	LOG_STATUS      = true	# if LOG_OUTPUT is false, log status info only
 
 	MAX_GET_WALK	= 50	# Max search time for paths
 

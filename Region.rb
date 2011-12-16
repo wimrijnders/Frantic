@@ -321,50 +321,19 @@ class Region
 	@@counter = 0
 	@@ai = nil
 
-	@@add_paths = []
-	@@done_paths = {}
-	@@add_regions = []
-
 	private 
 
 	def self.add_paths result
 		$logger.info { "add_paths #{ result }" }
 
 		result.clone.each do |path|
-			if @@done_paths[ path ]
-				$logger.info { "path already queued" }
+			unless Fiber1.add_list path
 				result.delete path
-			else
-				@@done_paths[ path ] = true
 			end
-if false
-			item = $region.get_path_basic path[0], path[-1]
-			unless item.nil?
-				$logger.info { "path item already there" }
-
-				if item[:path] == path
-					$logger.info { "path is the same; not adding to queue" }
-					result.delete path
-					next
-				end
-			end
-end
 		end
-
-
-
-		@@add_paths.concat result
 	end
 
 	public 
-
-	def init_fibers
-		[
-			Fiber1.new( self, @@add_paths ), 
-			RegionsFiber.new( self, @@add_regions )
-		]
-	end
-
 
 	def self.add_searches from, to_list, do_shortest = false, max_length = nil
 		SelectSearch.add_list [ from, to_list, do_shortest, max_length ]
@@ -374,7 +343,7 @@ end
 		return if source.done_region
 
 		$logger.info { "Adding region search for #{ source }" }
-		@@add_regions << source 
+		RegionsFiber.add_list source
 	end
 
 

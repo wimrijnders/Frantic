@@ -74,14 +74,16 @@ class PointCache
 					distance = Pathinfo.total_path_distance from, to, path, t[1][:dist]
 					move, direct = determine_move from, to 
 
-					raise "move is nil" if move.nil?
+					# If no move returned, never mind; we try again later
+					# and see if the backburner has completed it.
+					unless move.nil?
+						$logger.info { "distance old: #{ t[0] }; new: #{ distance }" }
 
-					$logger.info { "distance old: #{ t[0] }; new: #{ distance }" }
-
-					t[0] = distance
-					t[2] = move
-					t[4] = t[1][:dist]
-					@replaces += 1
+						t[0] = distance
+						t[2] = move
+						t[4] = t[1][:dist]
+						@replaces += 1
+					end
 				end
 
 				@hits += 1
@@ -264,60 +266,6 @@ class PointCache
 	end
 
 
-	#
-	# Store full information for given input into the path cache.
-	# 
-	def retrieve_item from, to, in_path = nil, check_invalid = false
-
-		# Note that param in_path is ignored if we get a cache hit
-		item = get from, to, check_invalid
-
-		if item.nil?
-			if set_walk from, to, nil, true
-				# We're done - there's a direct path
-			else
-			 
-				# Following to determine path
-				if in_path.nil?
-					p = Pathinfo.new from, to, in_path
-					path = p.path
-					dist = p.dist
-				else 
-					path = in_path
-					dist = Pathinfo.total_path_distance from, to, path
-				end
-				$logger.info "path #{ path }"
-		
-				newitem = nil	
-				unless path.nil?
-					# Hit the path cache - TODO: this is slightly inefficient,
-					# since it also happens in Pathinfo
-					if path.length > 2
-						pathitem = $region.get_path_basic path[0], path[-1]
-
-						firstliaison = $region.get_liaison path[0], path[1]
-						lastliaison = $region.get_liaison path[-2], path[-1]
-						unless pathitem.nil?
-							# fill in the full walk as much as possible
-							set_walk from, firstliaison, to
-							set_regions from, to, pathitem
-							set_walk lastliaison, to
-						end
-
-					else
-						# This should never be reached
-						$logger.info "WARNING: small path encountered; should not happen."
-			
-						# store anyway
-						set to, from, dist, @zero_pathitem 
-						newitem = set from, to, dist, @zero_pathitem 
-					end
-				end
-			end
-		end
-	end
-
-
 	def distance from, to, in_path = nil
 		item = get from, to
 		return nil if item.nil?
@@ -496,23 +444,41 @@ class PointCache
 	#
 	# return true if full path walked.
 	#
-	def set_walk from, to, lastpoint = nil, full_only = false
+	def set_walk from, to, lastpoint = nil, full_only = false, complete_path = false
 		return false if from == to
 
 		$logger.info { "entered #{ from }-#{to} => #{ lastpoint }" }
-
 		lastpoint = to if lastpoint.nil?
 
-		walk = Distance.get_walk from, to
-		return false if walk.nil? or walk.empty?
+		if complete_path
+			# Perhaps the path has been found in the meantime; check
+			tmp = get from, lastpoint , true
+			unless tmp.nil?
+				$logger.info { "walk #{from}-#{to} already found" }
+				return false
+			end
+		end
+
+		walk = Distance.get_walk from, to, complete_path
+		if walk.nil? or walk.empty?
+			return false
+		end
 
 		walked_full_path = ( walk[-1][0] == lastpoint )
 
-		$logger.info {
-			"walked full path #{ from }-#{to}" if walked_full_path
-		}
+		if walked_full_path
+			$logger.info { "walked full path #{ from }-#{to}" }
+		else
+			# TODO: Prob never reached any more; check
 
-		return false if not walked_full_path and full_only
+			$logger.info { "Did not walk full path #{ from }-#{to}" }
+
+			# trigger complete search
+			WalkFiber.add_list [ from, lastpoint ]
+
+			return false if full_only
+		end
+
 
 		walk.each do |w|
 			item = nil

@@ -259,17 +259,23 @@ class Strategy < BaseStrategy
 		$logger.info "=== Pattern Phase ==="
 		# Determine ant furthest away from first own active hill,
 		# for the pattern matcher
+
+		# Loop over hills to determine first active 
 		ai.hills.each_friend do |sq|
 			furthest = BaseStrategy.nearby_ants_region( sq, ai.my_ants).reverse[0]
 
 			if furthest
 				$logger.info "furthest #{ furthest }."
-				$patterns.add_square furthest.square
+				PatternsFiber.add_list furthest.square
 
 				# Note that last filled in value is remembered
 				ai.furthest = furthest
 			end
-			break			# TODO: determine why this is here
+
+			# Exit on first hill, irrespective if furthest ant 
+			# found or not (should always be found). This is because
+			# determining furthest ant is relatively costly.
+			break
 		end
 	end
 

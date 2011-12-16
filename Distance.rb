@@ -238,7 +238,10 @@ class Distance  < AntObject
 	# first item is from 
 	# If full path has been made, last item is to
 	#
-	def self.get_walk1 from, to
+	# Param complete_path not used, in there for compatibility.
+	#
+	def self.get_walk1 from, to, complete_path = false
+
 		raise "from and to are equal: #{ from }-#{to}" if from == to
 
 		d = Distance.get from, to
@@ -266,11 +269,12 @@ class Distance  < AntObject
 		result
 	end
 
-	def self.get_walk from, final_to
+	def self.get_walk from, final_to, complete_path = false
 		if from.region.nil? or final_to.region.nil?
 			$logger.info "from or to in unknown territory"
 			return nil
 		end
+
 		to = final_to
 		if from.region != final_to.region
 			path_item = $region.get_path_basic from.region, final_to.region
@@ -309,9 +313,13 @@ class Distance  < AntObject
 		found = false
 		count = 0
 		while not active.empty?
-			if $timer.value( :get_walk) > max_get_walk
-				$logger.info { "search taking longer than #{ max_get_walk }, aborting" }
-				break
+			if complete_path
+				Fiber.yield
+			else
+				if $timer.value( :get_walk) > max_get_walk
+					$logger.info { "search taking longer than #{ max_get_walk }, aborting" }
+					break
+				end
 			end
 
 			current = active.shift
@@ -336,7 +344,6 @@ class Distance  < AntObject
 				d = Distance.get n, to
 
 				# Put new values in front, to aid quicksort
-				#active.insert 0, [n, d.dist, path + [n] ]
 				item = [n, d.dist, path + [n] ]
 				added = true
 
@@ -389,6 +396,13 @@ class Distance  < AntObject
 
 		if not found 
 			$logger.info "No solution"
+
+			# most likely a time-out.
+			if not complete_path
+				$logger.info { "Putting walk #{from}-#{final_to} on backburner." }
+				WalkFiber.add_list [ from, final_to ]
+			end
+
 			return nil
 		end
 
