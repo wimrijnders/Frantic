@@ -400,9 +400,19 @@ class PointCache
 		end
 	end
 
+
+	#
+	# Note that the check may be strictly speaking invalid.
+	# It is possible to have a clear path, but that pointcache
+	# stores a path through a liaison.
+	#
+	# Let's hope that the pathfinder backburners can recalc that 
+	# eventually.
+	# 
 	def is_direct_path item
 		!item.nil? and !item[3]  and item[1] == @zero_pathitem
 	end
+
 
 	def has_direct_path from, to
 		return true if from == to

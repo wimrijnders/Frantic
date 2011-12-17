@@ -13,17 +13,36 @@ strategy = BaseStrategy.new
 	def move_away list
 		ant = list[-1]
 
-		return if ant.moved?
+		return false if ant.moved?
 
-		dirs = [ :N, :E, :S, :W ].sort_by! { rand }
 
-		if ant.stuck?
-			$logger.info "#{ ant } stuck!"
+		if $hill.nil? or $hill == ant.square
+			dirs = [ :N, :E, :S, :W ].sort_by! { rand }
+		else
+			# prefer to move away from the hill
+			d = Distance.new $hill, ant.square
+			dirs = [ d.longest_dir ]
+			unless d.shortest_dir.nil?
+				dirs << d.shortest_dir
+			else
+				dirs << [ left(d.dir), right(d.dir) ][ rand(2) ]
+			end
+			dirs.sort_by! { rand }
+		end
 
-			# Signal other ants to move away
+		tmp = []
+		dirs.each do |dir|
+			n = ant.square.neighbor( dir )
+			if n.passable? false
+				tmp << dir
+			end
+		end
+	
+		tmp.each do |dir|	
+			n = ant.square.neighbor( dir )
+			unless n.passable? 
+				ant2 = n.ant
 
-			dirs.each do |dir|
-				ant2 = ant.square.neighbor( dir ).ant
 				if ant2 and
 				   ant2.mine? and
 				   not ant2.moved? and
@@ -32,21 +51,15 @@ strategy = BaseStrategy.new
 					move_away list + [ ant2 ]	
 				end
 			end
-		end
 
-		if not ant.stuck?
-			sq = ant.square 
-
-			dirs.each do |dir|
-				if sq.neighbor(dir).passable?
-					$logger.info "Moving #{ ant} to #{ dir }" 
-					ant.move dir
-					break
-				end
+			if n.passable? 
+				ant.move dir
+				return true
 			end
-
-			return
 		end
+
+		ant.stay
+		return false 
 	end
 
 
@@ -67,6 +80,12 @@ $ai.run do |ai|
 	ai.my_ants.each do |ant|
 		next if ant.moved?
 
+		enemy = ant.closest_enemy
+		unless enemy.nil?
+			ant.set_order enemy.square, :ATTACK
+			next
+		end
+
 		if num_neighbors( ant) > 0
 			move_away [ ant]
 		end
@@ -74,6 +93,8 @@ $ai.run do |ai|
 
 	# Attempt to move off the hill if there
 	ai.hills.each_friend do |sq|
+		$hill = sq
+
 		if sq.ant? and sq.ant.mine? and not sq.ant.moved?
 			move_away [ sq.ant]
 		end

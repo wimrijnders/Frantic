@@ -94,14 +94,18 @@ class BaseStrategy
 
 	
 			$timer.start( :closest_ant_region ) {
-#				ant = BaseStrategy.closest_ant_region sq, ai
 				ant = ai.nearest_view l.square
 
 				unless ant.nil?
 					# Food is in view; check if still there
 					if l.square.food?
-						if ant.set_order sq, :FORAGE
-							l.add_ant ant
+						if ant.pos.neighbor? l.square
+							$logger.info { "#{ ant } right next to food #{ l.square }; just staying put." }
+							ant.stay
+						else
+							if ant.set_order sq, :FORAGE
+								l.add_ant ant
+							end
 						end
 					else
 						$logger.info { "Food #{ l.square } gone." }
@@ -180,7 +184,6 @@ class BaseStrategy
 
 	def turn ai, do_orders = true, do_food = true
 		evade ai
-		ant_orders ai if do_orders
 		find_food ai  if do_food
 
 		$logger.info "=== Default Move Phase ==="
@@ -192,10 +195,18 @@ class BaseStrategy
 			#next if ant.orders?
 			next if ant.collective?
 			next if ant.harvesting?
+			next if ant.orders?
 
 			ai.turn.check_maxed_out
 
 			default_move ant
+		end
+
+		if do_orders
+			ai.my_ants.each do |ant|
+				ant.clear_targets_reached	
+			end
+			ant_orders ai
 		end
 	end
 end

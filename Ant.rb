@@ -292,12 +292,11 @@ class MyAnt < Ant
 	# Check if ant can not move at all
 	#
 	def stuck?
-		count = 0
 		[ :N, :E, :S, :W ].each do |dir|
-			count += 1 if can_pass? dir
+			return false if can_pass? dir
 		end
 
-		count == 0
+		true
 	end
 
 
@@ -307,7 +306,10 @@ class MyAnt < Ant
 
 		next_sq = square.neighbor(dir)
 
-		$logger.info { "dir #{ dir }, next_sq: #{ next_sq }, can_pass: #{ can_pass? dir }; hole: #{ next_sq.hole?}" }
+		$logger.info {
+			"dir #{ dir }, next_sq: #{ next_sq }, " +
+			"can_pass: #{ can_pass? dir }; hole: #{ next_sq.hole?}"
+		}
 
 		if dir == :STAY
 			str =  "stuck"
@@ -317,6 +319,21 @@ class MyAnt < Ant
 		elsif can_pass? dir and ( ( not target.nil? and next_sq == target ) or  not next_sq.hole? )
 			str =  "passable"
 			order dir
+		elsif ( next_sq.ant? and not next_sq.ant.moved? ) or next_sq.moved_here?
+			# TODO: if possible, move the other ant first
+			#       see ant_orders()
+
+			# if you got here, you know where you are going.
+			# Don't initiate an evasion, either move to empty square or sit it out.
+			tmp = square.passable_directions
+
+			# Don't go back if you can help it
+			tmp -= [ reverse( dir ) ]
+			if tmp.empty?
+				stay
+			else
+				order tmp[0]
+			end
 		else
 
 			# Only use pathfinder on water squares

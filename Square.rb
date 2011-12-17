@@ -76,6 +76,16 @@ class Square
 		true
 	end
 
+	def passable_directions do_cur_ant = true
+		tmp = []
+		[ :N, :E, :S, :W ].each do |dir|
+			tmp << dir if neighbor(dir).passable? do_cur_ant
+		end
+
+		tmp
+	end
+
+
 	def moved_here?
 		!@moved_here.nil?
 	end
@@ -114,6 +124,21 @@ class Square
 		end
 		
 		return @@ai.map[row][col]
+	end
+
+	def neighbor? sq
+		[ :N, :E, :S, :W ].each do |dir|
+			return true if sq == neighbor(dir)
+		end
+
+		false
+	end
+
+	def neighbors
+		[ :N, :E, :S, :W ].each do |dir|
+			n = square.neighbor( dir )
+			yield n if n.land?
+		end
 	end
 
 

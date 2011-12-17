@@ -6,6 +6,223 @@ class BorderPatrol
 		@liaisons = []
 		@done_liaisons = []
 		@last_liaison = nil
+
+		@exits = {}
+	end
+
+
+	def all_neighbor_regions_present region
+		@exits[region][:exits].each_key do |k|
+			return false if @exits[k].nil?
+
+			# Combined isolated regions can have this. 
+			if @exits[k][:count].nil?
+				$logger.info "WARNING: region #{ k } has no count."
+				return false
+			end
+		end
+
+		true
+	end
+
+	def delete_exit from, to
+		if @exits[from][:exits].length == 1
+			$logger.info { "WARNING: only one exit left for #{ from }, not deleting" }
+			return 
+		end
+
+		@exits[from][:exits].delete to 
+	end
+
+
+	def hilo_counts region
+		cur_item = @exits[region]
+
+		highest = nil
+		lowest = nil
+		cur_count = cur_item[:count]
+		cur_item[:exits].each_key do |r|
+			item = @exits[r]
+
+			# If item or count not present, can not do this check
+			if item.nil?
+				return [nil, nil]
+			end
+
+			count = item[:count]
+			if count.nil?
+				return [nil, nil]
+			end
+
+			if lowest.nil? or count < lowest
+				lowest = count
+			end
+
+			if highest.nil? or count > highest
+				highest = count
+			end
+		end
+
+		[highest, lowest]
+	end
+
+	# Pre: all neighbors are top items in the exits hash
+	def analyze_region cur_region, cur_item
+
+		$logger.info "entered, #{ cur_region }"
+
+		# Check there are no paths to higher regions,
+		# or there is only a single exit.
+		single_exit = false
+		if cur_item[:exits].length == 1
+			single_exit = true
+		end
+
+
+
+		if single_exit
+			# Current region is a dead end, or has exactly one 
+			# defined outer exit (no other exit on the way back); always remove
+			# from neighbor. 
+			cur_item[:exits].each_key do |k|
+				delete_exit k, cur_region
+
+				if cur_item[:done]
+					$logger.info "Redoing analysis for region #{ k }"
+					analyze_region k, @exits[k] 
+				end
+			
+			end
+		end
+
+		cur_count = cur_item[:count]
+		highest, lowest = hilo_counts cur_region
+
+		if highest.nil? 
+			# Perhaps this always goes well; not sure, leaving it in.
+			$logger.info "can't complete analysis for #{ cur_region }; retrying later on"
+			return
+		end
+
+		if highest < cur_count
+			# There are no higher exits; this is effectively a dead end
+			$logger.info "Reached local max at #{ cur_region }"
+
+			# inform all neighbors
+			cur_item[:exits].each_key do |r|
+				delete_exit r, cur_region
+
+				if cur_item[:done]
+					$logger.info "Redoing analysis for region #{ r }"
+					analyze_region r, @exits[r] 
+				end
+			end
+		elsif highest == cur_count
+			# Cut ties if these regions have no higher neighbor
+			cur_item[:exits].each_key do |r|
+				hi, lo = hilo_counts r
+		
+				if hi.nil? 
+					$logger.info "can't complete analysis for #{ cur_region } 2; retrying later on"
+					return
+				end
+
+				if hi <= highest
+					$logger.info "#{ cur_region } neighbor #{ r } has no higher count than #{ highest }; cutting ties"
+
+					delete_exit cur_region, r
+					delete_exit r, cur_region
+
+					if cur_item[:done]
+						$logger.info "Redoing analysis for region #{ r }"
+						analyze_region r, @exits[r] 
+					end
+				end
+			end
+		end	
+
+
+
+		# Sanity check; exit(s) we're going to,
+		# should have an exit to a different region
+		$logger.debug {
+			break if cur_item[:exits].length > 1
+
+			cur_item[:exits].clone.each_key do |k|
+				v = @exits[k]
+				next if v.nil?
+
+				tmp = v[:exits].keys - [cur_region]
+				if tmp.length == 0
+					raise "no other exits from #{ cur_region } through #{k}"
+				end
+			end
+		}
+
+		cur_item[:done] = true
+	end
+
+	def analyze_regions
+		# Update counts
+		@exits.each_pair do |k,v|
+			next if v[:done]
+
+
+			# It possible that count has not been set, when
+			# given region is not connected to a hill region.
+			# Keep on retrying till we got it
+			if v[:count].nil?
+				set_distance_count k
+				next if v[:count].nil?
+			end
+
+			next unless all_neighbor_regions_present k
+
+			analyze_region k, v
+		end
+
+		show_exits
+	end
+
+
+	def show_exits
+		$logger.info {
+			str = ""
+			@exits.each_pair do |k,v|
+				str2 = ""
+				v.each_pair do |k2,v2|
+					str2 << "      #{ k2 } => #{ v2 }\n"
+				end
+				str << "   #{ k } => {\n#{ str2 }   }\n"
+			end
+			"exits: {\n#{ str }}"
+		}
+	end
+
+	def set_distance_count cur_region
+		if $ai.hills.my_hill_region? cur_region
+			@exits[cur_region][:count] = 0
+		else
+			regions = @exits[cur_region][:exits].keys
+
+			# get the lowest count from the surrounding regions
+			lowest = nil
+			regions.each do |r|
+				item = @exits[r]
+				next if item.nil?
+				count = item[:count]
+				next if count.nil?
+
+				if lowest.nil? or count < lowest
+					lowest = count
+				end
+			end
+
+			unless lowest.nil?
+				cur_count = lowest + 1
+				@exits[cur_region][:count] = cur_count 
+			end
+		end
 	end
 
 
@@ -91,7 +308,68 @@ class BorderPatrol
 
 		$logger.info { "Center region #{ cur_region }: #{ coord }; neigbor regions: #{ regions}" }
 
+		add_exits cur_region, true, coord
 		true
+	end
+
+
+	def add_exits cur_region, completed = false, coord = nil
+
+		if not @exits[cur_region].nil?
+			if !completed or @exits[cur_region][:completed]
+				$logger.info {
+					"#{ cur_region } already present in exits; completed: #{ @exits[cur_region][:completed] } ."
+				}
+				return 
+			end
+		end
+
+		cached_liaisons = $region.get_liaisons cur_region
+		if cached_liaisons.nil? or cached_liaisons.empty?
+			$logger.info "WARNING: region has no liaisons"
+			return false
+		end
+
+		exits = cached_liaisons.clone
+		# ensure that exits are on the target region
+		exits.clone.each_pair do |k,v|
+			next if v.region == k
+
+			have_hole = false
+			[ :N, :E, :S, :W ].each do |dir|
+				sq = v.neighbor dir
+				next unless sq.land?
+
+
+				if sq.region == k
+					$logger.info { "Replacing exit #{ v } with #{ sq} " }
+					exits[k] = sq
+
+					# If hole is the only option, use it
+					# But search further
+					break unless sq.hole?
+				end	
+			end
+
+			# Sanity check
+			$logger.debug {
+				raise "wrong region for exit point #{ exits[k] }!" if exits[k].region != k 
+			}
+		end
+		
+		@exits[cur_region] = {
+			:exits  => exits
+		}
+
+		unless coord.nil?
+			@exits[cur_region][:coord ] = coord
+		end
+
+		set_distance_count cur_region
+		if completed
+			@exits[cur_region][:completed ] = true
+			analyze_regions
+		end
 	end
 
 
@@ -229,17 +507,120 @@ class BorderPatrol
 			@regions.rotate! 
 		end
 
-		$logger.info "have regions: #{ @regions.join(", ") }"
-		$logger.info "Num completed regions: #{ @complete_regions.length }"
-		$logger.info "have liaisons: #{ @liaisons.join(", ") }"
-		$logger.info "last liaison: #{ @last_liaison }"
-		$logger.info "num done liaisons: #{ @done_liaisons.length }"
+		$logger.info { "\n" +
+			"have regions: #{ @regions.join(", ") }\n" +
+			"Num completed regions: #{ @complete_regions.length }\n" +
+			"have liaisons: #{ @liaisons.join(", ") }\n" +
+			"last liaison: #{ @last_liaison }\n" +
+			"num done liaisons: #{ @done_liaisons.length }"
+		}
 
 		changed
 	end
 
 
+	def select_exit_regions sq, skip_regions
+		$logger.info "entered, sq #{sq}"
+
+		exits = @exits[sq.region][:exits]
+
+		ret = nil
+
+		if exits.nil? or exits.empty?
+			# bummer....
+		elsif exits.length == 1
+			ret = exits.keys
+		else
+			# Select directions to highest count number or nil numbers
+			tmp = []
+			highest = nil
+			exits.keys.each do |k|
+				if @exits[k].nil? or @exits[k][:count].nil?
+					tmp << k
+				else
+					if highest.nil? or @exits[k][:count] > highest
+						highest = @exits[k][:count]
+					end
+				end
+			end
+
+			$logger.info "tmp #{tmp}"
+
+			unless highest.nil?
+				exits.keys.each do |k|
+					next if @exits[k].nil? or @exits[k][:count].nil?
+
+					if @exits[k][:count] == highest
+						tmp << k
+					end
+				end
+			end
+
+			$logger.info "tmp2 #{tmp}"
+
+			if tmp.length == 1
+				ret = tmp
+			elsif tmp.empty?
+				# bummer....pick anything
+				ret = exits.keys
+			else
+				# See if we can go to a region we have not been before.
+				tmp_keys = tmp - skip_regions
+				$logger.info "tmp_keys #{tmp_keys}"
+
+				if tmp_keys.empty?
+					# bummer....pick anything
+					ret = tmp
+				else
+					ret = tmp_keys
+				end
+			end
+		end
+
+		$logger.info "ret #{ ret }"
+		ret
+	end
+
 	def next_liaison sq, skip_regions
+		$logger.info "entered, sq #{sq}"
+
+		add_exits sq.region
+
+		ret = select_exit_regions sq, skip_regions
+
+		k = sq.region
+		last_select = @exits[k][:last_select]
+
+		if ret.nil? or ret.empty?
+			# Bummer....
+			ret = nil
+		elsif ret.length == 1
+			# Go with the single option
+			ret = @exits[k][:exits][ ret[0] ]
+
+			unless last_select.nil?
+				@exits[k].delete :last_select
+			end
+		else
+			# Select a direction which was not previously selected at this region
+
+			if last_select.nil? or not ret.include? last_select
+				key = ret[0]
+			else
+				tmp = ret.rotate( ret.index( last_select ) + 1 )
+				key = tmp[0]
+			end
+
+			ret = @exits[k][:exits][ key ]
+			$logger.info "new last_select: #{ key }" 
+			@exits[k][:last_select] = key
+		end
+		
+		$logger.info "ret #{ ret }"
+		ret
+	end
+
+	def next_liaison1 sq, skip_regions
 		$logger.info "entered, sq #{sq}"
 
 		lam = lambda do |list, sq|

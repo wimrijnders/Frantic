@@ -135,6 +135,21 @@ class Hills
 	end
 
 
+	def my_hill_region? region
+		@list.clone.each_pair do |key, item|
+			owner = item.owner
+
+			# Don't skip dead hills
+			next if owner != 0
+			
+			sq = Square.coord_to_square( key_to_coord( key ) )
+
+			return true if sq.region == region
+		end
+
+		false
+	end
+
 	def each_friend
 		@list.clone.each_pair do |key, item|
 			owner = item.owner

@@ -387,6 +387,9 @@ end
 		@orders = @orders[1..-1]
 		evade_reset
 
+if false
+		# not needed any more; handled in find_food
+
 		if p.order == :FORAGE
 			# Note that we do not use the coord with offset here
 			if del_food
@@ -395,6 +398,7 @@ end
 				ai.food.remove_ant self, [ p.sq_int.row, p.sq_int.col ]
 			end
 		end
+end
 	end
 
 
@@ -412,18 +416,11 @@ end
 		
 	end
 
-	def handle_orders
-		return false if moved?
-		return false if collective_assembled?
+
+	def clear_targets_reached
+		return false if !orders?
+
 		ai.turn.check_maxed_out
-
-		# Following happens when razing hills.
-		if neighbor_enemies?(2)
-			$logger.info { " #{ self } right next to enemy, staying and ignoring orders." }
-			stay
-			return true
-		end
-
 
 		prev_order = (orders?) ? @orders[0].square: nil
 
@@ -445,25 +442,6 @@ end
 				end 
 			end
 
-			if order_order == :DEFEND_HILL
-				d = Distance.get self.square, order_sq 
-
-				# Use of in_peril in order to get closer to hill than in_view
-				if d.in_peril?
-					# if on hill itself, move away
-					if self.square == order_sq
-						$logger.info { "Defender moving away from hill #{ order_sq.to_s}." }
-						move self.default
-						return
-					else
-						$logger.info { "Defending hill #{ order_sq.to_s}." }
-						stay
-						return true
-					end
-				end 
-			end
-
-
 if false
 			if order_order == :GOTO
 				d = Distance.get self.square, order_sq 
@@ -477,31 +455,8 @@ if false
 			end
 end
 
-			if order_order == :DEFEND
-				d = Distance.get self.square, order_sq 
-
-				# Use of distance in order to get closer to location than in_view
-				if ( self.square == order_sq ) or
-				   ( d.in_attack_range? and
-				     #Distance.direct_path? self.square, order_sq
-				     $pointcache.has_direct_path self.square, order_sq
-				   )
-					$logger.info { "Defending square #{ order_sq.to_s}." }
-
-					# Note: following may be a bit wasteful to call every time
-					# we are in handle orders
-					BorderPatrolFiber.clear_target order_sq
-
-					stay
-					return true
-				end 
-			end
-
-
 			if self.square == order_sq
 				# Done with this order, reached the target
-
-				#self.trail.set_trail order_sq  unless order_order == :ASSEMBLE
 
 				if order_order == :RAZE
 					$logger.info { "Hit anthill at #{ self.square.to_s }" }
@@ -529,6 +484,7 @@ end
 			end
 
 
+if false
 			if order_order == :GOTO
 				unless BorderPatrolFiber.known_region self.square
 					$logger.info { "#{ to_s } with order #{ order_order } outside known regions" }
@@ -537,6 +493,7 @@ end
 					next
 				end
 			end
+end
 
 
 			if order_order == :ASSEMBLE
@@ -549,38 +506,30 @@ end
 			# Check if food still present when in-range
 			if order_order == :FORAGE
 				sq = order_sq
-				str = ""
 
 				result = @ai.food.active? [ sq.row, sq.col ]
 				if result.nil?
 					# food is already gone. Skip order
+					$logger.info { "Food #{ sq } is gone" }
 					clear_first_order
-					str << "not in list!"
 					next
 				elsif result
-					str << "yes"
-			
-					d = Distance.get self, sq
-					if d.dist == 1
-						# Special case; sometimes food appears right next to
-						# ant (eg first turn next to an anthill). For some reason
-						# it does not get consumed immediately
-						$logger.info { "#{ self } right next to food #{ sq }." }
-						clear_first_order true
-						stay
-						return true
-					end
+					$logger.info { "Food #{ sq } still there: yes" }
 				else
+					str = "can't tell, not active"
+					$logger.info { "Food #{ sq } still there: #{ str}" }
+if false
 					d = Distance.get self, sq
 					if d.in_view?
-						str << "no"
+						$logger.info { "Food #{ sq } still there: no" }
 						clear_first_order true
 						next
 					else
-						str << "can't tell, out of view"
+						str = "can't tell, out of view"
+						$logger.info { "Food #{ sq } still there: #{ str}" }
 					end
+end
 				end
-				$logger.info { "Food #{ sq } still there: #{ str}" }
 			end
 
 
@@ -617,39 +566,110 @@ end
 			end
 
 
-			# check if harvest target is water
-			if order_order == :HARVEST and evading?
-				sq = order_sq
-				d = Distance.get self, sq
-
-				# Use of in_danger here is not because of attack, but because
-				# we want to get closer to the target square than in_view
-				if d.in_danger? and @ai.map[ sq.row ][sq.col].water?
-					$logger.info { "#{ self.to_s } harvest target #{ sq } is water. Can't get any closer" }
-					@orders[0].offset = [ -( sq.row - self.row ), - (sq.col - self.col ) ]
-					$logger.info { "Set order offset to #{ @orders[0].offset }." }
-					stay
-					evade_reset
-					return true
-				end
-			end
-
 			break
 		end
-
-		return false if !orders?
 
 		if evading?
 			if prev_order != @orders[0].square
 				# order changed; reset evasion
 				$logger.info "#{ self } evasion reset"
 				evade_reset
-			else
-				# Handle evasion elsewhere
-				$logger.info "#{ self } evading"
-				return false
 			end
 		end
+
+		# return value
+		orders?
+	end
+
+
+	def handle_orders
+		return false if moved?
+		return false if collective_assembled?
+		return false if !orders?
+		ai.turn.check_maxed_out
+
+		if evading?
+			# Handle evasion elsewhere
+			$logger.info "#{ self } evading"
+			return false
+		end
+
+		# Following happens when razing hills.
+		if neighbor_enemies?(2)
+			$logger.info { " #{ self } right next to enemy, staying and ignoring orders." }
+			stay
+			return true
+		end
+
+		square.neighbors do |n|
+			if n.food?
+				$logger.info { "#{ self } right next to food #{ n }." }
+				stay
+				return true	
+			end
+		end
+
+
+		order_sq    = @orders[0].square
+		order_order = @orders[0].order
+		$logger.info "handling order #{ order_order } on #{ order_sq} for #{ self }"
+
+		if order_order == :DEFEND_HILL
+			d = Distance.get self.square, order_sq 
+
+			# Use of in_peril in order to get closer to hill than in_view
+			if d.in_peril?
+				# if on hill itself, move away
+				if self.square == order_sq
+					$logger.info { "Defender moving away from hill #{ order_sq.to_s}." }
+					move self.default
+					return
+				else
+					$logger.info { "Defending hill #{ order_sq.to_s}." }
+					stay
+					return true
+				end
+			end 
+		end
+
+
+		if order_order == :DEFEND
+			d = Distance.get self.square, order_sq 
+
+			# Use of distance in order to get closer to location than in_view
+			if ( self.square == order_sq ) or
+			   ( d.in_attack_range? and
+			     $pointcache.has_direct_path self.square, order_sq
+			   )
+				$logger.info { "Defending square #{ order_sq.to_s}." }
+
+				# Note: following may be a bit wasteful to call every time
+				# we are in handle orders
+				BorderPatrolFiber.clear_target order_sq
+
+				stay
+				return true
+			end 
+		end
+
+
+		# check if harvest target is water
+		if order_order == :HARVEST and evading?
+			sq = order_sq
+			d = Distance.get self, sq
+
+			# Use of in_danger here is not because of attack, but because
+			# we want to get closer to the target square than in_view
+			if d.in_danger? and @ai.map[ sq.row ][sq.col].water?
+				$logger.info { "#{ self.to_s } harvest target #{ sq } is water. Can't get any closer" }
+				@orders[0].offset = [ -( sq.row - self.row ), - (sq.col - self.col ) ]
+				$logger.info { "Set order offset to #{ @orders[0].offset }." }
+				stay
+				evade_reset
+				return true
+			end
+		end
+
 
 		if @orders[0].order == :ASSEMBLE
 			# NB: method assemble removes :ASSEMBLE and other orders
@@ -660,9 +680,6 @@ end
 				return true
 			end
 		end
-
-		return false if !orders?
-
 
 		item = $pointcache.get self.square, order_sq
 
@@ -678,6 +695,9 @@ end
 			# This should never happen any more
 
 			$logger.info "WARNING: nil item from pointcache"
+			$logger.debug {
+				raise "WARNING: nil item from pointcache"
+			}
 
 			to = @orders[0].handle_liaison( self.square, ai )
 

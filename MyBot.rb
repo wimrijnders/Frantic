@@ -208,21 +208,23 @@ class Strategy < BaseStrategy
 	# Main turn routine
 	#
 	def turn ai
-		ai.turn.check_maxed_out
 
 		if ai.throttle?
+			ai.turn.check_maxed_out
 			$logger.info "=== Throttle Phase ==="
-
-			# All ants on top of hills should stay put
 			ai.hills.each_friend do |sq|
-				if sq.ant? and sq.ant.mine?
-					ant = sq.ant
+				next unless sq.ant? and sq.ant.mine?
 
-					$logger.info { "#{ ant } staying put on hill due to throttle." }
-					ant.stay
-				end
+				ant = sq.ant
+
+				$logger.info {
+					"#{ ant } staying put on hill due to throttle."
+				}
+
+				ant.stay
 			end
 		end
+
 
 		ai.turn.check_maxed_out
 		$timer.start( :check_attacked ) {
@@ -238,24 +240,31 @@ class Strategy < BaseStrategy
 
 
 		ai.turn.check_maxed_out
-		#if ai.turn.maxed_urgent?
-			# Try to complete all outstanding orders and hope for the best
-			# with any luck, some of the next phases may be completed in tim.
+		$logger.info "=== Clear Phase ==="
+		$timer.start( :clear ) {
+			ai.my_ants.each do |ant|
+				ant.clear_targets_reached	
+			end
+		}
 
+		ai.turn.check_maxed_out
+		if ai.turn.maxed_out? 1
+			# Try to complete all outstanding orders and hope for the best
+			# with any luck, some of the next phases may be completed in time.
 			$logger.info "=== First Order Phase ==="
 			$timer.start( :First_Order_Phase ) {
 				ant_orders ai
 			}
+		end
 
-			ai.turn.check_maxed_out
-			$logger.info "=== First Move Collective Phase ==="
-			$timer.start( :First_Colmove_Phase ) {
-				Collective.move_collectives ai
-			}
-		#end
+		ai.turn.check_maxed_out
+		$logger.info "=== First Move Collective Phase ==="
+		$timer.start( :First_Colmove_Phase ) {
+			Collective.move_collectives ai
+		}
 
 
-	unless ai.turn.maxed_out?
+		ai.turn.check_maxed_out
 		$logger.info "=== Pattern Phase ==="
 		# Determine ant furthest away from first own active hill,
 		# for the pattern matcher
@@ -277,23 +286,19 @@ class Strategy < BaseStrategy
 			# determining furthest ant is relatively costly.
 			break
 		end
-	end
 
 
 		ai.turn.check_maxed_out
-		unless ai.turn.maxed_out?
-			$logger.info "=== Collective Phase ==="
-			$timer.start :Collective_Phase
+		$logger.info "=== Collective Phase ==="
+		$timer.start :Collective_Phase
 
-			Collective.complete_collectives ai
+		Collective.complete_collectives ai
 
-			#if not ai.kamikaze? and not enough_collectives ai
-			if not enough_collectives ai
-				Collective.create_collectives ai unless ai.kamikaze? 
-			end
-
-			$timer.end :Collective_Phase
+		#if not ai.kamikaze? and not enough_collectives ai
+		if not enough_collectives ai
+			Collective.create_collectives ai unless ai.kamikaze? 
 		end
+		$timer.end :Collective_Phase
 
 
 		ai.turn.check_maxed_out
@@ -306,11 +311,10 @@ class Strategy < BaseStrategy
 		ai.turn.check_maxed_out
 		$logger.info "=== Conflict Phase ==="
 		$timer.start( :Conflict_Phase ) {
-			unless ai.turn.maxed_out?
-				defend_hills ai
-			end
+			defend_hills ai
 
 			# Handle non-collective ants which are in a conflict situation
+			ai.turn.check_maxed_out
 			ai.my_ants.each do |ant|
 				next if ant.collective?
 				next if ant.moved?
@@ -330,7 +334,7 @@ class Strategy < BaseStrategy
 
 
 		ai.turn.check_maxed_out
-		if ai.kamikaze? and ai.enemy_ants.length > 0 # and not ai.turn.maxed_out?
+		if ai.kamikaze? and ai.enemy_ants.length > 0
 			$logger.info "=== Kamikaze Phase ==="
 			$timer.start :Kamikaze_Phase
 
@@ -397,15 +401,15 @@ end
 		}
 
 		ai.turn.check_maxed_out
-		$logger.info "=== Second Order Phase ==="
-		$timer.start( :Second_Order_Phase ) {
-			ant_orders ai
+		$logger.info "=== Super Phase ==="
+		$timer.start( :Super_Phase ) {
+			super ai, false, false
 		}
 
 		ai.turn.check_maxed_out
-		$logger.info "=== Super Phase ==="
-		$timer.start( :Super_Phase ) {
-			super ai, false, false #, ( !ai.kamikaze? ) 
+		$logger.info "=== Second Order Phase ==="
+		$timer.start( :Second_Order_Phase ) {
+			ant_orders ai
 		}
 	end
 end

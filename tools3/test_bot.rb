@@ -5,10 +5,10 @@ require '../Config'
 # Configuration options
 #
 
-live    = false
+live    = true
 bot_num = nil 
 turns   = AntConfig::NUM_TURNS 
-flags   = "-R --turntime=#{ AntConfig::TURN_TIME }" #--serial" # "--nolaunch"
+flags   = "--nolaunch --turntime=#{ AntConfig::TURN_TIME }" #-R
 
 
 #
@@ -53,6 +53,11 @@ map = map.to_i if is_number? map
 
 
 bots = [
+	"ruby ../zBlob2.rb",
+	"ruby ../zBlob.rb",
+	"ruby ../zFoam2.rb",
+	"ruby ../zFoam.rb",
+
 	"ruby ../MyBot.rb",					# Frantic - latest version
 
 	"ruby ../frantic20/MyBot.rb",
@@ -82,7 +87,6 @@ bots = [
 
 if map == 'test'
 	mapfile = "submission_test/test.map"
-	#flags << " --food none"
 elsif map == 'open'
 	mapfile  = "maps/open_4_98.map"
 elsif map == 'm'

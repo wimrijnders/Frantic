@@ -19,8 +19,10 @@ class Turn
 	end
 
 
-	def maxed_out? 
-		history >=  MAX_HISTORY - 3
+	def maxed_out? max = nil
+		max =  MAX_HISTORY - 3 if max.nil?
+		
+		history >= max 
 	end
 
 	def maxed_urgent?

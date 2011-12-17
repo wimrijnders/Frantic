@@ -61,9 +61,6 @@ class Food
 	#
 	#
 	def should_forage?
-		# Only forage active food
-		return false unless active
-
 		if @counter <= $ai.turn_number
 			$logger.info "Food #{ coord } counter ran out, signal to be found."
 			return true
