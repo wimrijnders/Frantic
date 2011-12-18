@@ -108,6 +108,7 @@ class BaseStrategy
 							end
 						end
 					else
+						# TODO: Check if this is ever reached
 						$logger.info { "Food #{ l.square } gone." }
 						ai.food.remove [ l.square.row, l.square.col ]
 					end
@@ -127,46 +128,162 @@ class BaseStrategy
 	end
 	
 
+	#
+	# return true if move selected this turn; :STAY counts as a move
+	#
 	def move_neighbors list
 		ant = list[-1]
 
 		return false if ant.moved?
+
+		if ant.collective_assembled?
+			return false unless ant.collective.disband_if_stuck
+		end
+
 		return false if ant.collective_leader?
 
 		$ai.turn.check_maxed_out
 
-		if ant.stuck?
-			if $ai.turn.maxed_out?
-				ant.stay
-				return false
+		move = ant.next_move
+		$logger.info { "#{ant } move #{ move } " }
+		unless [true, false].include? move
+			if ant.handle_orders false
+				$logger.info { "#{ ant } handle_orders succeeded" }
+				return true
 			end
 
-			[ :N, :E, :S, :W ].each do |dir|
-				ant2 = ant.square.neighbor( dir ).ant
-				if ant2 and
-				   ant2.mine? and
-				   not ant2.moved? and
-				   not list.include? ant2
-			
-					if move_neighbors list + [ ant2 ]	
-						ant.handle_orders
-						return true
+			# perhaps the other ant is moving in the opposite direction,
+			# or going nowhere in particular.
+			# If so, we can exchange the orders
+			ant2 = ant.square.neighbor(move).ant
+			if not ant2.nil? and ant2.mine? and not ant2.moved? and
+			 ( [ true, false].include? ant2.next_move or
+				ant2.next_move == reverse(move) )
+
+				$logger.info { "ant2 #{ ant2 } next move: #{ ant2.next_move }" }
+				if ant2.collective_assembled?
+					unless ant2.collective.disband_if_stuck
+						$logger.info  "Not exchanging for collective members" 
+						return false
 					end
+				end
+
+				if ant.orders? and ant2.orders? and
+				   ant.orders[0] == ant2.orders[0]
+					$logger.info "Orders are the same; giving up"
+					return false
+				end
+
+				# Note that any sorts for both ants are now off by one
+				# This will be cumulative for multiple sorts
+				# We might have also reached our targets, you never know....
+				$logger.info { "Exchanging #{ ant } and #{ ant2}" }
+				ant.square, ant2.square = ant2.square, ant.square
+
+				ant.square.ant = ant
+				ant.evade_reset
+				ant.clear_next_move
+				ant.clear_targets_reached
+
+				ant2.square.ant = ant2
+				ant2.evade_reset
+				ant2.clear_next_move
+				ant2.clear_targets_reached
+
+
+				# Now, redo movement with new ant
+
+				# NOTE: recursive call; better watch stack depth
+				list.pop
+				list << ant2
+				$logger.info { "Redoing move with #{ ant2}" }
+				return 	move_neighbors list
+			end
+		else
+$logger.info { "4" }
+			# Move is open, try anything
+			[ :N, :E, :S, :W ].each do |dir|
+				if ant.move dir, nil, false
+					$logger.info { "#{ ant } move #{ dir } succeeded" }
+					return true
+				end
+			end
+		end
+$logger.info { "5" }
+
+
+		# No decent moves...
+		$logger.info { "#{ ant } fail" }
+
+		if $ai.turn.maxed_out?
+			ant.stay
+			$logger.info { "#{ ant } staying, maxed out" }
+			return true
+		end
+
+
+		moves = []
+		unless [true, false].include? move
+			# Continue in the order direction
+			moves << move
+		else
+			# select neighbor squares  with unmoved ants
+			[ :N, :E, :S, :W ].each do |dir|
+				n = ant.square.neighbor( dir )
+				if n.land? and not n.moved_here? and n.ant? and n.ant.mine? and not n.ant.moved?
+					moves << dir
 				end
 			end
 		end
 
-		if not ant.stuck?
-			ant.handle_orders
-			return true 
+		if moves.empty?
+			# give up
+			ant.stay
+			$logger.info { "#{ ant } staying, no moves" }
+			return true
+		end
+
+		done_dir = nil
+		moves.each do |dir|
+			ant2 = ant.square.neighbor( dir ).ant
+			next if ant2.nil? or list.include? ant2	# Avoid loops
+		
+			$logger.info "Recursing with #{ ant2 } 	to #{ dir }"
+			if move_neighbors list + [ ant2 ]	
+				done_dir = dir
+				break	
+			end
+		end
+
+
+		# Try moving current ant again
+		if done_dir
+			if ant.move done_dir, nil, false
+				$logger.info { "#{ ant } move #{ done_dir } succeeded on retry" }
+				return true
+			end
 		end
 
 		false
 	end
 
+
 	def ant_orders ai
 		ai.my_ants.each do |ant|
-			move_neighbors [ant]
+			next unless ant.orders?
+			# Following are needed, even if they also star in move_neighbors
+			next if ant.moved?
+			next if ant.collective_leader?
+
+			if not move_neighbors [ant]
+				$logger.info "move_neighbors top level fail"
+				# Perhaps this helps to alleviate the pain 
+				# for the rest of the crowd.
+				ant.clear_first_order
+
+				#$logger.info "Forcing handle_orders"
+				#ant.handle_orders true
+			end
 		end
 	end
 

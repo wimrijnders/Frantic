@@ -16,19 +16,28 @@ strategy = BaseStrategy.new
 		return false if ant.moved?
 
 
+		dirs = [ :N, :E, :S, :W ].sort_by! { rand }
+if false
 		if $hill.nil? or $hill == ant.square
 			dirs = [ :N, :E, :S, :W ].sort_by! { rand }
 		else
 			# prefer to move away from the hill
 			d = Distance.new $hill, ant.square
-			dirs = [ d.longest_dir ]
+			dir = d.longest_dir
+			dirs = [ dir ]
+			dirs += [ left(dir), right(dir) ].sort_by! { rand }
+			dirs << reverse( dir )
+
+if false
 			unless d.shortest_dir.nil?
 				dirs << d.shortest_dir
 			else
 				dirs << [ left(d.dir), right(d.dir) ][ rand(2) ]
 			end
 			dirs.sort_by! { rand }
+end
 		end
+end
 
 		tmp = []
 		dirs.each do |dir|
@@ -72,24 +81,25 @@ strategy = BaseStrategy.new
 		count
 	end
 
+#
+# Main loop
+#
+
 $ai.run do |ai|
 
-	strategy.turn ai
 
 	# Attempt to move away if too many neighbors
 	ai.my_ants.each do |ant|
 		next if ant.moved?
 
 		enemy = ant.closest_enemy
-		unless enemy.nil?
+		if not enemy.nil?
 			ant.set_order enemy.square, :ATTACK
-			next
-		end
-
-		if num_neighbors( ant) > 0
+		elsif num_neighbors( ant) > 0
 			move_away [ ant]
 		end
 	end
+
 
 	# Attempt to move off the hill if there
 	ai.hills.each_friend do |sq|
@@ -100,7 +110,7 @@ $ai.run do |ai|
 		end
 	end
 
-
+	strategy.turn ai
 end
 
 

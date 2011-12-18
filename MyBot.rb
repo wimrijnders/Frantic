@@ -66,7 +66,8 @@ end
 class Strategy < BaseStrategy
 
 	def default_move ant
-		ant.move ant.default 
+		tmp =  ant.default 
+		ant.move tmp unless tmp.nil? 
 	end
 
 	def enough_collectives ai

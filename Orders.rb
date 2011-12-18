@@ -108,6 +108,8 @@ end
 
 module Orders
 
+	attr_accessor :orders
+
 	def orders_init
 		@orders = []
 	end
@@ -199,6 +201,22 @@ end
 		}
 	end
 
+	
+	def check_order_distance n
+		# For a long-distance order, check if we need to insert an interim order here 
+		if n.order != :GOTO_EVASION
+			target = $region.path_direction self.square, n.square
+			if target and target != n.square
+				$logger.info "Adding extra GOTO_EVASION to #{ target }"
+				@orders.insert 0, Order.new(target, :GOTO_EVASION )
+
+				# Note that this is the highest priority order and we are inserting
+				# it at front. No need to sort
+			end
+		end
+	end
+
+
 	public
 
 	#
@@ -274,6 +292,9 @@ end
 		@orders.each { |o| o.clear_liaison }
 
 		@orders.insert 0,n
+		#check_order_distance n
+
+
 		evade_reset
 		sort_orders
 
@@ -383,12 +404,12 @@ end
 
 
 	def clear_first_order del_food = false
+		return unless orders?
+
 		p = @orders[0]
 		@orders = @orders[1..-1]
+		clear_next_move
 		evade_reset
-
-if false
-		# not needed any more; handled in find_food
 
 		if p.order == :FORAGE
 			# Note that we do not use the coord with offset here
@@ -398,7 +419,6 @@ if false
 				ai.food.remove_ant self, [ p.sq_int.row, p.sq_int.col ]
 			end
 		end
-end
 	end
 
 
@@ -422,12 +442,25 @@ end
 
 		ai.turn.check_maxed_out
 
-		prev_order = (orders?) ? @orders[0].square: nil
+		prev_order = @orders[0]
 
 		while orders?
-			order_sq    = @orders[0].square
-			order_order = @orders[0].order
+			n = @orders[0]
+			order_sq    = n.square
+			order_order = n.order
 			$logger.info "Checking order #{ order_order } on #{ order_sq} for #{ self }"
+
+			move = next_move
+			if not @prev_move.nil? and
+			   move == reverse( @prev_move ) and 
+			   @prev_order == n
+
+				$logger.info "Detected twitch; clearing this order."
+			    @prev_order = nil
+				clear_first_order
+				next
+			end
+
 
 			if order_order == :ATTACK
 				d = Distance.get self.square, order_sq 
@@ -516,9 +549,6 @@ end
 				elsif result
 					$logger.info { "Food #{ sq } still there: yes" }
 				else
-					str = "can't tell, not active"
-					$logger.info { "Food #{ sq } still there: #{ str}" }
-if false
 					d = Distance.get self, sq
 					if d.in_view?
 						$logger.info { "Food #{ sq } still there: no" }
@@ -528,7 +558,6 @@ if false
 						str = "can't tell, out of view"
 						$logger.info { "Food #{ sq } still there: #{ str}" }
 					end
-end
 				end
 			end
 
@@ -569,8 +598,11 @@ end
 			break
 		end
 
-		if evading?
-			if prev_order != @orders[0].square
+		first_order = @orders[0]
+		if not first_order.nil? and prev_order != first_order 
+			#check_order_distance first_order
+
+			if evading?
 				# order changed; reset evasion
 				$logger.info "#{ self } evasion reset"
 				evade_reset
@@ -582,37 +614,42 @@ end
 	end
 
 
-	def handle_orders
-		return false if moved?
-		return false if collective_assembled?
-		return false if !orders?
-		ai.turn.check_maxed_out
+	#
+	# return next direction if found
+	#        false if no direction
+	#        true if movement handled elsewhere
+	#	
+	def determine_next_move
+		#$logger.debug {
+		#	raise "#{ self } already moved" if moved?
+		#}
+
+		return true if collective_assembled?
 
 		if evading?
 			# Handle evasion elsewhere
 			$logger.info "#{ self } evading"
-			return false
+			return true
 		end
+
+		return false if !orders?
 
 		# Following happens when razing hills.
 		if neighbor_enemies?(2)
 			$logger.info { " #{ self } right next to enemy, staying and ignoring orders." }
-			stay
-			return true
+			return :STAY
 		end
 
 		square.neighbors do |n|
 			if n.food?
 				$logger.info { "#{ self } right next to food #{ n }." }
-				stay
-				return true	
+				return :STAY	
 			end
 		end
 
-
 		order_sq    = @orders[0].square
 		order_order = @orders[0].order
-		$logger.info "handling order #{ order_order } on #{ order_sq} for #{ self }"
+		$logger.info "Determining direction order #{ order_order } on #{ order_sq} for #{ self }"
 
 		if order_order == :DEFEND_HILL
 			d = Distance.get self.square, order_sq 
@@ -622,12 +659,12 @@ end
 				# if on hill itself, move away
 				if self.square == order_sq
 					$logger.info { "Defender moving away from hill #{ order_sq.to_s}." }
-					move self.default
-					return
+					tmp = self.default
+					tmp = false if tmp.nil?
+					tmp
 				else
 					$logger.info { "Defending hill #{ order_sq.to_s}." }
-					stay
-					return true
+					return :STAY
 				end
 			end 
 		end
@@ -647,12 +684,11 @@ end
 				# we are in handle orders
 				BorderPatrolFiber.clear_target order_sq
 
-				stay
-				return true
+				return :STAY
 			end 
 		end
 
-
+if false
 		# check if harvest target is water
 		if order_order == :HARVEST and evading?
 			sq = order_sq
@@ -664,56 +700,77 @@ end
 				$logger.info { "#{ self.to_s } harvest target #{ sq } is water. Can't get any closer" }
 				@orders[0].offset = [ -( sq.row - self.row ), - (sq.col - self.col ) ]
 				$logger.info { "Set order offset to #{ @orders[0].offset }." }
-				stay
-				evade_reset
-				return true
+				return :STAY
 			end
 		end
-
+end
 
 		if @orders[0].order == :ASSEMBLE
 			# NB: method assemble removes :ASSEMBLE and other orders
 			#     from collective members
 			if collective and collective.assemble
-				stay
-				evade_reset
-				return true
+				return :STAY
 			end
 		end
 
+
+		#
+		# Actual, regular movement
+		#
+
+		ai.turn.check_maxed_out
 		item = $pointcache.get self.square, order_sq
 
-		to = nil
 		if not item.nil? 
-			if not item[3]
-				$logger.info "Valid pointcache item detected" # #{ item }"
+			if item[3]
+				$logger.info "Invalid pointcache item detected" # #{ item }"
 			end
 
-			to = item[2]	# to is a direction
-			move to, order_sq
+			item[2]	# is a direction
 		else
 			# This should never happen any more
 
-			$logger.info "WARNING: nil item from pointcache"
 			$logger.debug {
-				raise "WARNING: nil item from pointcache"
+				raise "Nil item from pointcache"
 			}
 
-			to = @orders[0].handle_liaison( self.square, ai )
+			false
+		end
+	end
 
-			if to.nil? 
-				$logger.info "No to-square"
-				return false
-			else
-				move_to to  # to is a square
-			end
+
+
+	#
+	#
+	#
+	def handle_orders always_move = true
+		if moved?
+			$logger.info "WARNING:#{ self } already moved."
+			return false
 		end
 
+		ai.turn.check_maxed_out
+
+		to = next_move
+
+		return false if to === true or to === false
+
+		target = nil
+		order  = :NONE
+		if orders?
+			target = @orders[0].square
+			order = @orders[0].order
+		end
+
+		evade_reset if to == :STAY
+
+		ret = move to, target, always_move
+
 		$logger.info { 
-			"#{ to_s } order #{ order_order } to #{ order_sq }, dir/to #{ to }" 
+			"#{ self } order #{ order } to #{ target }, dir/to #{ to }, result #{ ret }" 
 		}
 
-		true
+		ret
 	end
 
 

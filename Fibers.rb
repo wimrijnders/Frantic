@@ -516,26 +516,33 @@ class Fibers
 					# Counters give some breathing space to other
 					# fibers; SelectSearch and Fiber1 have a tendency to
 					# completely take over fiber run time.
-					if f.kind_of? SelectSearch  and f.status != :waiting
-						$logger.info "giving priority 1 to SelectSearch"
-
+					if f.kind_of? SelectSearch
 						count = 0
-						while f.status != :waiting and count < 200
+						begin
 							f.resume
+
+							if count == 0 and f.status == :running
+								$logger.info "giving priority 1 to SelectSearch"
+							end
+
 							count += 1
 
 							$ai.turn.check_time_limit
-						end
-					elsif f.kind_of? Fiber1  and f.status != :waiting
-						$logger.info "giving priority 2 to Fiber1"
+						end while f.status == :running and count < 200
 
+					elsif f.kind_of? Fiber1 
 						count = 0
-						while f.status != :waiting and count < 100
+						begin
 							f.resume
+
+							if count == 0 and f.status == :running
+								$logger.info "giving priority 2 to Fiber1"
+							end
+
 							count += 1
 
 							$ai.turn.check_time_limit
-						end
+						end while f.status == :running and count < 100
 					else
 						f.resume
 						$ai.turn.check_time_limit

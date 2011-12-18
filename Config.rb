@@ -2,7 +2,7 @@
 
 module AntConfig
 	# Testbot config
-	NUM_TURNS		= 1500	# Max number of turns per game
+	NUM_TURNS		= 1000	# Max number of turns per game
 
 	# Tournament runs on Xeon X5675 3.07GHz servers (totaalnet); bogomips: 6117.71
 	# My laptop is a Core 2 Duo SU7300 1.3GHz; bogomips: 2678.11

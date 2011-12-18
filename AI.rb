@@ -427,8 +427,8 @@ class AI
 					# For some reason, can't create a method within ant
 					# which handles these resets. It screws up the movement
 					square.moved_here.moved=false
-					square.moved_here.moved_to=nil
 					square.moved_here.prev_move = square.moved_here.moved_to
+					square.moved_here.moved_to=nil
 					square.moved_here.abspos=nil
 					square.moved_here = nil
 				end

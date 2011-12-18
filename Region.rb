@@ -834,59 +834,46 @@ private
 	#
 	# return: square if next square found
 	#		  false  if no interim square needed; move directly.
-	#                Prob doesn't occur any more
 	#         nil    if path can not be determined
 	#
 	def path_direction from, to, check_skip_liaison = true
 		path = find_path from, to, check_skip_liaison
 
 		return nil if path.nil?
+
+		# TODO: check if following still occurs
 		return false if path.length < 2 
 
 		liaison = get_liaison path[0], path[1]
 		$logger.info { "liaison #{ liaison }, from #{ from }" }
 
-if false
-		# This occurs perhaps once per game; practically useless
-
-		if liaison and clear_path from, liaison 
-			$logger.info { "#{ from } clear to liaison. skipping."} 
-			path = path[1,-1]
-			return false if path.nil?
-			return false if path.length < 2
-			liaison = get_liaison path[0], path[1]
-		end
-end
-
 		# If you have the choice, set path to next region 
 		# requested
 
 		if not check_skip_liaison 
-#			$logger.info { "#{ from } already on liaison; adjusting path" }
-
-			# Find a neighboring region that is the same as the
-			# next requested region
 			next_region = path[1]
-			new_from = nil
-			[ :N, :E, :S, :W ].each do |dir|
-				if from.neighbor(dir).region == next_region
-					new_from = from.neighbor(dir)
-					$logger.info { "Found region #{ next_region} to #{ dir } at #{ liaison }; using that" }
-					break
+			if liaison.region == next_region
+				$logger.info { "liaison #{ liaison} already on next region" }
+			else
+
+				# Find a neighboring region that is the same as the
+				# next requested region
+				new_to = nil
+				[ :N, :E, :S, :W ].each do |dir|
+					if liaison.neighbor(dir).region == next_region
+						new_to = liaison.neighbor(dir)
+						$logger.info { "Found region #{ next_region} to #{ dir } of #{ liaison }; using that" }
+						break
+					end
+				end
+
+				unless new_to.nil?
+					$logger.info { "Adjusting path to #{new_to} instead of liaison #{ liaison}" }
+					liaison = new_to
+				else
+					$logger.info { "Could not find better point than liaison #{ liaison}" }
 				end
 			end
-
-
-			unless new_from.nil?
-				$logger.info { "Adjusting path to #{new_from} instead of liaison #{ liaison}" }
-				liaison = new_from
-			else
-				$logger.info { "Could not find better point than liaison #{ liaison}" }
-			end
-
-#			if from == liaison
-#				$logger.info { "Could not find good neighbor" }
-#			end
 		end
 
 		liaison

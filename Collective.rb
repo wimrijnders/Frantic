@@ -512,6 +512,19 @@ end
 		ok
 	end
 
+	def disband_if_stuck
+		if assembled?
+			# Disband if stuck
+			if all_moves( false).empty?
+				$logger.info { "collective #{ ant.collective } stuck; disbanding" }
+				disband
+				return true
+			end
+		end
+
+		false
+	end
+
 	private
 
 	def leader

@@ -6,7 +6,7 @@ require 'BaseStrategy'
 #
 # main routine
 #
-$logger.log = true
+$logger.log = false
 $logger.log_status = false
 strategy = BaseStrategy.new
 

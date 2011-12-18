@@ -112,7 +112,7 @@ class MyAnt < Ant
 
 	# Square this ant sits on.
 	attr_accessor :moved_to, :prev_move, 
-		:abspos, # absolute position relative to leader, if part of collective
+		:abspos,    # absolute position relative to leader, if part of collective
 		:been_there	# Regions through which this ant has passed
 	
 	attr_accessor :collective, :enemies
@@ -135,6 +135,8 @@ class MyAnt < Ant
 		@default_i = @@default_index
 		@default = [ :N, :E, :S, :W ][ @@default_index ]
 		@@default_index = ( @@default_index + 1 ) % 4
+		@next_move = nil
+		@prev_move = nil
 
 		#@next_default_dir = 0
 
@@ -148,13 +150,16 @@ class MyAnt < Ant
 
 
 	def default
-		return :STAY if stuck?
+		# Don't stay as default move; ant might need to get out of the
+		# way later on. In any case, ant is put on stay in turn_end
+		#return :STAY if stuck?
+		return nil if stuck?
 
 		target = BorderPatrolFiber.request_target self.pos, self.been_there
 		unless target.nil?
 			#if @ai.aggresive?
 			#	set_order target, :DEFEND
-			#	return :STAY
+			#	return nil 
 			#else
 				if set_order target, :GOTO
 					# Attempt to move in the right direction
@@ -175,7 +180,8 @@ class MyAnt < Ant
 		if best.nil?
 			#@default
 			$logger.info "stuck in default move"
-			:STAY 
+			#:STAY 
+			nil
 		else
 			best_dir
 		end	
@@ -209,12 +215,15 @@ class MyAnt < Ant
 			next_sq = @square.neighbor( direction )
 			next_sq.moved_here = self
 			@moved= true
+
 			@moved_to= direction
+			@prev_order = @orders[0]
 
 			next_region = next_sq.region
 			unless @been_there.include? next_region
 				@been_there << next_region
 			end
+
 
 			#@trail.add direction, @square
 			true
@@ -300,9 +309,13 @@ class MyAnt < Ant
 	end
 
 
-	def move dir, target = nil
+	#
+	# Return true if the requested direction could be taken, false otherwise
+	#
+	def move dir, target = nil, always_move = true
 
-		str = ""
+		strf = "#{ self } to #{ dir } => #{ target } - %s"
+		$logger.info { strf % [ 'entered' ] }
 
 		next_sq = square.neighbor(dir)
 
@@ -312,16 +325,27 @@ class MyAnt < Ant
 		}
 
 		if dir == :STAY
-			str =  "stuck"
 			stay
-
+			$logger.info { strf % [ 'staying' ] }
+			return true
 		# If next square is a hole and not our target, we dont want to go there
 		elsif can_pass? dir and ( ( not target.nil? and next_sq == target ) or  not next_sq.hole? )
-			str =  "passable"
+			$logger.info { strf % [ 'passable' ] }
 			order dir
-		elsif ( next_sq.ant? and not next_sq.ant.moved? ) or next_sq.moved_here?
-			# TODO: if possible, move the other ant first
-			#       see ant_orders()
+			return true
+		end
+
+		unless always_move
+			$logger.info { strf % [ 'move failed' ] }
+			return false
+		else
+			$logger.info { strf % [ 'trying evasion' ] }
+		end
+
+
+		str = ""
+
+		if ( next_sq.ant? and not next_sq.ant.moved? ) or next_sq.moved_here?
 
 			# if you got here, you know where you are going.
 			# Don't initiate an evasion, either move to empty square or sit it out.
@@ -341,7 +365,7 @@ class MyAnt < Ant
 				# Do regular evasion
 				evade dir
 				#stay	- bad idea
-				return 
+				return false
 			end
 
 			path_finder = EvadePathFinder.new square, dir, @left
@@ -383,8 +407,10 @@ class MyAnt < Ant
 			end
 		end
 
-		$logger.info { "#{ self } to #{ dir } => #{ target } - #{ str }" }
+		$logger.info { strf % [ str ] }
+		return false
 	end
+
 
 	#
 	# Move ant to specified direction vector
@@ -553,8 +579,27 @@ end
 
 		#moved = false
 		#moved_to = nil
+		@next_move = nil
 		@enemies = []
 		@friends = nil  #[]
+	end
+
+	#
+	# Determine and return next move to perform. 
+	# If no next move, value is 'true'
+	# If move should not be handled through handle_orders, value is 'false'
+	#
+	def next_move
+		if @next_move.nil?
+			@next_move = determine_next_move
+		end
+
+		@next_move
+	end
+
+	def clear_next_move
+		@next_move = nil
+		evade_reset
 	end
 
 
