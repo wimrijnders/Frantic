@@ -11,7 +11,7 @@ module AntConfig
 	# Still, this margin is not enough.....
 	# Bloody random timeout occurring; crank it up and hope for the best in the comp.
 
-	TURN_TIME		= 1500	# Num msec per bot per turn
+	TURN_TIME		= 1300	# Num msec per bot per turn
 
 	# Num msec safety margin for handling turn
 	#TURN_MARGIN		= 200   # This value for the tournament

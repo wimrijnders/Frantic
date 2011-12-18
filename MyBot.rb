@@ -86,6 +86,114 @@ class Strategy < BaseStrategy
 	end
 
 
+	$done_defend_regions = []
+	def handle_defence ai
+		points = Hash.new { |hash, key| hash[key] = [] }
+		defend_count = 0
+		not_defend = []
+
+		attacked = []
+
+		ai.my_ants.each do |ant|
+			o = ant.find_order :DEFEND
+			if  o.nil? 
+				not_defend << ant
+			else
+				attacked << ant.square.region if ant.attacked?
+				points[ o.square.region ] <<  ant
+				defend_count += 1
+			end
+		end
+
+		unless attacked.empty?
+			attacked.uniq!
+			$logger.info "Defenders under attack! restarting regions" 
+			$done_defend_regions = []
+
+			points.each_value do |ants|
+				ants.each do |ant|
+					ant.clear_order :DEFEND
+				end
+			end
+
+			points = {}
+			return
+		end
+
+		$logger.info { "points #{ points }"}
+		#$logger.info { "regions #{ regions}"}
+		$logger.info { "defenders #{ defend_count} out of #{ not_defend.length }" }
+
+		threshold = ai.my_ants.length()/3
+
+	if defend_count < threshold 
+		$logger.info "Not enough defenders"
+		not_defend.sort_by! { rand }
+
+		while defend_count < threshold 
+			ant = not_defend.pop
+			break if ant.nil?
+
+			# Only do ants right next to done-regions 
+			if $done_defend_regions.include? ant.square.region 
+				next
+			elsif $done_defend_regions.empty? 
+				unless ai.hills.my_hill_region? ant.square.region 
+					next
+				end
+			else
+				neighbor_regions = []
+				neighbor_regions = $region.get_neighbor_regions ant.square.region
+				#$logger.info "neighbor_regions #{ neighbor_regions }"
+				neighbor_regions &= $done_defend_regions
+
+				next if neighbor_regions.empty?
+				$logger.info "neighbor done regions #{ neighbor_regions }"
+			end
+
+			center = BorderPatrolFiber.get_center ant.square.region
+			unless center.nil? 
+				$logger.info "adding defender #{ ant } to #{ center }"
+				ant.clear_order :GOTO
+				ant.set_order center, :DEFEND
+				defend_count += 1
+			end
+		end
+
+
+	elsif defend_count > threshold 
+			$logger.info "Too many defenders"
+			defenders = []
+
+			points.each_value.each do |antlist|
+				defenders += antlist
+			end
+
+			defenders.sort_by! { rand }
+
+			while defenders.length > not_defend.length()/3
+				ant = defenders.pop
+				break if ant.nil?
+
+				ant.clear_order :DEFEND
+			end
+	end
+
+
+		points.each_pair do |region, antlist|
+			if antlist.length >= 4
+				$logger.info "Done defending #{ region }"
+				$done_defend_regions << region
+
+				# Defenders will be reassigned later on if needed
+				antlist.each do |ant|
+					ant.clear_order :DEFEND
+				end
+			end
+		end
+	end
+
+
 	#
 	#
 	#
@@ -156,6 +264,7 @@ class Strategy < BaseStrategy
 			$logger.info { "Targetting hill #{ sq }" }
 
 			# Determine if there are enemy ants defending 
+if false
 			if ai.defensive?
 				defenders = BaseStrategy.nearby_ants_region sq, ai.enemy_ants
 				unless defenders.empty?
@@ -167,6 +276,7 @@ class Strategy < BaseStrategy
 					next
 				end
 			end
+end
 
 
 			# Make list of ants which are available for attacking the hill
@@ -295,9 +405,8 @@ class Strategy < BaseStrategy
 
 		Collective.complete_collectives ai
 
-		#if not ai.kamikaze? and not enough_collectives ai
 		if not enough_collectives ai
-			Collective.create_collectives ai unless ai.kamikaze? 
+			Collective.create_collectives ai #unless ai.kamikaze? 
 		end
 		$timer.end :Collective_Phase
 
@@ -399,6 +508,12 @@ end
 		$logger.info "=== Second Move Collective Phase ==="
 		$timer.start( :Second_Colmove_Phase ) {
 			Collective.move_collectives ai
+		}
+
+		ai.turn.check_maxed_out
+		$logger.info "=== Defend Phase ==="
+		$timer.start( :Defend_Phase ) {
+			handle_defence ai
 		}
 
 		ai.turn.check_maxed_out

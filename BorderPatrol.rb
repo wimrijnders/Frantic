@@ -15,9 +15,13 @@ class Exits
 	def exits; @exits; end
 	def count; @count; end
 	def completed; @completed; end
+	def coord; @coord; end
 
 	def last_select ret
-		if @last_select.nil? or not ret.include? @last_select
+		if @last_select.nil? or
+			ret.length == 1 or
+			not ret.include? @last_select
+
 			key = ret[0]
 		else
 			tmp = ret.rotate( ret.index( @last_select ) + 1 )
@@ -35,74 +39,66 @@ class Exits
 	end
 
 	def select_exit_regions skip_regions
+		return nil if exits.nil? or exits.empty?
 
-		ret = nil
-
-		if exits.nil? or exits.empty?
-			# bummer....
-		elsif exits.length == 1
-			ret = exits.keys
-		else
-			# Select directions to highest count number or nil numbers
-			tmp = []
-			highest = nil
-			each_exit do |k, x|
-				if x.nil? or x.count.nil?
-					tmp << k
-				else
-					if highest.nil? or x.count > highest
-						highest = x.count
-					end
-				end
-			end
-
-			$logger.info "tmp #{tmp}"
-
-			unless highest.nil?
-				each_exit do |k, x|
-					next if x.nil? or x.count.nil?
-
-					if x.count == highest
-						tmp << k
-					end
-				end
-			end
-
-			$logger.info "tmp2 #{tmp}"
-
-			if tmp.length == 1
-				ret = tmp
-			elsif tmp.empty?
-				# bummer....pick anything
-				ret = exits.keys
-			else
-				# See if we can go to a region we have not been before.
-				tmp_keys = tmp - skip_regions
-				$logger.info "tmp_keys #{tmp_keys}"
-
-				if tmp_keys.empty?
-					# bummer....pick anything
-					ret = tmp
-				else
-					ret = tmp_keys
-				end
-			end
-		end
-
-		if ret.nil? or ret.empty?
-			# Bummer....
-			ret = nil
-		elsif ret.length == 1
-			# Go with the single option
-			ret = exits[ ret[0] ]
+		if exits.length == 1
 			clear_last_select
-		else
-			# Select a direction which was not previously selected at this region
-			ret = last_select ret
+			return exits.values[ 0 ]
 		end
 
-		$logger.info "ret #{ ret }"
-		ret
+		$logger.info "keys #{ exits.keys }"
+		$logger.info "skip_regions #{skip_regions}"
+
+		# Go to regions we haven't been before
+		tmp_keys = exits.keys - skip_regions
+		unless tmp_keys.empty?
+			$logger.info "unknown #{tmp_keys}"
+			return last_select tmp_keys
+		end
+
+
+		unexplored = []
+		explored = []
+		each_exit do |k, x|
+			if x.nil? or x.count.nil?
+				unexplored << k
+			else
+				explored << k
+			end
+		end
+
+
+		# Go to unexplored regions
+		unless unexplored.empty?
+			$logger.info "unexplored #{unexplored}"
+			return last_select unexplored
+		end
+
+		hi, lo = hilo_counts
+		highest = []
+		lowest  = []
+		explored.each do |k|
+			x = @parent.exits[k]
+
+			highest << x.region if not hi.nil? and  x.count == hi
+			lowest  << x.region if not lo.nil? and  x.count == lo
+		end
+
+		# Go to highest count
+		unless highest.empty?
+			$logger.info "highest #{ highest }"
+			return last_select highest
+		end
+
+		# Backtrack to lowest
+		unless lowest.empty?
+			$logger.info "lowest #{ lowest }"
+			return last_select lowest
+		end
+
+		# Never mind; do them all
+		$logger.info "doing all"
+		return last_select exits.keys
 	end
 
 
@@ -224,10 +220,10 @@ class Exits
 		if delete_exit to
 			# Exits changed, need to redo
 
-			if done
+			#if done
 				$logger.info "Redoing analysis for region #{ @region }"
-				analyze_region
-			end
+				@parent.add_analyze self
+			#end
 		end
 	end
 
@@ -237,8 +233,13 @@ class Exits
 		end
 	end
 
-	def hilo_counts
+	def peak?
+		hi, lo = hilo_counts
 
+		!hi.nil? and count > hi #and !@exits.length == 1
+	end
+
+	def hilo_counts
 		highest = nil
 		lowest = nil
 
@@ -249,17 +250,17 @@ class Exits
 				return [nil, nil]
 			end
 
-			count = item.count
-			if count.nil?
+			this_count = item.count
+			if this_count.nil?
 				return [nil, nil]
 			end
 
-			if lowest.nil? or count < lowest
-				lowest = count
+			if lowest.nil? or this_count < lowest
+				lowest = this_count
 			end
 
-			if highest.nil? or count > highest
-				highest = count
+			if highest.nil? or this_count > highest
+				highest = this_count
 			end
 		end
 
@@ -284,12 +285,6 @@ class Exits
 
 		$logger.info "entered, #{ @region }"
 
-		if exits.length == 1
-			# Current region is a dead end
-			# always remove from neighbor. 
-			$logger.info "#{ @region } dead end."
-			remove_from_exits
-		end
 
 		highest, lowest = hilo_counts
 
@@ -299,11 +294,13 @@ class Exits
 			return
 		end
 
-		if highest < count
+		#if highest < count
+		if highest <= count
 			# There are no higher exits; this is effectively a dead end
 			$logger.info "Reached local max at #{ @region }"
 			remove_from_exits
-		elsif highest == count
+if false
+		#elsif highest == count
 			# Cut ties if these regions have no higher neighbor
 			each_exit do |r, item|
 				next unless item.count == highest
@@ -322,8 +319,17 @@ class Exits
 					item.delete_exit_redo @region
 				end
 			end
+end
 		end	
 
+		# Final cleanup; current region could have become
+		# a dead end after previous actions
+		if exits.length == 1
+			# Current region is a dead end
+			# always remove from neighbor. 
+			$logger.info "#{ @region } dead end."
+			remove_from_exits
+		end
 
 		# Sanity check; exit(s) we're going to,
 		# should have an exit to a different region
@@ -348,6 +354,10 @@ class Exits
 		each_exit do |k, x|
 			return false if x.nil?
 
+
+			# Only do completed regions or better
+			return false unless x.done or x.completed
+
 			# Combined isolated regions can have this. 
 			if x.count.nil?
 				$logger.info "WARNING: region #{ k } has no count."
@@ -365,13 +375,16 @@ class ExitsList
 
 	def initialize
 		@exits = {}
+		@analyze_queue = []
 	end
+
 
 	def add region, coord = nil, completed = false
 
 		x = @exits[region]
 		if not x.nil?
-			if !completed or x.completed
+			#if !completed or x.completed
+			if x.completed
 				$logger.info {
 					"#{ region } already present in exits; completed: #{ @exits[region].completed } ."
 				}
@@ -387,29 +400,8 @@ class ExitsList
 
 		liaisons = cached_liaisons.clone
 		# ensure that exits are on the target region
-		liaisons.clone.each_pair do |k,v|
-			next if v.region == k
-
-			have_hole = false
-			[ :N, :E, :S, :W ].each do |dir|
-				sq = v.neighbor dir
-				next unless sq.land?
-
-
-				if sq.region == k
-					$logger.info { "Replacing exit #{ v } with #{ sq} " }
-					liaisons[k] = sq
-
-					# If hole is the only option, use it
-					# But search further
-					break unless sq.hole?
-				end	
-			end
-
-			# Sanity check
-			$logger.debug {
-				raise "wrong region for exit point #{ liaisons[k] }!" if liaisons[k].region != k 
-			}
+		liaisons.clone.each_pair do | to, liaison|
+			liaisons[to] = exit_on_target liaison,to 
 		end
 
 		$logger.info "liaisons #{ liaisons }"
@@ -427,8 +419,21 @@ class ExitsList
 	end
 
 
+	def add_analyze v
+		@analyze_queue << v
+	end
+
 	def analyze_regions
-		# Update counts
+		$logger.info { "entered, #{ @analyze_queue.length } items in queue" }
+
+		# Order important, take from start of queue
+		while ( v = @analyze_queue.shift )
+			# Don't check done here, we are redoing
+			v.analyze_region
+		end
+
+		$logger.info { "analyze queue done" }
+
 		@exits.each_value do |v|
 			next if v.done
 			v.analyze_region
@@ -439,19 +444,23 @@ class ExitsList
 
 
 	def show_exits
-		$logger.info {
-			str = ""
+		unless Fiber.current?
+			$logger.info {
+				str = ""
 
-			@exits.each_value do |v|
-				str << v.show
-			end
-			"exits: {\n#{ str }}"
-		}
+				@exits.each_value do |v|
+					str << v.show
+				end
+				"exits: {\n#{ str }}"
+			}
+		end
 	end
 
 
 	def select_exit_regions sq, skip_regions
 		$logger.info "entered, sq #{sq}"
+
+		return nil if @exits[sq.region].nil?
 
 		ret = @exits[sq.region].select_exit_regions skip_regions
 
@@ -459,6 +468,55 @@ class ExitsList
 		ret
 	end
 
+
+	def exit_on_target liaison, to
+		return liaison  if liaison.region == to 
+
+		have_hole = false
+		[ :N, :E, :S, :W ].each do |dir|
+			sq = liaison.neighbor dir
+			next unless sq.land?
+
+
+			if sq.region ==to 
+				$logger.info { "Replacing exit #{ liaison } with #{ sq} " }
+				liaison = sq
+
+				# If hole is the only option, use it
+				# But search further
+				break unless sq.hole?
+			end	
+		end
+
+		# Sanity check
+		$logger.debug {
+			raise "wrong region for exit point #{ liaison }!" if liaison.region != to 
+		}
+
+		liaison
+	end 
+
+	def is_peak region
+		$logger.info "entered"
+	
+		max = nil
+		item = nil
+		@exits.each_pair do | k, v |
+			return false if not v.done
+
+			# Select the highest done item
+			if max.nil? or ( not v.count.nil? and v.count >= max )
+				max = v.count
+
+				if v.done
+					item = v
+				end
+			end
+		end
+
+		$logger.info "done"
+		( max == item.count and region == item.region )
+	end
 end
 
 
@@ -622,13 +680,23 @@ class BorderPatrol
 		cached_liaisons = $region.get_liaisons region
 
 		unless cached_liaisons.nil?
-			next_regions, liaisons = cached_liaisons.to_a.transpose
+			#next_regions, liaisons = cached_liaisons.to_a.transpose
+			next_regions = []
+			liaisons = []
+			cached_liaisons.each_pair do |to,liaison|
+				next_regions << to 
+
+				# Add adjusted liaisons for each bordering region 
+				# Note that these are actually double now
+				liaisons << @exits.exit_on_target( liaison, to  )
+				liaisons << @exits.exit_on_target( liaison, region )
+			end
 
 			# Add regions to active list
 			next_regions.each do |r|
 				@regions <<  r
-				@regions -= @complete_regions
 			end
+			@regions -= @complete_regions
 
 			# Add liaisons to active list
 			done = true
@@ -693,18 +761,26 @@ class BorderPatrol
 	def action
 		changed = false
 
-		unless @regions.empty?
-			changed = get_region_liaisons  @regions[0]
-			@regions.rotate! 
+		@regions.clone.each do |r|
+			changed = true if  get_region_liaisons  @regions[0]
+			Fiber.yield
 		end
 
+		#unless @regions.empty?
+		#	changed = get_region_liaisons  @regions[0]
+		#	@regions.rotate! 
+		#end
+
+		if changed
 		$logger.info { "\n" +
 			"have regions: #{ @regions.join(", ") }\n" +
-			"Num completed regions: #{ @complete_regions.length }\n" #+
+			"Num completed regions: #{ @complete_regions.length }\n" +
 			#"have liaisons: #{ @liaisons.join(", ") }\n" +
-			#"last liaison: #{ @last_liaison }\n" +
-			#"num done liaisons: #{ @done_liaisons.length }"
+			"have #{ @liaisons.length } liaisons\n" +
+			"last liaison: #{ @last_liaison }\n" +
+			"num done liaisons: #{ @done_liaisons.length }"
 		}
+		end
 
 		changed
 	end
@@ -712,12 +788,22 @@ class BorderPatrol
 
 
 
+	$done_peak = false
 	def next_liaison sq, skip_regions
 		$logger.info "entered, sq #{sq}"
 
 		@exits.add sq.region
 
-		ret = @exits.select_exit_regions sq, skip_regions
+		if @exits.is_peak sq.region
+			$logger.info "#{ sq} is on peak region; changing strategy"
+			$done_peak = true
+		end
+
+		if $done_peak
+			ret = next_liaison1 sq, skip_regions
+		else
+			ret = @exits.select_exit_regions sq, skip_regions
+		end
 
 		
 		$logger.info "ret #{ ret }"
@@ -771,7 +857,6 @@ class BorderPatrol
 
 		end
 
-
 		$logger.info "ret #{ ret }"
 		ret
 	end
@@ -808,5 +893,18 @@ class BorderPatrol
 		end
 
 		false
+	end
+
+	def get_center  region
+		if @exits[region].nil?
+			nil
+		else
+			tmp = @exits[region].coord
+			if tmp.nil?
+				nil
+			else
+				Square.coord_to_square tmp
+			end
+		end
 	end
 end

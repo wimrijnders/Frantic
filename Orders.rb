@@ -664,7 +664,8 @@ end
 					tmp
 				else
 					$logger.info { "Defending hill #{ order_sq.to_s}." }
-					return :STAY
+					#return :STAY
+					return false
 				end
 			end 
 		end
@@ -680,11 +681,8 @@ end
 			   )
 				$logger.info { "Defending square #{ order_sq.to_s}." }
 
-				# Note: following may be a bit wasteful to call every time
-				# we are in handle orders
-				BorderPatrolFiber.clear_target order_sq
-
-				return :STAY
+				#return :STAY
+				return false
 			end 
 		end
 
@@ -700,7 +698,8 @@ if false
 				$logger.info { "#{ self.to_s } harvest target #{ sq } is water. Can't get any closer" }
 				@orders[0].offset = [ -( sq.row - self.row ), - (sq.col - self.col ) ]
 				$logger.info { "Set order offset to #{ @orders[0].offset }." }
-				return :STAY
+				#return :STAY
+				return false
 			end
 		end
 end
@@ -728,11 +727,8 @@ end
 
 			item[2]	# is a direction
 		else
-			# This should never happen any more
-
-			$logger.debug {
-				raise "Nil item from pointcache"
-			}
+			# This should never happen any more - but it does.....
+			$logger.info "WARNING: Nil item from pointcache"
 
 			false
 		end

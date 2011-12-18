@@ -8,7 +8,7 @@ require '../Config'
 live    = true
 bot_num = nil 
 turns   = AntConfig::NUM_TURNS 
-flags   = "--nolaunch --turntime=#{ AntConfig::TURN_TIME }" #-R
+flags   = "-R --nolaunch --turntime=#{ AntConfig::TURN_TIME }" #-R
 
 
 #

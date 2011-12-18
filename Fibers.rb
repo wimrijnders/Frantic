@@ -41,6 +41,10 @@ class Fiber
 				prev_yield
 			end
 		end
+
+		def current?
+			Fiber.current == @root_fiber
+		end
 	end
 end
 
@@ -441,9 +445,12 @@ class BorderPatrolFiber < WorkerFiber
 				@@list << "go"	# Note that this allows double (perhaps even more) go's in list
 			end
 		end
-		if @@obj.action
-			@@list << "go"
-		end
+
+		@@obj.action
+
+		#if @@obj.action
+		#	@@list << "go"
+		#end
 	end
 
 
@@ -473,6 +480,10 @@ class BorderPatrolFiber < WorkerFiber
 
 	def self.known_region sq
 		@@obj.known_region sq.region
+	end
+
+	def self.get_center region
+		@@obj.get_center region
 	end
 end
 

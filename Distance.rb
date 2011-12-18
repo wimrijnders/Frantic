@@ -384,12 +384,14 @@ class Distance  < AntObject
 			end
 
 			count += 1
-			$logger.info {
-				str = "Iteration: #{ count }, num active: #{ active.length }\n"
-				active[0..3].each { |a| str << "[ " + a.join(",") + "]\n" }
-
-				 "Current active:\n#{ str }"
-			}
+			unless Fiber.current?
+				$logger.info {
+					str = "Iteration: #{ count }, num active: #{ active.length }\n"
+					active[0..3].each { |a| str << "[ " + a.join(",") + "]\n" }
+	
+					 "Current active:\n#{ str }"
+				}
+			end
 		end
 
 		$timer.end :get_walk

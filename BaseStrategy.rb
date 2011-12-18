@@ -169,7 +169,7 @@ class BaseStrategy
 				end
 
 				if ant.orders? and ant2.orders? and
-				   ant.orders[0] == ant2.orders[0]
+				   ant.orders[0] == ant2.orders[0] 
 					$logger.info "Orders are the same; giving up"
 					return false
 				end
@@ -189,18 +189,28 @@ class BaseStrategy
 				ant2.evade_reset
 				ant2.clear_next_move
 				ant2.clear_targets_reached
+		
+				move2 = ant2.next_move
+				if move2 == move
+					$logger.info "#{ ant2 } wants to go back; not redoing"
 
+					# In fact, it could happen again this turn; refuse to budge
+					ant2.stay
+					return false
+				else
+					# Now, redo movement with new ant
 
-				# Now, redo movement with new ant
-
-				# NOTE: recursive call; better watch stack depth
-				list.pop
-				list << ant2
-				$logger.info { "Redoing move with #{ ant2}" }
-				return 	move_neighbors list
+					# NOTE: recursive call; better watch stack depth
+					list.pop
+					list << ant2
+					$logger.info { "Redoing move with #{ ant2}" }
+					return 	move_neighbors list
+				end
 			end
 		else
-$logger.info { "4" }
+			# If we are first mover, don't bother
+			return true if list.length == 1
+
 			# Move is open, try anything
 			[ :N, :E, :S, :W ].each do |dir|
 				if ant.move dir, nil, false
@@ -209,7 +219,6 @@ $logger.info { "4" }
 				end
 			end
 		end
-$logger.info { "5" }
 
 
 		# No decent moves...
@@ -279,7 +288,11 @@ $logger.info { "5" }
 				$logger.info "move_neighbors top level fail"
 				# Perhaps this helps to alleviate the pain 
 				# for the rest of the crowd.
-				ant.clear_first_order
+				unless ant.first_order :DEFEND or
+					ant.first_order :DEFEND_HILL 
+
+					ant.clear_first_order
+				end
 
 				#$logger.info "Forcing handle_orders"
 				#ant.handle_orders true
@@ -312,7 +325,7 @@ $logger.info { "5" }
 			#next if ant.orders?
 			next if ant.collective?
 			next if ant.harvesting?
-			next if ant.orders?
+			#next if ant.orders?
 
 			ai.turn.check_maxed_out
 

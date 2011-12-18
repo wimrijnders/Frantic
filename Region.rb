@@ -465,6 +465,17 @@ class Region
 		@liaison[ from ]
 	end
 
+	def get_neighbor_regions from
+		tmp = get_liaisons from
+
+		if tmp.nil?
+			[]	
+		else
+			tmp.keys
+		end
+	end
+	
+
 
 	private
 

@@ -369,8 +369,8 @@ class AI
 				if owner==0
 
 					unless sq.moved_here?
-						$logger.info { "New ant at #{ sq }." }
 						a = MyAnt.new sq, self
+						$logger.info { "New #{ a  }." }
 						my_ants.push a
 					else
 						a = sq.moved_here 
@@ -703,7 +703,7 @@ end
 		# Anything that's left is a new ant	
 		new_enemy_ants.each do |a|
 			a.init_state unless a.state?
-			$logger.info { "New ant #{ a }" }
+			$logger.info { "leftover: New enemy ant #{ a }" }
 		end
 		found_list += new_enemy_ants
 

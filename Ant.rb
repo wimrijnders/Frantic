@@ -155,18 +155,20 @@ class MyAnt < Ant
 		#return :STAY if stuck?
 		return nil if stuck?
 
-		target = BorderPatrolFiber.request_target self.pos, self.been_there
-		unless target.nil?
-			#if @ai.aggresive?
-			#	set_order target, :DEFEND
-			#	return nil 
-			#else
+		if has_order :DEFEND or has_order :DEFEND_HILL 
+			# Let them move off the hill
+			return nil unless @ai.hills.my_hill? square.to_coord
+		else
+			return nil if orders?
+
+			target = BorderPatrolFiber.request_target self.pos, self.been_there
+			unless target.nil?
 				if set_order target, :GOTO
 					# Attempt to move in the right direction
 					item = $pointcache.get self.square, target 
 					return item[2] unless item.nil?
 				end
-			#end
+			end
 		end
 
 
