@@ -136,7 +136,7 @@ class Square
 
 	def neighbors
 		[ :N, :E, :S, :W ].each do |dir|
-			n = square.neighbor( dir )
+			n = neighbor( dir )
 			yield n if n.land?
 		end
 	end

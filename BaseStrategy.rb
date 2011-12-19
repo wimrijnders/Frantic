@@ -206,6 +206,14 @@ class BaseStrategy
 					$logger.info { "Redoing move with #{ ant2}" }
 					return 	move_neighbors list
 				end
+			else
+				# try anything
+				[ :N, :E, :S, :W ].each do |dir|
+					if ant.move dir, nil, false
+						$logger.info { "#{ ant } any move #{ dir } succeeded" }
+						return true
+					end
+				end
 			end
 		else
 			# If we are first mover, don't bother

@@ -46,17 +46,6 @@ class Exits
 			return exits.values[ 0 ]
 		end
 
-		$logger.info "keys #{ exits.keys }"
-		$logger.info "skip_regions #{skip_regions}"
-
-		# Go to regions we haven't been before
-		tmp_keys = exits.keys - skip_regions
-		unless tmp_keys.empty?
-			$logger.info "unknown #{tmp_keys}"
-			return last_select tmp_keys
-		end
-
-
 		unexplored = []
 		explored = []
 		each_exit do |k, x|
@@ -67,13 +56,8 @@ class Exits
 			end
 		end
 
-
-		# Go to unexplored regions
-		unless unexplored.empty?
-			$logger.info "unexplored #{unexplored}"
-			return last_select unexplored
-		end
-
+		$logger.info "keys #{ exits.keys }"
+		$logger.info "skip_regions #{skip_regions}"
 		hi, lo = hilo_counts
 		highest = []
 		lowest  = []
@@ -84,21 +68,46 @@ class Exits
 			lowest  << x.region if not lo.nil? and  x.count == lo
 		end
 
+
+		# Go to regions we haven't been before
+		tmp_keys = exits.keys - skip_regions
+		if tmp_keys.empty?
+
+			# Backtrack to lowest
+			unless lowest.empty?
+				$logger.info "lowest #{ lowest }"
+				return last_select lowest
+			end
+
+			$logger.info "doing all"
+			return last_select exits.keys
+		elsif tmp_keys.length == 1
+			clear_last_select
+			return exits[ tmp_keys[0] ]
+		end
+
+		# If you have a choice, try to differentiate 
+
+
+
+		# Go to unexplored regions
+		unexplored &= tmp_keys
+		unless unexplored.empty?
+			$logger.info "unexplored #{unexplored}"
+			return last_select unexplored
+		end
+
 		# Go to highest count
+		highest &= tmp_keys
 		unless highest.empty?
 			$logger.info "highest #{ highest }"
 			return last_select highest
 		end
 
-		# Backtrack to lowest
-		unless lowest.empty?
-			$logger.info "lowest #{ lowest }"
-			return last_select lowest
-		end
 
 		# Never mind; do them all
-		$logger.info "doing all"
-		return last_select exits.keys
+		$logger.info "do all selected"
+		return last_select tmp_keys
 	end
 
 
@@ -294,8 +303,7 @@ class Exits
 			return
 		end
 
-		#if highest < count
-		if highest <= count
+		if highest < count
 			# There are no higher exits; this is effectively a dead end
 			$logger.info "Reached local max at #{ @region }"
 			remove_from_exits
@@ -497,8 +505,6 @@ class ExitsList
 	end 
 
 	def is_peak region
-		$logger.info "entered"
-	
 		max = nil
 		item = nil
 		@exits.each_pair do | k, v |
@@ -514,8 +520,7 @@ class ExitsList
 			end
 		end
 
-		$logger.info "done"
-		( max == item.count and region == item.region )
+		( not item.nil? and max == item.count and region == item.region )
 	end
 end
 
@@ -625,7 +630,7 @@ class BorderPatrol
 	def add_hill_region sq
 		$logger.info "Adding region #{ sq.region } for square #{ sq }"
 
-		@regions << sq.region
+		@regions << sq.region unless @regions.include? sq.region
 		get_region_liaisons sq.region
 	end
 
@@ -666,14 +671,14 @@ class BorderPatrol
 	def get_region_liaisons region
 		if  @complete_regions.include? region
 			# This region has been handled to completion
-			return
-		else
-			if handle_region region
-				@complete_regions << region
-			end
-
-			# Do the liaisons one final time
+			return false
 		end
+
+		return false unless handle_region region
+
+		@complete_regions << region
+
+		# Do the liaisons one final time
 
 		ret = false
 
@@ -696,6 +701,7 @@ class BorderPatrol
 			next_regions.each do |r|
 				@regions <<  r
 			end
+			@regions.uniq!
 			@regions -= @complete_regions
 
 			# Add liaisons to active list
@@ -793,7 +799,9 @@ class BorderPatrol
 		$logger.info "entered, sq #{sq}"
 
 		@exits.add sq.region
+		ret = next_liaison1 sq, skip_regions
 
+if false
 		if @exits.is_peak sq.region
 			$logger.info "#{ sq} is on peak region; changing strategy"
 			$done_peak = true
@@ -804,8 +812,7 @@ class BorderPatrol
 		else
 			ret = @exits.select_exit_regions sq, skip_regions
 		end
-
-		
+end	
 		$logger.info "ret #{ ret }"
 		ret
 	end
@@ -906,5 +913,13 @@ class BorderPatrol
 				Square.coord_to_square tmp
 			end
 		end
+	end
+
+	def num_exits region
+		item = @exits[region]
+
+		return 0 if item.nil?
+
+		item.exits.length
 	end
 end

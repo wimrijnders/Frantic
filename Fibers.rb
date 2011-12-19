@@ -440,17 +440,9 @@ class BorderPatrolFiber < WorkerFiber
 
 	def action source
 		$logger.info { "doing action #{ source }" }
-		unless source == "go"
-			if @@obj.clear_liaison source
-				@@list << "go"	# Note that this allows double (perhaps even more) go's in list
-			end
-		end
+		@@obj.clear_liaison source
 
-		@@obj.action
-
-		#if @@obj.action
-		#	@@list << "go"
-		#end
+		@@obj.action if @@list.empty?
 	end
 
 
@@ -484,6 +476,10 @@ class BorderPatrolFiber < WorkerFiber
 
 	def self.get_center region
 		@@obj.get_center region
+	end
+
+	def self.num_exits region
+		@@obj.num_exits region
 	end
 end
 

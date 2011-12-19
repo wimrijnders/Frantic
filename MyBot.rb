@@ -133,17 +133,19 @@ class Strategy < BaseStrategy
 		while defend_count < threshold 
 			ant = not_defend.pop
 			break if ant.nil?
-
+		
+			region = ant.square.region
+	
 			# Only do ants right next to done-regions 
-			if $done_defend_regions.include? ant.square.region 
+			if $done_defend_regions.include? region 
 				next
 			elsif $done_defend_regions.empty? 
-				unless ai.hills.my_hill_region? ant.square.region 
+				unless ai.hills.my_hill_region? region 
 					next
 				end
 			else
 				neighbor_regions = []
-				neighbor_regions = $region.get_neighbor_regions ant.square.region
+				neighbor_regions = $region.get_neighbor_regions region
 				#$logger.info "neighbor_regions #{ neighbor_regions }"
 				neighbor_regions &= $done_defend_regions
 
@@ -151,7 +153,14 @@ class Strategy < BaseStrategy
 				$logger.info "neighbor done regions #{ neighbor_regions }"
 			end
 
-			center = BorderPatrolFiber.get_center ant.square.region
+			# Skip region with only one outward exit
+			if BorderPatrolFiber.num_exits( region ) <= 2
+				# mark it as done
+				$done_defend_regions << region
+				next
+			end
+
+			center = BorderPatrolFiber.get_center region
 			unless center.nil? 
 				$logger.info "adding defender #{ ant } to #{ center }"
 				ant.clear_order :GOTO
